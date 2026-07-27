@@ -74,9 +74,10 @@ no authentication.
 
 On the first visit, the browser asks which configured Runplan user to use. If
 the server has no users yet, the same dialog creates the first one from a
-lowercase username and full name. It remembers the choice and the most recently
-opened program for each user in browser-local storage. Use the user selector in
-the header to switch later.
+lowercase username and full name. It remembers the user choice in browser-local
+storage and persists each user's active program in the server-side user
+registry, shared with the CLI. Use the user selector in the header to switch
+later.
 
 The web server supports separate Garmin accounts without adding a Runplan login.
 Set `RUNPLAN_USERS_FILE` to a TOML file outside the project:
@@ -137,10 +138,20 @@ uv sync
 Dependencies are defined in `pyproject.toml`, while `uv.lock` pins the exact
 versions. A `requirements.txt` file is therefore not needed.
 
-## Preview a program without uploading it
+## Select and preview a user's active program
+
+Programs are isolated below the configured program root by user ID. Select the
+active program once; the web frontend updates the same setting whenever a user
+opens another program:
 
 ```bash
-uv run runplan sync ~/.local/share/runplan/programs/morgan-example-5k.yaml --dry-run
+uv run runplan user set-plan klaus marathon.yaml
+```
+
+Preview the active program without contacting Garmin:
+
+```bash
+uv run runplan sync klaus --dry-run
 ```
 
 A program file contains every program week. Runplan validates the complete
@@ -151,7 +162,7 @@ ISO format (`YYYY-Www`); weeks begin on Monday, matching Danish calendar weeks.
 Preview explicit plan week 1:
 
 ```bash
-uv run runplan sync ~/.local/share/runplan/programs/morgan-example-5k.yaml --select-weeks 1 --dry-run
+uv run runplan sync klaus --select-weeks 1 --dry-run
 ```
 
 The default output is a concise human-readable overview of weekdays,
@@ -159,7 +170,7 @@ durations, steps, and planned sync changes. Use JSON for debugging or
 automation:
 
 ```bash
-uv run runplan sync ~/.local/share/runplan/programs/morgan-example-5k.yaml --select-weeks 1 --dry-run --output json
+uv run runplan sync klaus --select-weeks 1 --dry-run --output json
 ```
 
 Select several weeks with `--select-weeks 1,3,5-7`, or pass `current`, `next`,
@@ -197,10 +208,13 @@ the target as a pace zone and can warn when the runner leaves that range.
 
 ## Garmin login
 
-Create the credentials file outside the project. Its default location is:
+Each configured Runplan user has an isolated credentials file, token store,
+sync state directory, default pace, and active program. A user created through
+the web interface receives the paths documented above. Its credentials file
+contains:
 
 ```text
-~/.config/runplan/credentials.toml
+~/.config/runplan/users/klaus/credentials.toml
 ```
 
 The file must contain:
@@ -224,12 +238,19 @@ password = "your-password"
 Then sync the current plan week and the following plan week:
 
 ```bash
-uv run runplan sync ~/.local/share/runplan/programs/morgan-example-5k.yaml
+uv run runplan sync klaus
 ```
 
-Set `GARMIN_CREDENTIALS_FILE` to use another location. The file must remain
-outside the project directory. The Garmin library stores login tokens
-separately in `~/.garminconnect`.
+The configured credentials and token paths must remain outside the project.
+Sync every configured user's active program sequentially with:
+
+```bash
+uv run runplan sync --all
+```
+
+Users without an active program are reported and skipped. Other users continue
+after a failure; the command returns a non-zero status when any attempted sync
+fails.
 
 ## Sync behavior
 
@@ -242,10 +263,12 @@ The program's `start_week` anchors these calculations.
 Use `--select-weeks` for an explicit selection such as `3`, `1,3,5-7`,
 `current`, `next`, or `all`. It is mutually exclusive with `--weeks-ahead`.
 
-Every real sync first reconciles tracked historical workouts with Garmin.
-Workouts linked to an activity become completed; past workouts without an
-activity become missed. Completed and missed workouts are retained in local
-history and are never recreated or pruned automatically. Run reconciliation
+Every real sync first reconciles tracked historical workouts and compares the
+selected plan occurrences with Garmin's scheduled workouts. A Garmin activity
+association marks a workout completed, including on the current day. Past
+workouts without an activity become missed; current and future workouts remain
+active. Completed and missed workouts are retained in local history and are
+never recreated or pruned automatically. Run legacy file-based reconciliation
 without scheduling new workouts with:
 
 ```bash
@@ -257,14 +280,13 @@ be removed. Runplan previews the diff and asks for confirmation. For controlled
 non-interactive automation, use `--prune --yes`. Completed history, missed
 workouts, past schedules, and unowned Garmin workouts are never pruned.
 
-Runplan stores Garmin IDs, names, and descriptions in
-`~/.local/state/runplan/<program-id>.json`. Keep this file while the program is
+Runplan stores Garmin IDs, names, and descriptions in each user's configured
+state directory. Keep this state while the program is
 active because it enables safe reuse and cleanup. New and updated Garmin
 workouts also contain a compact Runplan ownership marker at the end of the
 description. It contains the non-secret Runplan user ID and plan/workout
-identity, never Garmin credentials. The CLI defaults to `local-default`; set a
-stable installation value with `RUNPLAN_OWNER_ID` or `sync --owner-id` and use
-the same value for recovery.
+identity, never Garmin credentials. User-based sync always uses the stable
+Runplan user ID as the ownership ID.
 
 If local state is lost after a reinstall, preview recovery from Garmin with:
 
@@ -289,13 +311,13 @@ on the workout itself; do not include the plan name, week, or distance.
 First preview the managed workouts that would be removed:
 
 ```bash
-uv run runplan sync ~/.local/share/runplan/programs/morgan-example-5k.yaml --delete-all --dry-run
+uv run runplan sync klaus --delete-all --dry-run
 ```
 
 Then delete the program's active schedules and workout templates:
 
 ```bash
-uv run runplan sync ~/.local/share/runplan/programs/morgan-example-5k.yaml --delete-all --yes
+uv run runplan sync klaus --delete-all --yes
 ```
 
 `--yes` is required for an actual deletion. This command does not delete

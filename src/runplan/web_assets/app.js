@@ -584,10 +584,13 @@ async function loadPrograms() {
       showEmptyPrograms();
       return;
     }
+    const active = state.user.activeProgram;
     const saved = storedValue(programStorageKey(state.user.id));
-    const selected = result.programs.some((program) => program.file === saved)
-      ? saved
-      : result.programs[0].file;
+    const selected = result.programs.some((program) => program.file === active)
+      ? active
+      : result.programs.some((program) => program.file === saved)
+        ? saved
+        : result.programs[0].file;
     await loadProgram(selected);
   } catch (error) { showError(error.message); $("#program-name").textContent = "Programs unavailable"; }
 }
@@ -621,7 +624,14 @@ async function uploadProgram(file) {
 
 async function loadProgram(file) {
   clearUndoMove();
-  render(await request(`/api/programs/${encodeURIComponent(file)}?${userQuery()}`));
+  const program = await request(`/api/programs/${encodeURIComponent(file)}?${userQuery()}`);
+  const active = await request(`/api/users/${encodeURIComponent(state.user.id)}/active-program`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file }),
+  });
+  state.user = active.user;
+  state.users = state.users.map((user) => user.id === state.user.id ? state.user : user);
+  render(program);
   $("#program-select").value = file;
   storeValue(programStorageKey(state.user.id), file);
 }

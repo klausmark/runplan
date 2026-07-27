@@ -60,13 +60,11 @@ On the first visit, the browser requires selection of a server-configured
 Runplan user. When none exist, the dialog can create the first user from only a
 lowercase username and full name; the server persists non-secret configuration
 and derives isolated credential, token, and state paths. Garmin credentials are
-added separately before sync. The browser remembers the user and the filename
-of the last successfully opened program for each user in local storage. On a
-later visit, the frontend restores the user when it is still configured and
-restores that user's program when it is still included in the server's current
-program list; otherwise it asks for a user or falls back to the first available
-program. These preferences are browser-local convenience state, not
-authentication or program ownership.
+added separately before sync. The browser remembers the selected user locally,
+while each user's active program is persisted in the server-side user registry
+and shared by the web frontend and CLI. Opening a valid program updates that
+setting; `runplan user set-plan USER FILE` provides the equivalent CLI action.
+This selection is convenience state, not authentication or program ownership.
 
 Garmin sync is a separate confirmed action, never an implicit consequence of
 saving the plan. It uses the CLI's selection and synchronization use cases,
@@ -249,6 +247,14 @@ Every real sync first reconciles historical managed schedules. A Garmin
 associated activity becomes missed. Both are terminal for automatic sync and
 prune. Compact completed history remains in local state so later syncs cannot
 recreate it and future reporting can compare planned and completed training.
+Selected occurrences are also compared with Garmin before synchronization, so
+an association on the current day or after local state loss is still recorded
+as completed. Matching requires tracked Garmin IDs or valid ownership metadata.
+
+User-based CLI sync resolves the active program, credentials, tokens, default
+pace, state directory, and ownership ID from the selected profile. `sync --all`
+processes profiles sequentially, skips profiles without an active program, and
+continues after failures while returning a failure status for a partial batch.
 
 ## Recoverable Garmin ownership
 

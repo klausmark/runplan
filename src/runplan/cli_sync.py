@@ -24,7 +24,9 @@ def run_sync(args: argparse.Namespace) -> int:
     try:
         from .cli import prepare_sync_selections
 
-        compiled_selections = prepare_sync_selections(args)
+        compiled_selections = prepare_sync_selections(
+            args, fallback_pace_value=getattr(args, "fallback_pace_value", None)
+        )
         definition, compiled = compiled_selections[0]
     except WeekSelectionError as exc:
         print(f"Cannot select sync weeks: {exc}", file=sys.stderr)
@@ -56,6 +58,9 @@ def run_sync(args: argparse.Namespace) -> int:
                 prune=True,
                 today=getattr(args, "today", None),
                 owner_id=getattr(args, "owner_id", "local-default"),
+                repository=getattr(args, "repository", None),
+                credentials_file=getattr(args, "credentials_file", None),
+                token_store=getattr(args, "token_store", None),
             )
         if args.dry_run and not args.delete_all:
             from .cli import run_preview
@@ -68,9 +73,17 @@ def run_sync(args: argparse.Namespace) -> int:
                 compiled_selections,
                 today=getattr(args, "today", None),
                 owner_id=getattr(args, "owner_id", "local-default"),
+                repository=getattr(args, "repository", None),
+                credentials_file=getattr(args, "credentials_file", None),
+                token_store=getattr(args, "token_store", None),
             )
         if args.delete_all:
-            state = load_state(definition["program_id"])
+            repository = getattr(args, "repository", None)
+            state = (
+                repository.load(definition["program_id"])
+                if repository is not None
+                else load_state(definition["program_id"])
+            )
             tracked = [
                 record
                 for record in state["workouts"].values()
@@ -116,8 +129,14 @@ def run_sync(args: argparse.Namespace) -> int:
                 )
                 return 2
             try:
-                client = login_to_garmin()
-                deleted = delete_all_managed(client, definition, compiled)
+                client = login_to_garmin(
+                    credentials_file=getattr(args, "credentials_file", None),
+                    token_store=getattr(args, "token_store", None),
+                )
+                deleted = delete_all_managed(
+                    client, definition, compiled,
+                    repository=getattr(args, "repository", None),
+                )
                 print(f"\nCleanup complete: {deleted} workouts processed.")
                 return 0
             except GarminConnectAuthenticationError as exc:

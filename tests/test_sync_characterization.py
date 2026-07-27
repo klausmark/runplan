@@ -283,6 +283,37 @@ class SyncCharacterizationTests(unittest.TestCase):
         )
         self.assertEqual([], repeated.actions)
 
+    def test_selected_workout_is_completed_today_from_garmin_after_state_loss(self) -> None:
+        client = FakeGarmin()
+        selection = compiled_week(1)
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [selection],
+            owner_id="klaus",
+            today=date(2026, 12, 28),
+        )
+        mixed_schedule = next(
+            item for item in client.schedules if item["date"] == "2026-12-28"
+        )
+        mixed_schedule["associatedActivityId"] = 901
+        mixed_schedule["associatedActivityDateTime"] = "2026-12-28T10:00:00"
+        JsonStateRepository().delete("characterization-plan")
+
+        results = synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [selection],
+            owner_id="klaus",
+            today=date(2026, 12, 28),
+        )
+
+        completed = [action for result in results for action in result.actions if action.kind == "completed"]
+        self.assertEqual([901], [action.activity_id for action in completed])
+        record = load_state("characterization-plan")["workouts"]["week-01/mixed"]
+        self.assertEqual("completed", record["status"])
+        self.assertEqual(901, record["activity_id"])
+
     def test_prune_only_removes_future_active_workouts(self) -> None:
         records = {
             "week-08/past": {

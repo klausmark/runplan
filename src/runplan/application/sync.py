@@ -123,6 +123,113 @@ def reconcile_program(
     return result
 
 
+def reconcile_selected_program(
+    client: GarminClient,
+    repository: StateRepository,
+    selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
+    *,
+    owner_id: str,
+    today: date | None = None,
+) -> ReconcileResult:
+    """Reconcile Garmin calendar evidence for every selected plan occurrence."""
+    _validate_selections(selections)
+    reference_date = today or date.today()
+    program_id = selections[0][0]["program_id"]
+    state = repository.load(program_id)
+    records: dict[str, Any] = state["workouts"]
+    selected = [
+        (program["week"], definition)
+        for program, compiled in selections
+        for definition, _ in compiled
+    ]
+    dates = {definition["schedule_date"] for _, definition in selected}
+    scheduled = scheduled_items_for_dates(client, dates) if dates else []
+    remote_workouts = get_all_workouts(client)
+    owned: dict[str, dict[str, Any]] = {}
+    for remote in remote_workouts:
+        try:
+            metadata = parse_ownership(remote.get("description"))
+        except OwnershipMetadataError:
+            continue
+        if (
+            metadata is not None
+            and metadata.owner_id == owner_id
+            and metadata.program_id == program_id
+        ):
+            owned[f"week-{metadata.week:02d}/{metadata.workout_id}"] = remote
+
+    result = ReconcileResult(program_id)
+    changed = False
+    for week, definition in selected:
+        key = f"week-{week:02d}/{definition['id']}"
+        record = records.get(key)
+        occurrence = _schedule_for_record(scheduled, record) if isinstance(record, dict) else None
+        remote = owned.get(key)
+        if occurrence is None and remote is not None:
+            occurrence = next(
+                (
+                    item
+                    for item in scheduled
+                    if item.get("workoutId") == remote.get("workoutId")
+                    and item.get("date") == definition["schedule_date"]
+                ),
+                None,
+            )
+        activity_id = occurrence.get("associatedActivityId") if occurrence else None
+        if activity_id is not None:
+            if isinstance(record, dict) and record.get("status") == "completed":
+                continue
+            completed_at = occurrence.get("associatedActivityDateTime")
+            completed = {
+                "week": week,
+                "date": definition["schedule_date"],
+                "name": definition["name"],
+                "status": "completed",
+                "activity_id": activity_id,
+                "owner_id": owner_id,
+                "program_id": program_id,
+                "key": key,
+            }
+            workout_id = occurrence.get("workoutId") or (
+                remote.get("workoutId") if remote else None
+            )
+            schedule_id = occurrence.get("workoutScheduleId", occurrence.get("id"))
+            if workout_id is not None:
+                completed["workout_id"] = workout_id
+            if schedule_id is not None:
+                completed["schedule_id"] = schedule_id
+            if completed_at:
+                completed["completed_at"] = completed_at
+            records[key] = completed
+            result.add(
+                "completed",
+                definition["name"],
+                workout_id=workout_id,
+                schedule_id=schedule_id,
+                date=definition["schedule_date"],
+                activity_id=activity_id,
+                completed_at=completed_at,
+            )
+            changed = True
+        elif (
+            definition["schedule_date"] < reference_date.isoformat()
+            and isinstance(record, dict)
+            and record.get("status") not in _TERMINAL_STATUSES
+        ):
+            record["status"] = "missed"
+            result.add(
+                "missed",
+                record.get("name", definition["name"]),
+                workout_id=record.get("workout_id"),
+                schedule_id=record.get("schedule_id"),
+                date=definition["schedule_date"],
+            )
+            changed = True
+    if changed:
+        repository.save(program_id, state)
+    return result
+
+
 def _is_prunable(record: Any, reference_date: date) -> bool:
     """Return whether prune may remove this future active record."""
     return (
@@ -553,6 +660,13 @@ def synchronize_program_weeks(
     _validate_selections(selections)
     program_id = selections[0][0]["program_id"]
     reconciled = reconcile_program(client, repository, program_id, today=today)
+    selected_reconciled = reconcile_selected_program(
+        client,
+        repository,
+        selections,
+        owner_id=owner_id,
+        today=today,
+    )
     results: list[SyncResult] = []
     for program, compiled in selections:
         results.append(
@@ -566,8 +680,19 @@ def synchronize_program_weeks(
                 owner_id=owner_id,
             )
         )
-    if results and reconciled.actions:
-        results[0].actions[0:0] = reconciled.actions
+    if results:
+        reported = {
+            (action.kind, action.name, action.date, action.activity_id)
+            for result in results
+            for action in result.actions
+        }
+        reconciliation_actions: list[SyncAction] = []
+        for action in reconciled.actions + selected_reconciled.actions:
+            identity = (action.kind, action.name, action.date, action.activity_id)
+            if identity not in reported:
+                reconciliation_actions.append(action)
+                reported.add(identity)
+        results[0].actions[0:0] = reconciliation_actions
     if prune:
         reference_date = today or date.today()
         desired_keys = {
@@ -896,10 +1021,12 @@ def delete_all_managed(
     client: GarminClient,
     program: dict[str, Any],
     compiled: list[tuple[dict[str, Any], Any]],
+    *,
+    repository: StateRepository | None = None,
 ) -> int:
     """CLI-compatible wrapper for deleting program-owned Garmin workouts."""
     deleted, actions = delete_managed_workouts(
-        client, JsonStateRepository(), program, compiled
+        client, repository or JsonStateRepository(), program, compiled
     )
     _print_actions(actions)
     return deleted
@@ -911,6 +1038,7 @@ __all__ = [
     "discover_sync_state",
     "plan_program_weeks",
     "reconcile_program",
+    "reconcile_selected_program",
     "rebuild_sync_state",
     "sync_program_week",
     "synchronize_program_week",

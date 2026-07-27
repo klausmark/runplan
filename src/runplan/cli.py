@@ -151,7 +151,7 @@ def run_preview(
 ) -> int:
     """Render a prepared multi-week dry-run using the selected formatter."""
     sync_plan = plan_program_weeks(
-        JsonStateRepository(),
+        getattr(arguments, "repository", None) or JsonStateRepository(),
         selections,
         prune=getattr(arguments, "prune", False),
         today=getattr(arguments, "today", None),
@@ -168,12 +168,17 @@ def run_multi_week_sync(
     prune: bool = False,
     today: date | None = None,
     owner_id: str = "local-default",
+    repository: JsonStateRepository | None = None,
+    credentials_file: Path | None = None,
+    token_store: Path | None = None,
 ) -> int:
     """Execute additive Garmin synchronization for prepared weeks."""
     try:
-        client = login_to_garmin()
+        client = login_to_garmin(
+            credentials_file=credentials_file, token_store=token_store
+        )
         results = synchronize_program_weeks(
-            client, JsonStateRepository(), selections, prune=prune, today=today,
+            client, repository or JsonStateRepository(), selections, prune=prune, today=today,
             owner_id=owner_id,
         )
         for result in results:
@@ -197,7 +202,11 @@ def build_parser() -> argparse.ArgumentParser:
     sync_parser = commands.add_parser(
         "sync", help="Sync program weeks with Garmin Connect"
     )
-    sync_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
+    sync_target = sync_parser.add_mutually_exclusive_group(required=True)
+    sync_target.add_argument("user_id", nargs="?", help="Configured Runplan user ID")
+    sync_target.add_argument(
+        "--all", dest="all_users", action="store_true", help="Sync every configured user"
+    )
     sync_parser.add_argument("--dry-run", action="store_true")
     sync_parser.add_argument(
         "--output", choices=("overview", "json"), default="overview"
@@ -205,12 +214,15 @@ def build_parser() -> argparse.ArgumentParser:
     sync_parser.add_argument("--delete-all", action="store_true")
     sync_parser.add_argument("--prune", action="store_true")
     sync_parser.add_argument("--yes", action="store_true")
-    sync_parser.add_argument(
-        "--owner-id",
-        default=os.getenv("RUNPLAN_OWNER_ID", "local-default"),
-        help="Stable non-secret Runplan owner ID embedded in Garmin metadata",
-    )
     add_week_selectors(sync_parser, allow_weeks_ahead=True)
+
+    user_parser = commands.add_parser("user", help="Manage configured Runplan users")
+    user_commands = user_parser.add_subparsers(dest="user_command", required=True)
+    set_plan_parser = user_commands.add_parser(
+        "set-plan", help="Set a user's active program"
+    )
+    set_plan_parser.add_argument("user_id")
+    set_plan_parser.add_argument("filename")
 
     export_parser = commands.add_parser(
         "export", help="Render selected program weeks"
@@ -305,7 +317,9 @@ def run_export(arguments: Namespace) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     if arguments.command == "sync":
-        return run_sync(arguments)
+        return run_user_sync(arguments)
+    if arguments.command == "user":
+        return run_user_command(arguments)
     if arguments.command == "export":
         return run_export(arguments)
     if arguments.command == "serve":
@@ -317,6 +331,95 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "rebuild-state":
         return run_rebuild_state(arguments)
     return 2
+
+
+def _program_path(user_id: str, filename: str) -> Path:
+    """Resolve one user's active program inside the configured program root."""
+    return default_program_directory().expanduser().resolve() / user_id / filename
+
+
+def run_user_command(arguments: Namespace) -> int:
+    """Execute user configuration commands."""
+    from .users import WebError, load_user_registry
+
+    if arguments.user_command != "set-plan":
+        return 2
+    try:
+        registry = load_user_registry()
+        user = registry.get(arguments.user_id)
+        path = _program_path(user.id, arguments.filename)
+        if not path.is_file():
+            raise ValueError(f"Program not found for {user.id}: {path}")
+        load_definition_model(path)
+        registry.set_active_program(user.id, arguments.filename)
+    except (ValueError, WorkoutDefinitionError, WebError) as exc:
+        print(f"Cannot set active program: {exc}", file=sys.stderr)
+        return 2
+    print(f"Active program for {user.id}: {arguments.filename}")
+    return 0
+
+
+def _sync_one_user(arguments: Namespace, user: Any) -> int:
+    """Resolve a user profile and delegate to the existing sync adapter."""
+    if user.active_program is None:
+        print(
+            f"User {user.id} has no active program. "
+            f"Set one with: runplan user set-plan {user.id} FILE",
+            file=sys.stderr,
+        )
+        return 2
+    path = _program_path(user.id, user.active_program)
+    if not path.is_file():
+        print(f"Active program for {user.id} was not found: {path}", file=sys.stderr)
+        return 2
+    values = vars(arguments).copy()
+    values.update(
+        yaml_file=path,
+        owner_id=user.id,
+        repository=JsonStateRepository(user.state_directory),
+        credentials_file=user.credentials_file,
+        token_store=user.token_store,
+        fallback_pace_value=user.default_pace,
+    )
+    try:
+        return run_sync(Namespace(**values))
+    except SystemExit as exc:
+        print(f"Sync failed for {user.id}: {exc}", file=sys.stderr)
+        return 2
+
+
+def run_user_sync(arguments: Namespace) -> int:
+    """Synchronize one configured user or a best-effort batch of all users."""
+    from .users import WebError, load_user_registry
+
+    try:
+        registry = load_user_registry()
+    except ValueError as exc:
+        print(f"Cannot load Runplan users: {exc}", file=sys.stderr)
+        return 2
+    if not arguments.all_users:
+        try:
+            user = registry.get(arguments.user_id)
+        except WebError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        return _sync_one_user(arguments, user)
+
+    synced = skipped = failed = 0
+    for user in registry.users():
+        print(f"\nUser: {user.id} ({user.name})")
+        if user.active_program is None:
+            print("Skipped: no active program.")
+            skipped += 1
+            continue
+        result = _sync_one_user(arguments, user)
+        if result == 0:
+            synced += 1
+        else:
+            failed += 1
+            print(f"Failed: {user.id} (exit code {result}).", file=sys.stderr)
+    print(f"\nSync summary: {synced} synced, {skipped} skipped, {failed} failed.")
+    return 1 if failed else 0
 
 
 def run_reconcile(arguments: Namespace) -> int:
@@ -383,6 +486,8 @@ __all__ = [
     "run_reconcile",
     "run_rebuild_state",
     "run_sync",
+    "run_user_command",
+    "run_user_sync",
     "week_selection",
 ]
 

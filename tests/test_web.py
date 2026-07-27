@@ -50,7 +50,7 @@ class WebAssetTests(unittest.TestCase):
         self.assertNotIn('notify("Workout moved', script)
         self.assertNotIn('notify("Plan settings saved', script)
 
-    def test_user_and_program_choices_are_browser_local(self) -> None:
+    def test_user_choice_is_local_and_active_program_is_server_backed(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
 
@@ -61,6 +61,8 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn('$("#add-user-button").addEventListener', script)
         self.assertIn('const USER_STORAGE_KEY = "runplan-user"', script)
         self.assertIn('`runplan-program:${userId}`', script)
+        self.assertIn("state.user.activeProgram", script)
+        self.assertIn("/active-program", script)
         self.assertIn('request("/api/users")', script)
         self.assertIn('$("#user-dialog").showModal()', script)
         self.assertIn('id="user-settings-dialog"', html)
@@ -138,7 +140,10 @@ class UserRegistryTests(unittest.TestCase):
             second = registry.create("runner-two", "Runner Two")
             reloaded = load_user_registry(config)
 
-            self.assertEqual({"id": "sample-runner", "name": "Sample Runner"}, created)
+            self.assertEqual(
+                {"id": "sample-runner", "name": "Sample Runner", "activeProgram": None},
+                created,
+            )
             self.assertEqual([created, second], reloaded.list())
             user = reloaded.get("sample-runner")
             self.assertEqual(
@@ -221,7 +226,10 @@ state_dir = "state/sample-runner"
             registry = load_user_registry(config)
             user = registry.get("sample-runner")
 
-            self.assertEqual([{"id": "sample-runner", "name": "Sample Runner"}], registry.list())
+            self.assertEqual(
+                [{"id": "sample-runner", "name": "Sample Runner", "activeProgram": None}],
+                registry.list(),
+            )
             self.assertEqual(root / "secrets/sample-runner.toml", user.credentials_file)
             self.assertEqual(root / "tokens/sample-runner", user.token_store)
             self.assertEqual(root / "state/sample-runner", user.state_directory)
@@ -233,6 +241,19 @@ state_dir = "state/sample-runner"
         with self.assertRaises(WebError) as context:
             registry.get("unknown")
         self.assertEqual(400, context.exception.status)
+
+    def test_active_program_round_trips_without_exposing_profile_paths(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = Path(directory) / "users.toml"
+            registry = load_user_registry(config)
+            registry.create("runner", "Runner")
+
+            updated = registry.set_active_program("runner", "marathon.yaml")
+            reloaded = load_user_registry(config)
+
+            self.assertEqual("marathon.yaml", updated.active_program)
+            self.assertEqual("marathon.yaml", reloaded.get("runner").active_program)
+            self.assertEqual("marathon.yaml", reloaded.list()[0]["activeProgram"])
 
 
 class ProgramStoreTests(unittest.TestCase):
