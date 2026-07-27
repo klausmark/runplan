@@ -46,6 +46,29 @@ function clearUndoMove() {
   updateUndoControl();
 }
 
+function showEmptyPrograms() {
+  state.program = null;
+  clearUndoMove();
+  $("#program-name").textContent = "No programs yet";
+  $("#program-description").textContent = "Upload a YAML running program to get started.";
+  $("#calendar").replaceChildren();
+  $("#empty-programs").classList.remove("hidden");
+  $("#app-status").classList.add("hidden");
+  $("#program-select").disabled = true;
+  for (const selector of ["#sync-button", "#settings-button", "#export-button"]) {
+    $(selector).disabled = true;
+  }
+}
+
+function showProgramControls() {
+  $("#empty-programs").classList.add("hidden");
+  $("#app-status").classList.remove("hidden");
+  $("#program-select").disabled = false;
+  for (const selector of ["#sync-button", "#settings-button", "#export-button"]) {
+    $(selector).disabled = false;
+  }
+}
+
 function showError(message) {
   const notice = $("#notice");
   notice.textContent = message;
@@ -248,6 +271,7 @@ async function confirmSync() {
 function render(program) {
   cancelTouchDrag();
   state.program = program;
+  showProgramControls();
   $("#program-name").textContent = program.program.name;
   $("#program-description").textContent = program.program.description || "No program description";
   setAppStatus("saved", "Saved");
@@ -551,18 +575,48 @@ async function saveEdit(payload) {
 
 async function loadPrograms() {
   try {
-    const result = await request("/api/programs");
+    const result = await request(`/api/programs?${userQuery()}`);
     const select = $("#program-select");
     select.replaceChildren(...result.programs.map((program) => {
       const option = document.createElement("option"); option.value = program.file; option.textContent = program.name; return option;
     }));
-    if (!result.programs.length) throw new Error("No valid YAML programs found in the program directory.");
+    if (!result.programs.length) {
+      showEmptyPrograms();
+      return;
+    }
     const saved = storedValue(programStorageKey(state.user.id));
     const selected = result.programs.some((program) => program.file === saved)
       ? saved
       : result.programs[0].file;
     await loadProgram(selected);
-  } catch (error) { showError(error.message); $("#program-name").textContent = "No program available"; }
+  } catch (error) { showError(error.message); $("#program-name").textContent = "Programs unavailable"; }
+}
+
+async function uploadProgram(file) {
+  if (!file) return;
+  if (!/\.ya?ml$/i.test(file.name)) {
+    showError("Choose a .yaml or .yml file.");
+    return;
+  }
+  try {
+    setAppStatus("saving", "Uploading…");
+    await request("/api/programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: state.user.id,
+        filename: file.name,
+        content: await file.text(),
+      }),
+    });
+    storeValue(programStorageKey(state.user.id), file.name);
+    await loadPrograms();
+  } catch (error) {
+    if (state.program) setSaveFailure(error);
+    showError(error.message);
+  } finally {
+    $("#program-file-input").value = "";
+  }
 }
 
 async function loadProgram(file) {
@@ -734,6 +788,12 @@ async function initialize() {
 $("#program-select").addEventListener("change", (event) => {
   setMobileMenu(false, false);
   loadProgram(event.target.value).catch(error => showError(error.message));
+});
+for (const selector of ["#upload-program-button", "#empty-upload-program-button"]) {
+  $(selector).addEventListener("click", () => $("#program-file-input").click());
+}
+$("#program-file-input").addEventListener("change", (event) => {
+  uploadProgram(event.target.files[0]);
 });
 $("#user-select").addEventListener("change", (event) => {
   setMobileMenu(false, false);

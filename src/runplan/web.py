@@ -294,12 +294,17 @@ class ProgramStore:
     """Confined filesystem storage for YAML program documents."""
 
     def __init__(
-        self, root: Path, *, repository: StateRepository | None = None
+        self,
+        root: Path,
+        *,
+        repository: StateRepository | None = None,
+        user_scoped: bool = False,
     ) -> None:
         self.root = root.expanduser().resolve()
         if not self.root.is_dir():
             raise ValueError(f"Program directory does not exist: {self.root}")
         self.repository = repository or JsonStateRepository()
+        self.user_scoped = user_scoped
 
     def path(self, name: str) -> Path:
         decoded = unquote(name)
@@ -309,6 +314,59 @@ class ProgramStore:
         if path.parent != self.root:
             raise WebError(HTTPStatus.BAD_REQUEST, "Invalid program filename")
         return path
+
+    def for_user(self, user_id: str) -> ProgramStore:
+        """Return storage confined to one user's program directory."""
+        if not self.user_scoped:
+            return self
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", user_id):
+            raise WebError(HTTPStatus.BAD_REQUEST, "Invalid Runplan user")
+        root = (self.root / user_id).resolve()
+        if root.parent != self.root:
+            raise WebError(HTTPStatus.BAD_REQUEST, "Invalid Runplan user")
+        root.mkdir(parents=True, exist_ok=True)
+        return ProgramStore(root, repository=self.repository)
+
+    def upload(
+        self,
+        name: Any,
+        content: Any,
+        *,
+        repository: StateRepository | None = None,
+        fallback_pace_value: str | None = None,
+    ) -> dict[str, Any]:
+        """Validate and atomically store a new YAML program."""
+        if not isinstance(name, str):
+            raise WebError(HTTPStatus.BAD_REQUEST, "Program filename is required")
+        path = self.path(name)
+        if path.exists():
+            raise WebError(HTTPStatus.CONFLICT, "A program with that filename already exists")
+        if not isinstance(content, str) or not content.strip():
+            raise WebError(HTTPStatus.BAD_REQUEST, "Program YAML is required")
+        if len(content.encode("utf-8")) > 1_000_000:
+            raise WebError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Program YAML must be 1 MB or less")
+        try:
+            raw = _load_editable_yaml(content)
+        except RoundTripYAMLError as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, f"Invalid YAML: {exc}") from exc
+        if not isinstance(raw, dict):
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Program YAML must be an object")
+        try:
+            load_program_model(raw)
+        except WorkoutDefinitionError as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        try:
+            temporary.write_text(content, encoding="utf-8")
+            temporary.replace(path)
+        except OSError as exc:
+            temporary.unlink(missing_ok=True)
+            raise WebError(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not save program") from exc
+        return self.get(
+            name,
+            repository=repository,
+            fallback_pace_value=fallback_pace_value,
+        )
 
     def list(self) -> list[dict[str, str]]:
         result = []
@@ -651,6 +709,10 @@ class WebSyncService:
         self.client_factory = client_factory
         self.today = today
 
+    def store_for(self, user_id: str | None) -> ProgramStore:
+        user = self.users.get(user_id or self.users.default_id)
+        return self.store.for_user(user.id)
+
     def repository_for(self, user_id: str | None) -> StateRepository:
         user = self.users.get(user_id or self.users.default_id)
         return self.repository or JsonStateRepository(user.state_directory)
@@ -667,7 +729,7 @@ class WebSyncService:
             user = self.users.get(user_id or self.users.default_id)
             return prepare_sync_selections(
                 Namespace(
-                    yaml_file=self.store.path(name),
+                    yaml_file=self.store_for(user.id).path(name),
                     select_weeks=None,
                     weeks_ahead=None,
                     delete_all=False,
@@ -684,7 +746,7 @@ class WebSyncService:
         user = self.users.get(user_id)
         return prepare_sync_selections(
             Namespace(
-                yaml_file=self.store.path(name),
+                yaml_file=self.store_for(user.id).path(name),
                 select_weeks="all",
                 weeks_ahead=None,
                 delete_all=False,
@@ -700,7 +762,7 @@ class WebSyncService:
 
     def preview(self, name: str, user_id: str | None = None) -> dict[str, Any]:
         user = self.users.get(user_id or self.users.default_id)
-        revision = self.store.revision(name)
+        revision = self.store_for(user.id).revision(name)
         selections = self._selections(name, user.id)
         try:
             plan = plan_program_weeks(
@@ -753,7 +815,7 @@ class WebSyncService:
 
     def recovery_preview(self, name: str, user_id: str | None = None) -> dict[str, Any]:
         user = self.users.get(user_id or self.users.default_id)
-        revision = self.store.revision(name)
+        revision = self.store_for(user.id).revision(name)
         try:
             discovery = discover_sync_state(
                 self.client_for(user.id),
@@ -826,6 +888,16 @@ def make_handler(
                         )},
                     )
                     return
+                if urlsplit(self.path).path == "/api/programs":
+                    user = registry.get(payload.get("userId"))
+                    uploaded = sync.store_for(user.id).upload(
+                        payload.get("filename"),
+                        payload.get("content"),
+                        repository=sync.repository_for(user.id),
+                        fallback_pace_value=user.default_pace,
+                    )
+                    self._json(HTTPStatus.CREATED, uploaded)
+                    return
                 user_parts = self._api_user_parts(required=False)
                 if len(user_parts) == 2 and user_parts[1] == "settings":
                     self._json(
@@ -839,7 +911,7 @@ def make_handler(
                     repository = sync.repository_for(user.id)
                     self._json(
                         HTTPStatus.OK,
-                        store.edit(
+                        sync.store_for(user.id).edit(
                             parts[0],
                             payload,
                             repository=repository,
@@ -870,7 +942,12 @@ def make_handler(
                 self._json(HTTPStatus.OK, registry.settings(user_parts[0]))
                 return
             if parsed.path == "/api/programs":
-                self._json(HTTPStatus.OK, {"programs": store.list()})
+                user_id = query.get("user", [None])[0]
+                user = registry.get(user_id)
+                self._json(
+                    HTTPStatus.OK,
+                    {"programs": sync.store_for(user.id).list()},
+                )
                 return
             if parsed.path.startswith("/api/programs/"):
                 parts = self._api_program_parts()
@@ -879,7 +956,7 @@ def make_handler(
                 if len(parts) == 1:
                     self._json(
                         HTTPStatus.OK,
-                        store.get(
+                        sync.store_for(user.id).get(
                             parts[0],
                             repository=sync.repository_for(user.id),
                             fallback_pace_value=user.default_pace,
@@ -888,7 +965,7 @@ def make_handler(
                     return
                 if len(parts) == 2 and parts[1] == "export":
                     format_name = query.get("format", [""])[0]
-                    content, content_type, filename = store.export(
+                    content, content_type, filename = sync.store_for(user.id).export(
                         parts[0],
                         format_name,
                         fallback_pace_value=user.default_pace,
@@ -967,7 +1044,7 @@ def serve(host: str, port: int, program_dir: Path) -> int:
     users = load_user_registry()
     program_dir = program_dir.expanduser()
     program_dir.mkdir(parents=True, exist_ok=True)
-    store = ProgramStore(program_dir)
+    store = ProgramStore(program_dir, user_scoped=True)
     server = ThreadingHTTPServer((host, port), make_handler(store, users=users))
     print("WARNING: Runplan web has no authentication; use only on a trusted network.")
     print(f"Serving {store.root} for {len(users.list())} user(s) on http://{host}:{port}")

@@ -22,10 +22,11 @@ on all interfaces:
 uv run runplan serve --host 0.0.0.0 --port 8000
 ```
 
-Open `http://SERVER-IP:8000`. The web frontend lists valid `.yaml` and `.yml`
-files from `~/.local/share/runplan/programs` by default and creates that
-directory when needed. Set `RUNPLAN_PROGRAM_DIR` or pass `--program-dir` to use
-a different server-side data location. It supports plan name,
+Open `http://SERVER-IP:8000`. Each Runplan user has an isolated directory under
+`~/.local/share/runplan/programs` by default. A new user starts without programs
+and can upload a valid `.yaml` or `.yml` plan in the web frontend. Set
+`RUNPLAN_PROGRAM_DIR` or pass `--program-dir` to use a different server-side
+root directory. It supports plan name,
 description, and start-week editing, drag-and-drop workout scheduling, focused
 workout YAML editing, and YAML, Markdown, and PDF downloads.
 

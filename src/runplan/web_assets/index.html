@@ -32,6 +32,7 @@
         <div class="top-actions">
           <div class="user-control"><label class="user-picker">User <select id="user-select" aria-label="Runplan user"></select></label><button id="add-user-button" class="add-user-button" type="button">Add user</button></div>
           <label class="program-picker">Program <select id="program-select"></select></label>
+          <button id="upload-program-button" class="button secondary" type="button">Upload program</button>
           <button id="sync-button" class="button primary">Sync Garmin</button>
           <button id="user-settings-button" class="button secondary">User settings</button>
           <button id="settings-button" class="button secondary">Plan settings</button>
@@ -64,7 +65,14 @@
       </section>
 
       <div id="notice" class="notice hidden" role="alert"></div>
+      <section id="empty-programs" class="empty-state hidden">
+        <p class="eyebrow">No programs yet</p>
+        <h2>Upload your first running program</h2>
+        <p>Choose a valid Runplan YAML file. It will be stored only for the selected user.</p>
+        <button id="empty-upload-program-button" class="button primary" type="button">Upload program</button>
+      </section>
       <section id="calendar" class="calendar" aria-label="Training weeks"></section>
+      <input id="program-file-input" class="visually-hidden" type="file" accept=".yaml,.yml,application/yaml,text/yaml">
     </main>
 
     <dialog id="user-dialog" class="user-dialog">

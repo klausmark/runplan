@@ -68,6 +68,16 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn('id="user-settings-garmin-password"', html)
         self.assertIn("hasGarminPassword", script)
 
+    def test_empty_program_state_and_yaml_upload_are_packaged(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="empty-programs"', html)
+        self.assertIn('id="program-file-input"', html)
+        self.assertIn("showEmptyPrograms()", script)
+        self.assertIn('request("/api/programs", {', script)
+        self.assertIn("filename: file.name", script)
+
     def test_recovery_review_ui_is_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
@@ -480,6 +490,35 @@ weeks:
     def test_confines_program_files_to_root(self) -> None:
         with self.assertRaises(WebError):
             self.store.get("../plan.yaml")
+
+    def test_user_scoped_store_isolates_programs_and_allows_empty_users(self) -> None:
+        scoped = ProgramStore(self.root, user_scoped=True)
+
+        alice = scoped.for_user("alice")
+        bob = scoped.for_user("bob")
+
+        self.assertEqual([], alice.list())
+        self.assertEqual([], bob.list())
+        alice.upload("alice-plan.yaml", self.path.read_text(encoding="utf-8"))
+        self.assertEqual(["alice-plan.yaml"], [item["file"] for item in alice.list()])
+        self.assertEqual([], bob.list())
+
+    def test_upload_validates_yaml_and_does_not_overwrite(self) -> None:
+        empty_root = self.root / "uploads"
+        empty_root.mkdir()
+        uploads = ProgramStore(empty_root)
+
+        uploaded = uploads.upload("new-plan.yaml", self.path.read_text(encoding="utf-8"))
+        self.assertEqual("Characterization Plan", uploaded["program"]["name"])
+
+        with self.assertRaises(WebError) as conflict:
+            uploads.upload("new-plan.yaml", self.path.read_text(encoding="utf-8"))
+        self.assertEqual(409, conflict.exception.status)
+
+        with self.assertRaises(WebError) as invalid:
+            uploads.upload("broken.yaml", "program: [")
+        self.assertEqual(422, invalid.exception.status)
+        self.assertFalse((empty_root / "broken.yaml").exists())
 
 
 class WebSyncServiceTests(unittest.TestCase):
