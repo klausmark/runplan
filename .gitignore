@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local Runplan runtime data and secrets
+/.env
+/.env.*
+!/.env.example
+/credentials*.toml
+/users.toml
+/secrets/
+/tokens/
+/state/

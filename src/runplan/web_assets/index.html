@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Runplan Studio</title>
+    <script>
+      (() => {
+        let theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        try {
+          const saved = window.localStorage.getItem("runplan-theme");
+          if (saved === "light" || saved === "dark") theme = saved;
+        } catch (_) {}
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-primary">
+        <a class="brand" href="/" aria-label="Runplan Studio home">
+          <span class="brand-mark">R</span>
+          <span>Runplan <strong>Studio</strong></span>
+        </a>
+        <div class="mobile-primary-actions">
+          <button id="mobile-menu-button" class="mobile-menu-button" type="button" aria-controls="mobile-actions" aria-expanded="false"><span aria-hidden="true">☰</span><span class="visually-hidden">Open menu</span></button>
+        </div>
+      </div>
+      <div id="mobile-actions" class="topbar-actions-shell">
+        <div class="mobile-menu-heading"><strong>Menu</strong><button id="mobile-menu-close" class="icon-button" type="button" aria-label="Close menu">×</button></div>
+        <div class="top-actions">
+          <div class="user-control"><label class="user-picker">User <select id="user-select" aria-label="Runplan user"></select></label><button id="add-user-button" class="add-user-button" type="button">Add user</button></div>
+          <label class="program-picker">Program <select id="program-select"></select></label>
+          <button id="sync-button" class="button primary">Sync Garmin</button>
+          <button id="user-settings-button" class="button secondary">User settings</button>
+          <button id="settings-button" class="button secondary">Plan settings</button>
+          <div class="export-menu">
+            <button id="export-button" class="button secondary">Export</button>
+            <div id="export-options" class="menu hidden">
+              <a data-export="yaml">YAML source</a>
+              <a data-export="markdown">Markdown</a>
+              <a data-export="pdf">PDF</a>
+            </div>
+          </div>
+          <button id="theme-button" class="theme-toggle desktop-theme-toggle" type="button" data-theme-toggle aria-label="Change color theme" title="Change color theme"></button>
+        </div>
+      </div>
+    </header>
+    <button id="mobile-menu-backdrop" class="mobile-menu-backdrop" type="button" aria-label="Close menu" tabindex="-1"></button>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Training calendar</p>
+          <h1 id="program-name">Loading programs…</h1>
+          <p id="program-description" class="description"></p>
+        </div>
+        <div id="app-status" class="status-card" data-status="saved" aria-live="polite">
+          <span class="status-dot"></span>
+          <div><strong id="save-status">Saved</strong><small id="start-week"></small></div>
+          <button id="undo-move" class="status-undo hidden" type="button">Undo move</button>
+        </div>
+      </section>
+
+      <div id="notice" class="notice hidden" role="alert"></div>
+      <section id="calendar" class="calendar" aria-label="Training weeks"></section>
+    </main>
+
+    <dialog id="user-dialog" class="user-dialog">
+      <form id="user-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Welcome</p><h2 id="user-dialog-title">Choose your user</h2></div></div>
+        <p id="user-dialog-help" class="editor-help">Your choice and your most recent program are remembered only in this browser.</p>
+        <div id="existing-user-fields">
+          <label>Runplan user<select id="user-choice"></select></label>
+        </div>
+        <div id="new-user-fields" class="hidden user-fields">
+          <label>Username<input id="new-username" autocomplete="username" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxlength="50" placeholder="sample-runner"></label>
+          <label>Full name<input id="new-full-name" autocomplete="name" maxlength="100" placeholder="Sample Runner"></label>
+        </div>
+        <footer><button id="user-cancel" type="button" class="button secondary hidden">Cancel</button><button id="user-submit" class="button primary">Continue</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog">
+      <form id="settings-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Program</p><h2>Plan settings</h2></div><button type="button" class="icon-button close">×</button></div>
+        <label>Name<input id="settings-name" required></label>
+        <label>Description<textarea id="settings-description" rows="5"></textarea></label>
+        <label>Short name<input id="settings-short-name" required minlength="2" maxlength="10" pattern="[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*" placeholder="HCA26"></label>
+        <label>Start week<input id="settings-start-week" required pattern="[0-9]{4}-W[0-9]{2}" placeholder="2026-W31"></label>
+        <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save changes</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="user-settings-dialog">
+      <form id="user-settings-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Runplan user</p><h2>User settings</h2></div><button type="button" class="icon-button close">×</button></div>
+        <label>Username<input id="user-settings-username" disabled></label>
+        <label>Full name<input id="user-settings-full-name" autocomplete="name" maxlength="100" required></label>
+        <label>Default pace<input id="user-settings-default-pace" required pattern="[0-9]+:[0-5][0-9](?:-[0-9]+:[0-5][0-9])? min/km" placeholder="6:00 min/km"><small>Used to estimate distance and duration when a workout has no explicit pace.</small></label>
+        <label>Garmin email<input id="user-settings-garmin-email" type="email" autocomplete="username" required></label>
+        <label>Garmin password<input id="user-settings-garmin-password" type="password" autocomplete="current-password"><small id="user-settings-password-help">Leave blank to keep the saved password.</small></label>
+        <footer><button id="recovery-button" type="button" class="button secondary">Recover sync state</button><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save settings</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="workout-dialog" class="workout-dialog">
+      <form id="workout-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Advanced editor</p><h2 id="workout-title">Edit workout YAML</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p class="editor-help">The workout ID is stable and cannot be changed. The complete program is validated before saving.</p>
+        <textarea id="workout-yaml" class="code-editor" wrap="off" spellcheck="false" aria-label="Workout YAML"></textarea>
+        <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Validate & save</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="move-dialog">
+      <form id="move-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Calendar</p><h2 id="move-title">Move workout</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p class="editor-help">Moving to an occupied day swaps the two workouts.</p>
+        <div class="move-fields">
+          <label>Week<select id="move-week" required></select></label>
+          <label>Day<select id="move-day" required><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="7">Sunday</option></select></label>
+        </div>
+        <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Move workout</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="sync-dialog" class="sync-dialog">
+      <div class="sync-dialog-content">
+        <div class="dialog-heading"><div><p class="eyebrow">Garmin Connect</p><h2>Review sync</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p id="sync-summary" class="editor-help">Preparing sync preview…</p>
+        <div id="sync-actions" class="sync-actions" aria-live="polite"></div>
+        <p id="sync-error" class="sync-error hidden" role="alert"></p>
+        <footer><button type="button" class="button secondary close">Cancel</button><button id="sync-confirm" type="button" class="button primary" disabled>Sync Garmin</button></footer>
+      </div>
+    </dialog>
+
+    <dialog id="recovery-dialog" class="sync-dialog">
+      <div class="sync-dialog-content">
+        <div class="dialog-heading"><div><p class="eyebrow">Garmin Connect</p><h2>Recover sync state</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p id="recovery-summary" class="editor-help">Reading Garmin without making changes…</p>
+        <div id="recovery-results" class="sync-actions" aria-live="polite"></div>
+        <p id="recovery-error" class="sync-error hidden" role="alert"></p>
+        <footer><button type="button" class="button secondary close">Cancel</button><button id="recovery-confirm" type="button" class="button primary" disabled>Rebuild local state</button></footer>
+      </div>
+    </dialog>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

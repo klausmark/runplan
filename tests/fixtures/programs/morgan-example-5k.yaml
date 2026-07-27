@@ -1,0 +1,60 @@
+program:
+  id: morgan-example-beginner-5k
+  name: "Morgan Example - Beginner 5K"
+  short_name: M5K
+  description: >-
+    A fictional beginner plan used only for automated tests and documentation.
+  start_week: 2027-W01
+
+weeks:
+  - week: 1
+    focus: Establish an easy run/walk rhythm
+    workouts:
+      - id: easy-intervals-a
+        day: 1
+        name: Easy intervals A
+        description: Walk briskly and keep every running interval conversational.
+        steps:
+          - warmup: 7m
+          - repeat:
+              count: 5
+              steps:
+                - run: 1m
+                - recovery: 2m
+          - cooldown: 5m
+      - id: easy-intervals-b
+        day: 4
+        name: Easy intervals B
+        steps:
+          - warmup: 7m
+          - repeat:
+              count: 6
+              steps:
+                - run: 1m
+                - recovery: 2m
+          - cooldown: 5m
+  - week: 2
+    focus: Extend the easy running intervals
+    workouts:
+      - id: longer-intervals
+        day: 2
+        name: Longer intervals
+        steps:
+          - warmup: 7m
+          - repeat:
+              count: 5
+              steps:
+                - run: 2m
+                - recovery: 2m
+          - cooldown: 5m
+      - id: weekend-easy
+        day: 6
+        name: Weekend easy
+        steps:
+          - warmup: 7m
+          - repeat:
+              count: 4
+              steps:
+                - run: 3m
+                - recovery: 2m
+          - cooldown: 5m

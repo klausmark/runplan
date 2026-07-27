@@ -1,0 +1,33 @@
+[project]
+name = "runplan"
+version = "0.1.0"
+description = "Synchronize YAML running plans with Garmin Connect"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "garminconnect[workout]>=0.3.6",
+    "pyyaml>=6.0.3",
+    "reportlab>=4.4.0",
+    "ruamel-yaml>=0.18.0",
+]
+
+[project.scripts]
+runplan = "runplan.cli:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+runplan = ["web_assets/*.html", "web_assets/*.css", "web_assets/*.js"]
+
+[dependency-groups]
+dev = [
+    "pypdf>=6.0.0",
+]

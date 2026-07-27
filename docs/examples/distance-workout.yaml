@@ -1,0 +1,27 @@
+program:
+  id: distance-workout-example
+  name: "Distance-based step example"
+  short_name: DIST5K
+  description: >-
+    A mixed interval workout with a time-based warmup and distance-based work
+    intervals.
+  start_week: 2026-W32
+
+weeks:
+  - week: 1
+    focus: "Controlled 400-meter intervals"
+    workouts:
+      - id: intervals
+        day: 1
+        name: "400-meter intervals"
+        description: >-
+          Run the intervals evenly and use the walking recoveries for active
+          recovery.
+        steps:
+          - warmup: 10m
+          - repeat:
+              count: 5
+              steps:
+                - run: {distance: 400m, pace: "4:30-4:45 min/km"}
+                - recovery: {time: 90s}
+          - cooldown: {distance: 1km}

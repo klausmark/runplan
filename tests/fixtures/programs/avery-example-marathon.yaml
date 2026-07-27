@@ -1,0 +1,56 @@
+program:
+  id: avery-example-marathon
+  name: "Avery Example - Marathon Block"
+  short_name: AMAR
+  description: >-
+    A fictional three-week marathon block used to exercise mixed workout syntax.
+  start_week: 2027-W10
+
+weeks:
+  - week: 1
+    focus: Controlled marathon preparation
+    workouts:
+      - id: easy-run
+        day: 1
+        name: Easy run
+        steps:
+          - run: {distance: 8km}
+      - id: tempo-repeats
+        day: 4
+        name: Tempo repeats
+        steps:
+          - warmup: 10m
+          - repeat:
+              count: 3
+              steps:
+                - run: {distance: 1km, pace: "5:00-5:10 min/km"}
+                - recovery: 2m
+          - cooldown: 8m
+  - week: 2
+    focus: Peak fictional volume
+    workouts:
+      - id: medium-run
+        day: 3
+        name: Medium run
+        steps:
+          - run: {distance: 12km}
+      - id: long-run
+        day: 7
+        name: Long run
+        steps:
+          - run: {distance: 24km}
+  - week: 3
+    focus: Recovery and consolidation
+    workouts:
+      - id: recovery-run
+        day: 2
+        name: Recovery run
+        steps:
+          - run: {distance: 6km}
+      - id: progression
+        day: 6
+        name: Progression run
+        steps:
+          - warmup: 10m
+          - run: {distance: 5km, pace: "5:20-5:30 min/km"}
+          - cooldown: 8m

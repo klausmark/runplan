@@ -1,0 +1,30 @@
+Characterization Plan
+
+Stable behavior fixture
+
+Start week: 2026-W53
+Program weeks: 2
+Selected weeks: 1
+Total workouts: 2
+Estimated total duration: 47 min 42 sec
+Estimated total distance: 7.6 km
+
+------------------------------------------------------------------------
+
+Week 1 (2026-12-28 to 2027-01-03)
+Focus: Mixed steps
+Workouts this week: 2
+Estimated duration this week: 47 min 42 sec
+Estimated distance this week: 7.6 km
+
+Monday · Mixed · 8 min + 1.8 km
+Time, distance and pace
+  Warmup: 1 km
+  Repeat 2 times:
+    Run: 400 m @ 4:30-4:45 min/km
+    Recovery: 1 min 30 sec
+  Cooldown: 5 min
+
+Thursday · Easy · 5 km
+Easy run
+  Run: 5 km

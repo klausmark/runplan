@@ -1,0 +1,45 @@
+program:
+  id: riley-example-return-5k
+  name: "Riley Example - Return to 5K"
+  short_name: R5K
+  description: >-
+    A fictional cautious return-to-running plan used only as a test fixture.
+  start_week: 2027-W05
+
+weeks:
+  - week: 1
+    focus: Comfortable running without pace pressure
+    workouts:
+      - id: short-easy
+        day: 2
+        name: Short easy run
+        steps:
+          - warmup: 8m
+          - run: 15m
+          - cooldown: 5m
+      - id: relaxed-repeats
+        day: 5
+        name: Relaxed repeats
+        steps:
+          - warmup: 8m
+          - repeat:
+              count: 4
+              steps:
+                - run: 4m
+                - recovery: 2m
+          - cooldown: 5m
+  - week: 2
+    focus: Add a little continuous volume
+    workouts:
+      - id: steady-easy
+        day: 2
+        name: Steady easy run
+        steps:
+          - warmup: 8m
+          - run: 22m
+          - cooldown: 5m
+      - id: easy-five
+        day: 6
+        name: Easy five kilometres
+        steps:
+          - run: {distance: 5km}
