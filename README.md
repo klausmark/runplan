@@ -38,6 +38,39 @@ public internet. Use it only on a trusted network or behind a reverse proxy that
 provides authentication and TLS. Authentication and per-user ownership are
 tracked as required follow-up work in `PLAN.md`.
 
+### Run with Docker Compose
+
+Create the local configuration and set `RUNPLAN_HOST_IP` to an address assigned
+to the Docker host, such as its Tailscale IPv4 address. Set the desired host
+port in `RUNPLAN_HOST_PORT`:
+
+```bash
+cp .env.example .env
+# Edit .env before continuing. Find the Tailscale address with: tailscale ip -4
+```
+
+Then build and start Runplan in the background:
+
+```bash
+docker compose up -d --build
+```
+
+Open `http://RUNPLAN_HOST_IP:RUNPLAN_HOST_PORT` using the values from `.env`.
+Programs, users, Garmin credentials and tokens, and sync state are persisted in
+the `runplan-data` Docker volume. Stop the container without deleting that data
+with:
+
+```bash
+docker compose down
+```
+
+Compose requires both binding values and fails instead of listening on an
+unintended interface when either is missing. With, for example,
+`RUNPLAN_HOST_IP=100.64.0.1` and `RUNPLAN_HOST_PORT=8080`, Runplan is available
+at `http://100.64.0.1:8080` only through that host interface. Use an
+authenticated TLS reverse proxy for public exposure, since Runplan itself has
+no authentication.
+
 On the first visit, the browser asks which configured Runplan user to use. If
 the server has no users yet, the same dialog creates the first one from a
 lowercase username and full name. It remembers the choice and the most recently
