@@ -824,7 +824,12 @@ def make_handler(
                     preview.pop("_records", None)
                     self._json(HTTPStatus.OK, preview)
                     return
-            assets = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"), "/styles.css": ("styles.css", "text/css")}
+            assets = {
+                "/": ("index.html", "text/html"),
+                "/app.js": ("app.js", "text/javascript"),
+                "/styles.css": ("styles.css", "text/css"),
+                "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+            }
             asset = assets.get(parsed.path)
             if asset is None:
                 raise WebError(HTTPStatus.NOT_FOUND, "Not found")

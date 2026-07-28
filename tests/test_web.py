@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -21,6 +22,7 @@ from runplan.web import (
     WebError,
     WebSyncService,
     load_user_registry,
+    make_handler,
 )
 
 
@@ -39,6 +41,32 @@ class MemoryStateRepository:
 
 
 class WebAssetTests(unittest.TestCase):
+    def test_runplan_favicon_is_packaged_and_linked(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        favicon = (ASSET_DIR / "favicon.svg").read_text(encoding="utf-8")
+
+        self.assertIn('rel="icon" type="image/svg+xml" href="/favicon.svg"', html)
+        self.assertIn('fill="#1d6b4d"', favicon)
+        self.assertIn('stroke="#fff"', favicon)
+
+    def test_favicon_is_served_as_svg(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = ProgramStore(Path(directory))
+            handler = object.__new__(make_handler(store))
+            handler.path = "/favicon.svg"
+            handler.wfile = BytesIO()
+            handler.send_response = Mock()
+            handler.send_header = Mock()
+            handler.end_headers = Mock()
+
+            handler._get()
+
+            handler.send_response.assert_called_once_with(200)
+            handler.send_header.assert_any_call(
+                "Content-Type", "image/svg+xml; charset=utf-8"
+            )
+            self.assertTrue(handler.wfile.getvalue().startswith(b"<svg"))
+
     def test_theme_control_and_dark_palette_are_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
