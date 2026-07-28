@@ -163,8 +163,7 @@ dialog footer { display: flex; justify-content: end; gap: 10px; margin-top: 4px;
 .sync-action strong { font-size: 12px; }
 .sync-action span, .sync-action small { color: var(--muted); font-size: 11px; }
 .sync-action small { white-space: nowrap; }
-.sync-schedule, .sync-create, .sync-update { border-left: 4px solid var(--green); }
-.sync-unschedule, .sync-delete { border-left: 4px solid #b86235; }
+.sync-schedule { border-left: 4px solid var(--green); }
 .sync-warning { border-left: 4px solid #c88a20; }
 .sync-legacy { border-left: 4px solid var(--muted); }
 .sync-error { margin: 0; padding: 11px 12px; border-radius: 9px; background: #fde3df; color: #7b241a; font-size: 13px; }

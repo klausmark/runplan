@@ -139,6 +139,20 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn("/sync/recovery/preview", script)
         self.assertIn("recoveryPreview.confirmationToken", script)
 
+    def test_garmin_sync_is_one_click_without_review_dialog(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+
+        self.assertNotIn('id="sync-dialog"', html)
+        self.assertNotIn("syncPreview", script)
+        self.assertIn('$("#sync-button").addEventListener("click", syncGarmin)', script)
+        self.assertIn("confirmationToken: preview.confirmationToken", script)
+        self.assertIn('button.textContent = "Checking…"', script)
+        self.assertIn('button.textContent = "Syncing…"', script)
+        self.assertIn('button.textContent = "Done"', script)
+        self.assertIn("}, 2000);", script)
+        self.assertIn("showError(error.message)", script)
+
     def test_yaml_editor_uses_horizontal_scrolling_instead_of_wrapping(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")

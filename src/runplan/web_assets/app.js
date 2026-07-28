@@ -1,4 +1,4 @@
-const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null, syncPreview: null, recoveryPreview: null };
+const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null, recoveryPreview: null };
 const $ = (selector) => document.querySelector(selector);
 const TOUCH_DRAG_DELAY = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
@@ -194,19 +194,6 @@ function durationLabel(seconds, approximate = false) {
   return `${approximate ? "~" : ""}${value}`;
 }
 
-const syncActionLabels = {
-  create: "Create workout",
-  update: "Update workout",
-  reuse: "Workout already exists",
-  schedule: "Schedule workout",
-  already_scheduled: "Already scheduled",
-  unschedule: "Remove old schedule",
-  delete: "Delete replaced workout",
-  completed: "Completed",
-  missed: "Missed",
-  retired: "Retired",
-};
-
 const workoutStatusLabels = {
   planned: "Planned",
   scheduled: "Scheduled",
@@ -216,71 +203,38 @@ const workoutStatusLabels = {
   changed: "Changed since sync",
 };
 
-function renderSyncActions(plan) {
-  const actions = plan.actions || [];
-  $("#sync-summary").textContent = `Weeks ${plan.weeks.join(", ")} · ${actions.length} sync ${actions.length === 1 ? "action" : "actions"}`;
-  $("#sync-actions").replaceChildren(...actions.map((action) => {
-    const row = document.createElement("div");
-    row.className = `sync-action sync-${action.kind}`;
-    const text = document.createElement("div");
-    const label = document.createElement("strong");
-    label.textContent = syncActionLabels[action.kind] || action.kind;
-    const name = document.createElement("span");
-    name.textContent = action.name;
-    text.append(label, name);
-    const date = document.createElement("small");
-    date.textContent = action.date || "";
-    row.append(text, date);
-    return row;
-  }));
-}
+let syncButtonResetTimer = null;
 
-async function openSync() {
-  state.syncPreview = null;
-  setAppStatus("garmin", "Checking Garmin…");
-  $("#sync-confirm").textContent = "Sync Garmin";
-  $("#sync-summary").textContent = "Preparing sync preview…";
-  $("#sync-actions").replaceChildren();
-  $("#sync-error").classList.add("hidden");
-  $("#sync-confirm").disabled = true;
-  $("#sync-dialog").showModal();
-  try {
-    const preview = await request(`/api/programs/${encodeURIComponent(state.program.file)}/sync/preview?${userQuery()}`);
-    state.syncPreview = preview;
-    renderSyncActions(preview.plan);
-    $("#sync-confirm").disabled = false;
-    setAppStatus("garmin", "Garmin ready");
-  } catch (error) {
-    $("#sync-error").textContent = error.message;
-    $("#sync-error").classList.remove("hidden");
-    setAppStatus("failed", "Garmin check failed");
-  }
-}
-
-async function confirmSync() {
-  if (!state.syncPreview) return;
-  const button = $("#sync-confirm");
+async function syncGarmin() {
+  const button = $("#sync-button");
+  const file = state.program.file;
+  const userId = state.user.id;
+  setMobileMenu(false, false);
+  window.clearTimeout(syncButtonResetTimer);
   button.disabled = true;
-  button.textContent = "Syncing…";
-  setAppStatus("garmin", "Syncing Garmin…");
-  $("#sync-error").classList.add("hidden");
+  button.textContent = "Checking…";
+  setAppStatus("garmin", "Checking Garmin…");
   try {
-    const result = await request(`/api/programs/${encodeURIComponent(state.program.file)}/sync`, {
+    const preview = await request(
+      `/api/programs/${encodeURIComponent(file)}/sync/preview?user=${encodeURIComponent(userId)}`
+    );
+    button.textContent = "Syncing…";
+    setAppStatus("garmin", "Syncing Garmin…");
+    await request(`/api/programs/${encodeURIComponent(file)}/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: state.user.id, confirmationToken: state.syncPreview.confirmationToken }),
+      body: JSON.stringify({ userId, confirmationToken: preview.confirmationToken }),
     });
-    const actions = result.results.flatMap((item) => item.actions);
-    renderSyncActions({ weeks: result.weeks, actions });
-    $("#sync-summary").textContent = `Sync complete · ${actions.length} ${actions.length === 1 ? "action" : "actions"}`;
-    await loadProgram(state.program.file);
+    if (state.user.id === userId && state.program?.file === file) await loadProgram(file);
     setAppStatus("garmin", "Garmin synced");
     button.textContent = "Done";
-    button.disabled = false;
-    state.syncPreview = null;
+    button.disabled = true;
+    syncButtonResetTimer = window.setTimeout(() => {
+      button.textContent = "Sync Garmin";
+      button.disabled = !state.program;
+    }, 2000);
   } catch (error) {
-    $("#sync-error").textContent = error.message;
-    $("#sync-error").classList.remove("hidden");
+    showError(error.message);
     button.textContent = "Sync Garmin";
     button.disabled = false;
     setAppStatus("failed", "Garmin sync failed");
@@ -799,7 +753,6 @@ async function selectUser(userId, persist = true) {
   if (!user) throw new Error("The selected Runplan user is no longer available.");
   state.user = user;
   state.program = null;
-  state.syncPreview = null;
   $("#user-select").value = user.id;
   if (persist) storeValue(USER_STORAGE_KEY, user.id);
   await loadPrograms();
@@ -888,12 +841,8 @@ $("#user-settings-button").addEventListener("click", async () => {
     $("#user-settings-dialog").showModal();
   } catch (error) { showError(error.message); }
 });
-$("#sync-button").addEventListener("click", () => openSync());
+$("#sync-button").addEventListener("click", syncGarmin);
 $("#undo-move").addEventListener("click", undoLastMove);
-$("#sync-confirm").addEventListener("click", () => state.syncPreview ? confirmSync() : $("#sync-dialog").close());
-$("#sync-dialog").addEventListener("close", () => {
-  if (["Checking Garmin…", "Garmin ready"].includes($("#save-status").textContent)) setAppStatus("saved", "Saved");
-});
 $("#recovery-button").addEventListener("click", () => openRecovery());
 $("#recovery-confirm").addEventListener("click", () => state.recoveryPreview ? confirmRecovery() : $("#recovery-dialog").close());
 document.querySelectorAll("dialog .close").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
