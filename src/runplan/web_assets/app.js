@@ -13,6 +13,7 @@ function storeValue(key, value) {
 }
 
 function programStorageKey(userId) { return `runplan-program:${userId}`; }
+function weekOpenStorageKey(userId, programId, week) { return `runplan-week-open:${userId}:${programId}:${week}`; }
 function userQuery() { return `user=${encodeURIComponent(state.user.id)}`; }
 
 async function request(url, options = {}) {
@@ -161,6 +162,24 @@ function addDays(iso, days) {
   return value.toISOString().slice(0, 10);
 }
 
+function localIsoDate(value = new Date()) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isPastWeek(startDate, today = localIsoDate()) {
+  return addDays(startDate, 6) < today;
+}
+
+function storedWeekOpen(userId, programId, week) {
+  const value = storedValue(weekOpenStorageKey(userId, programId, week));
+  if (value === "open") return true;
+  if (value === "closed") return false;
+  return null;
+}
+
 function distanceLabel(meters, approximate = false) {
   const kilometers = meters / 1000;
   const value = new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(kilometers);
@@ -279,9 +298,11 @@ function render(program) {
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const calendar = $("#calendar");
   calendar.replaceChildren(...program.weeks.map((week) => {
-    const section = document.createElement("article");
+    const section = document.createElement("details");
     section.className = "week";
-    const heading = document.createElement("header");
+    const savedOpen = storedWeekOpen(state.user.id, program.program.id, week.week);
+    section.open = savedOpen ?? !isPastWeek(week.start_date);
+    const heading = document.createElement("summary");
     heading.className = "week-heading";
     const title = document.createElement("h2");
     title.textContent = `Week ${week.week}`;
@@ -317,6 +338,13 @@ function render(program) {
       days.append(cell);
     }
     section.append(heading, days);
+    section.addEventListener("toggle", (event) => {
+      if (!event.isTrusted) return;
+      storeValue(
+        weekOpenStorageKey(state.user.id, program.program.id, week.week),
+        section.open ? "open" : "closed",
+      );
+    });
     return section;
   }));
 }

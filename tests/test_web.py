@@ -81,6 +81,19 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn('request("/api/programs", {', script)
         self.assertIn("filename: file.name", script)
 
+    def test_past_weeks_are_locally_persisted_collapsible_details(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('document.createElement("details")', script)
+        self.assertIn('document.createElement("summary")', script)
+        self.assertIn("addDays(startDate, 6) < today", script)
+        self.assertIn("runplan-week-open:${userId}:${programId}:${week}", script)
+        self.assertIn('section.open ? "open" : "closed"', script)
+        self.assertIn(".week:not([open]) > .week-heading", styles)
+        self.assertIn(".week-heading:focus-visible", styles)
+        self.assertIn("prefers-reduced-motion", styles)
+
     def test_recovery_review_ui_is_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

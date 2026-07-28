@@ -89,7 +89,13 @@ main { width: min(1500px, 94vw); margin: 0 auto; padding: 46px 0 80px; }
 .empty-state h2 { margin: 5px 0 10px; font: 500 30px Georgia, serif; }
 .empty-state > p:not(.eyebrow) { margin: 0 auto 24px; color: var(--muted); line-height: 1.55; }
 .week { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px var(--shadow); }
-.week-heading { display: flex; justify-content: space-between; align-items: center; padding: 17px 20px; border-bottom: 1px solid var(--line); }
+.week-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 17px 20px; border-bottom: 1px solid var(--line); cursor: pointer; list-style: none; }
+.week-heading::-webkit-details-marker { display: none; }
+.week-heading::after { content: ""; flex: 0 0 auto; width: 8px; height: 8px; margin-left: 2px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 160ms ease; }
+.week[open] > .week-heading::after { transform: rotate(225deg); }
+.week:not([open]) > .week-heading { border-bottom-color: transparent; }
+.week-heading:hover { background: var(--paper); }
+.week-heading:focus-visible { outline: 3px solid var(--green); outline-offset: -3px; }
 .week-heading h2 { font: 600 21px Georgia, serif; margin: 0; }
 .week-heading p { color: var(--muted); margin: 0; font-size: 13px; }
 .week-details { display: flex; align-items: baseline; justify-content: end; gap: 14px; text-align: right; }
@@ -184,7 +190,10 @@ dialog footer { display: flex; justify-content: end; gap: 10px; margin-top: 4px;
   .export-menu, .export-menu .button { width: 100%; }
   .desktop-theme-toggle { grid-column: 2; justify-self: end; }
   .hero { align-items: start; flex-direction: column; }
-  .week-heading { align-items: start; }
+  .week-heading { align-items: start; gap: 10px; }
+  .week-heading h2 { flex: 0 0 auto; }
+  .week-heading::after { margin-top: 6px; }
+  .week-details { min-width: 0; }
   .week-details { align-items: end; flex-direction: column-reverse; gap: 4px; }
   .status-card { min-width: 0; }
   main { width: 92vw; padding-top: 28px; }
@@ -202,4 +211,5 @@ dialog footer { display: flex; justify-content: end; gap: 10px; margin-top: 4px;
 }
 @media (prefers-reduced-motion: reduce) {
   .topbar-actions-shell, .mobile-menu-backdrop { transition: none; }
+  .week-heading::after { transition: none; }
 }
