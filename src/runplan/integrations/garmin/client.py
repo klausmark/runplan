@@ -98,6 +98,26 @@ def scheduled_items_for_dates(
         year, month = (int(part) for part in month_key.split("-"))
         calendar = client.get_scheduled_workouts(year, month)
         items.extend(calendar.get("calendarItems", []))
+    unique_items: list[dict[str, Any]] = []
+    seen_items: set[tuple[Any, ...]] = set()
+    for item in items:
+        item_date = item.get("date", item.get("calendarDate"))
+        if item_date not in dates:
+            continue
+        item_type = item.get("itemType")
+        item_id = item.get("id")
+        workout = item.get("workout") if isinstance(item.get("workout"), dict) else {}
+        workout_id = item.get("workoutId", workout.get("workoutId"))
+        identity = (
+            (item_type, "id", item_id)
+            if item_id is not None
+            else (item_type, "fallback", item_date, workout_id)
+        )
+        if identity in seen_items:
+            continue
+        seen_items.add(identity)
+        unique_items.append(item)
+    items = unique_items
     normalized = []
     for item in items:
         if item.get("itemType") != "workout":
@@ -114,11 +134,11 @@ def scheduled_items_for_dates(
             }
         )
     relevant_workouts = {
-        item.get("workoutId"): item
+        (item.get("workoutId"), item.get("date")): item
         for item in normalized
         if item.get("date") in dates and item.get("workoutId") is not None
     }
-    associated: set[Any] = set()
+    associated: set[tuple[Any, str]] = set()
     for item in items:
         if item.get("itemType") != "activity" or item.get("date") not in dates:
             continue
@@ -131,12 +151,14 @@ def scheduled_items_for_dates(
         metadata = metadata if isinstance(metadata, dict) else {}
         details = details if isinstance(details, dict) else {}
         workout_id = metadata.get("associatedWorkoutId")
-        occurrence = relevant_workouts.get(workout_id)
+        occurrence_key = (workout_id, item.get("date"))
+        occurrence = relevant_workouts.get(occurrence_key)
         if occurrence is None:
             continue
-        if workout_id in associated:
+        if occurrence_key in associated:
             raise RuntimeError(
-                f"Multiple Garmin activities are associated with workoutId={workout_id}"
+                "Multiple Garmin activities are associated with "
+                f"workoutId={workout_id} on {item.get('date')}"
             )
         distance = details.get("distance")
         duration = details.get("duration")
@@ -157,7 +179,7 @@ def scheduled_items_for_dates(
         )
         occurrence["actualDistanceMeters"] = float(distance)
         occurrence["actualDurationSeconds"] = float(duration)
-        associated.add(workout_id)
+        associated.add(occurrence_key)
 
     # Older Garmin responses expose the activity ID directly on the workout.
     # Fetch its summary as well so every completed record has actual totals.

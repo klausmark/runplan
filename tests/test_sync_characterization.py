@@ -1073,6 +1073,52 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
         self.assertEqual(11158.74, result[0]["actualDistanceMeters"])
         self.assertEqual(4057.619, result[0]["actualDurationSeconds"])
 
+    def test_overlapping_month_results_deduplicate_the_same_calendar_activity(self) -> None:
+        class CalendarClient:
+            def __init__(self) -> None:
+                self.activity_calls: list[str] = []
+
+            def get_scheduled_workouts(self, year: int, month: int) -> dict:
+                return {"calendarItems": [
+                    {"itemType": "workout", "date": "2026-07-27", "id": 20, "workoutId": 10},
+                    {"itemType": "activity", "date": "2026-07-27", "id": 900},
+                ]}
+
+            def get_activity(self, activity_id: str) -> dict:
+                self.activity_calls.append(activity_id)
+                return {
+                    "activityId": 900,
+                    "metadataDTO": {"associatedWorkoutId": 10},
+                    "summaryDTO": {"distance": 7593.39, "duration": 2489.549},
+                }
+
+        client = CalendarClient()
+        result = scheduled_items_for_dates(client, {"2026-07-27", "2026-08-02"})
+
+        self.assertEqual(["900"], client.activity_calls)
+        self.assertEqual(900, result[0]["associatedActivityId"])
+
+    def test_distinct_activities_for_the_same_workout_and_date_remain_a_conflict(self) -> None:
+        class CalendarClient:
+            def get_scheduled_workouts(self, year: int, month: int) -> dict:
+                return {"calendarItems": [
+                    {"itemType": "workout", "date": "2026-07-27", "id": 20, "workoutId": 10},
+                    {"itemType": "activity", "date": "2026-07-27", "id": 900},
+                    {"itemType": "activity", "date": "2026-07-27", "id": 901},
+                ]}
+
+            def get_activity(self, activity_id: str) -> dict:
+                return {
+                    "activityId": int(activity_id),
+                    "metadataDTO": {"associatedWorkoutId": 10},
+                    "summaryDTO": {"distance": 5000, "duration": 1800},
+                }
+
+        with self.assertRaisesRegex(
+            RuntimeError, "workoutId=10 on 2026-07-27"
+        ):
+            scheduled_items_for_dates(CalendarClient(), {"2026-07-27"})
+
 
 if __name__ == "__main__":
     unittest.main()
