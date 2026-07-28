@@ -46,8 +46,16 @@ class WebAssetTests(unittest.TestCase):
         favicon = (ASSET_DIR / "favicon.svg").read_text(encoding="utf-8")
 
         self.assertIn('rel="icon" type="image/svg+xml" href="/favicon.svg"', html)
+        self.assertIn(
+            '<img class="brand-mark" src="/favicon.svg" width="34" height="34" alt="">',
+            html,
+        )
+        self.assertNotIn('<span class="brand-mark">R</span>', html)
         self.assertIn('fill="#1d6b4d"', favicon)
-        self.assertIn('stroke="#fff"', favicon)
+        self.assertIn('<g transform="rotate(-4 32 32)">', favicon)
+        self.assertIn('fill="#fff" fill-rule="evenodd"', favicon)
+        self.assertIn("l9 7-6 6-9-7-4-3", favicon)
+        self.assertNotIn('stroke=', favicon)
 
     def test_favicon_is_served_as_svg(self) -> None:
         with TemporaryDirectory() as directory:

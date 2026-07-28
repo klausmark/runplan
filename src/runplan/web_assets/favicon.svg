@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Runplan">
-  <rect x="7" y="7" width="50" height="50" rx="15" fill="#1d6b4d" transform="rotate(-4 32 32)"/>
-  <path d="M23 47V17h12c7 0 11 4 11 10s-4 10-11 10H23m13-1 11 12" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="rotate(-4 32 32)">
+    <rect x="7" y="7" width="50" height="50" rx="15" fill="#1d6b4d"/>
+    <path fill="#fff" fill-rule="evenodd" d="M20 49V15h15c8 0 13 4.7 13 12 0 4-2.5 7.5-7 9l9 7-6 6-9-7-4-3h-3v10Zm8-27v10h7c3.6 0 6-2 6-5s-2.4-5-6-5Z"/>
+  </g>
 </svg>

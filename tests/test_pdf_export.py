@@ -2,6 +2,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import Mock
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -15,6 +16,7 @@ from runplan import (
 from runplan.parsing.yaml_loader import load_program_model
 from runplan.exporters.html import format_program_html
 from runplan.exporters.markdown import format_program_markdown
+from runplan.exporters.pdf import _draw_runplan_mark
 from runplan.presentation.program_text import format_program_text
 from tests.helpers import program_data
 
@@ -24,6 +26,19 @@ PROGRAM_FIXTURES = PROJECT_DIR / "tests" / "fixtures" / "programs"
 
 
 class PdfExportTests(unittest.TestCase):
+    def test_runplan_mark_uses_vector_geometry_instead_of_font_text(self) -> None:
+        canvas = Mock()
+        glyph = canvas.beginPath.return_value
+
+        _draw_runplan_mark(canvas, 10, 20, 64)
+
+        canvas.rotate.assert_called_once_with(4)
+        canvas.roundRect.assert_called_once_with(7, 7, 50, 50, 15, fill=1, stroke=0)
+        canvas.drawPath.assert_called_once_with(
+            glyph, fill=1, stroke=0, fillMode=0
+        )
+        canvas.drawCentredString.assert_not_called()
+
     def test_pdf_and_text_have_matching_sections_and_one_week_per_page(self) -> None:
         program = build_program_export(
             load_program_model(program_data()), WeekSelection.all()

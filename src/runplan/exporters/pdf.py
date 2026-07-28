@@ -44,34 +44,51 @@ GREEN = colors.HexColor("#1D6B4D")
 GREEN_DARK = colors.HexColor("#124D38")
 
 
-class RunplanMark(Flowable):
-    """The slightly tilted R mark used by the web application."""
+def _draw_runplan_mark(canvas: Any, x: float, y: float, size: float) -> None:
+    """Draw the canonical 64-unit Runplan mark on a ReportLab canvas."""
+    canvas.saveState()
+    canvas.translate(x + size / 2, y + size / 2)
+    # SVG uses a downward y-axis, so its -4 degree rotation is +4 in PDF space.
+    canvas.rotate(4)
+    canvas.scale(size / 64, -size / 64)
+    canvas.translate(-32, -32)
+    canvas.setFillColor(GREEN)
+    canvas.roundRect(7, 7, 50, 50, 15, fill=1, stroke=0)
 
-    def __init__(self, bold_font: str, size: float = 18 * mm) -> None:
+    glyph = canvas.beginPath()
+    glyph.moveTo(20, 49)
+    glyph.lineTo(20, 15)
+    glyph.lineTo(35, 15)
+    glyph.curveTo(43, 15, 48, 19.7, 48, 27)
+    glyph.curveTo(48, 31, 45.5, 34.5, 41, 36)
+    glyph.lineTo(50, 43)
+    glyph.lineTo(44, 49)
+    glyph.lineTo(35, 42)
+    glyph.lineTo(31, 39)
+    glyph.lineTo(28, 39)
+    glyph.lineTo(28, 49)
+    glyph.close()
+    glyph.moveTo(28, 22)
+    glyph.lineTo(28, 32)
+    glyph.lineTo(35, 32)
+    glyph.curveTo(38.6, 32, 41, 30, 41, 27)
+    glyph.curveTo(41, 24, 38.6, 22, 35, 22)
+    glyph.close()
+    canvas.setFillColor(colors.white)
+    canvas.drawPath(glyph, fill=1, stroke=0, fillMode=0)
+    canvas.restoreState()
+
+
+class RunplanMark(Flowable):
+    """The canonical Runplan mark used by the web application."""
+
+    def __init__(self, size: float = 18 * mm) -> None:
         super().__init__()
-        self.bold_font = bold_font
         self.width = size
         self.height = size
 
     def draw(self) -> None:
-        canvas = self.canv
-        canvas.saveState()
-        canvas.translate(self.width / 2, self.height / 2)
-        canvas.rotate(-4)
-        canvas.setFillColor(GREEN)
-        canvas.roundRect(
-            -self.width / 2,
-            -self.height / 2,
-            self.width,
-            self.height,
-            4 * mm,
-            fill=1,
-            stroke=0,
-        )
-        canvas.setFillColor(colors.white)
-        canvas.setFont(self.bold_font, self.height * 0.55)
-        canvas.drawCentredString(0, -self.height * 0.19, "R")
-        canvas.restoreState()
+        _draw_runplan_mark(self.canv, 0, 0, self.width)
 
 
 def register_pdf_fonts() -> tuple[str, str]:
@@ -244,9 +261,10 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
         if footer:
             canvas.setStrokeColor(LINE)
             canvas.line(18 * mm, 12 * mm, A4[0] - 18 * mm, 12 * mm)
+            _draw_runplan_mark(canvas, 18 * mm, 5.3 * mm, 5 * mm)
             canvas.setFillColor(GREEN)
             canvas.setFont(bold_font, 8)
-            canvas.drawString(18 * mm, 7.5 * mm, "R  RUNPLAN")
+            canvas.drawString(25 * mm, 7.5 * mm, "RUNPLAN")
             canvas.setFillColor(MUTED)
             canvas.setFont(regular_font, 8)
             canvas.drawRightString(A4[0] - 18 * mm, 7.5 * mm, f"Page {doc.page}")
@@ -297,7 +315,7 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
 
     story: list[Any] = [
         Spacer(1, 16 * mm),
-        RunplanMark(bold_font),
+        RunplanMark(),
         Spacer(1, 15 * mm),
         Paragraph("RUNPLAN · TRAINING PLAN", eyebrow_style),
         Paragraph(html.escape(program.name), title_style),
