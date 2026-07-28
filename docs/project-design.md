@@ -239,8 +239,12 @@ Removal requires explicit `--prune` intent. Runplan shows the structured diff
 and asks for confirmation; `--yes` is the explicit non-interactive alternative.
 Pruning is calculated against the union of every selected week and deletes only
 future active records whose ownership is verified. Completed history, missed
-workouts, and past schedules are preserved. State is persisted after each
-externally successful operation so retries can continue safely.
+workouts, and recorded activities are preserved locally. Independently of
+prune, normal sync removes owned Garmin calendar entries and uploaded workout
+templates after a workout becomes completed or missed. It then clears those
+remote IDs locally while retaining activity IDs and actual results. State is
+persisted after each externally successful operation so retries can continue
+safely.
 
 Every real sync first reconciles historical managed schedules. A Garmin
 `associatedActivityId`, or an activity summary whose
@@ -248,8 +252,10 @@ Every real sync first reconciles historical managed schedules. A Garmin
 completed. The completed record includes Garmin's actual distance and total
 duration; a past occurrence without an
 associated activity becomes missed. Both are terminal for automatic sync and
-prune. Compact completed history remains in local state so later syncs cannot
-recreate it and future reporting can compare planned and completed training.
+prune. Their owned Garmin schedule and workout template are automatically
+cleaned up, but recorded activities are never deleted. Compact terminal history
+remains in local state so later syncs cannot recreate it and future reporting
+can compare planned and completed training.
 Selected occurrences are also compared with Garmin before synchronization, so
 an association on the current day or after local state loss is still recorded
 as completed. Matching requires tracked Garmin IDs or valid ownership metadata.

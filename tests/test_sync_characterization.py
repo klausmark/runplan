@@ -20,6 +20,7 @@ from runplan import (
     sync_program_week,
 )
 from runplan.application.sync import (
+    cleanup_terminal_workouts,
     discover_sync_state,
     plan_program_weeks,
     reconcile_program,
@@ -383,8 +384,140 @@ class SyncCharacterizationTests(unittest.TestCase):
         self.assertNotIn("week-09/future", state)
         self.assertIn("week-10/completed", state)
         self.assertIn(("delete", 90), client.events)
-        self.assertNotIn(("delete", 80), client.events)
-        self.assertNotIn(("delete", 100), client.events)
+        self.assertIn(("delete", 80), client.events)
+        self.assertIn(("delete", 100), client.events)
+        self.assertNotIn("workout_id", state["week-08/past"])
+        self.assertNotIn("workout_id", state["week-10/completed"])
+
+    def test_terminal_cleanup_removes_remote_objects_but_keeps_completed_result(self) -> None:
+        record = {
+            **self._old_record(),
+            "week": 1,
+            "workout_id": 10,
+            "schedule_id": 20,
+            "date": "2026-07-20",
+            "name": "Completed workout",
+            "status": "completed",
+            "activity_id": 900,
+            "completed_at": "2026-07-20T18:30:00",
+            "actual_distance_meters": 7593.39,
+            "actual_duration_seconds": 2489.549,
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-01/completed": record}},
+        )
+        client = FakeGarmin(
+            workouts=[{
+                "workoutId": 10,
+                "workoutName": record["name"],
+                "description": record["description"],
+            }],
+            schedules=[{
+                "itemType": "workout",
+                "workoutId": 10,
+                "workoutScheduleId": 20,
+                "date": "2026-07-20",
+            }],
+        )
+
+        actions = cleanup_terminal_workouts(
+            client, JsonStateRepository(), "characterization-plan"
+        )
+
+        self.assertEqual(["unschedule", "delete"], [action.kind for action in actions])
+        cleaned = load_state("characterization-plan")["workouts"]["week-01/completed"]
+        self.assertEqual("completed", cleaned["status"])
+        self.assertEqual(900, cleaned["activity_id"])
+        self.assertEqual(7593.39, cleaned["actual_distance_meters"])
+        self.assertNotIn("schedule_id", cleaned)
+        self.assertNotIn("workout_id", cleaned)
+        self.assertNotIn(("delete", 900), client.events)
+
+    def test_terminal_cleanup_clears_ids_when_remote_objects_are_already_missing(self) -> None:
+        save_state(
+            "characterization-plan",
+            {
+                "program_id": "characterization-plan",
+                "workouts": {"week-01/missed": {
+                    "week": 1,
+                    "workout_id": 10,
+                    "schedule_id": 20,
+                    "date": "2026-07-20",
+                    "name": "Missed workout",
+                    "status": "missed",
+                }},
+            },
+        )
+        client = FakeGarmin()
+
+        actions = cleanup_terminal_workouts(
+            client, JsonStateRepository(), "characterization-plan"
+        )
+
+        self.assertEqual([], actions)
+        cleaned = load_state("characterization-plan")["workouts"]["week-01/missed"]
+        self.assertNotIn("schedule_id", cleaned)
+        self.assertNotIn("workout_id", cleaned)
+
+    def test_terminal_cleanup_preflights_ownership_before_deleting_anything(self) -> None:
+        record = {
+            **self._old_record(),
+            "workout_id": 10,
+            "schedule_id": 20,
+            "date": "2026-07-20",
+            "name": "Completed workout",
+            "status": "completed",
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-01/completed": record}},
+        )
+        client = FakeGarmin(
+            workouts=[{"workoutId": 10, "workoutName": "Someone else's workout"}],
+            schedules=[{"itemType": "workout", "workoutId": 10, "workoutScheduleId": 20, "date": "2026-07-20"}],
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "does not belong"):
+            cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
+
+        self.assertNotIn(("unschedule", 20), client.events)
+        self.assertNotIn(("delete", 10), client.events)
+
+    def test_terminal_cleanup_checkpoints_unschedule_before_delete_failure(self) -> None:
+        record = {
+            **self._old_record(),
+            "workout_id": 10,
+            "schedule_id": 20,
+            "date": "2026-07-20",
+            "name": "Missed workout",
+            "status": "missed",
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-01/missed": record}},
+        )
+
+        class DeleteFailure(FakeGarmin):
+            def delete_workout(self, workout_id: int) -> None:
+                self.events.append(("delete_failed", workout_id))
+                raise RuntimeError("simulated delete failure")
+
+        client = DeleteFailure(
+            workouts=[{
+                "workoutId": 10,
+                "workoutName": record["name"],
+                "description": record["description"],
+            }],
+            schedules=[{"itemType": "workout", "workoutId": 10, "workoutScheduleId": 20, "date": "2026-07-20"}],
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "simulated delete failure"):
+            cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
+
+        checkpoint = load_state("characterization-plan")["workouts"]["week-01/missed"]
+        self.assertNotIn("schedule_id", checkpoint)
+        self.assertEqual(10, checkpoint["workout_id"])
 
     def test_obsolete_workout_is_removed_only_after_new_week_is_complete(self) -> None:
         old = self._old_record()
@@ -808,6 +941,36 @@ class SyncCharacterizationTests(unittest.TestCase):
         self.assertEqual("completed", results[0].actions[0].kind)
         uploads = [event for event in client.events if event[0] == "upload"]
         self.assertEqual([("upload", "Week 1 - Easy")], uploads)
+
+    def test_sync_plan_includes_terminal_cleanup_outside_selected_weeks(self) -> None:
+        save_state(
+            "characterization-plan",
+            {
+                "program_id": "characterization-plan",
+                "workouts": {
+                    "week-09/completed": {
+                        "week": 9,
+                        "date": "2026-10-20",
+                        "name": "Old completed workout",
+                        "status": "completed",
+                        "workout_id": 90,
+                        "schedule_id": 190,
+                        "activity_id": 900,
+                    }
+                },
+            },
+        )
+
+        plan = plan_program_weeks(JsonStateRepository(), [compiled_week(1)])
+
+        cleanup = [
+            (action.kind, action.workout_id, action.schedule_id)
+            for action in plan.actions
+            if action.name == "Old completed workout"
+        ]
+        self.assertEqual(
+            [("unschedule", 90, 190), ("delete", 90, None)], cleanup
+        )
 
     def test_untracked_past_workouts_become_missed_instead_of_being_scheduled(self) -> None:
         selection = compiled_week(1)

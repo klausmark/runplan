@@ -28,6 +28,7 @@ _CONTENT_FIELDS = (
 )
 
 _TERMINAL_STATUSES = {"completed", "missed", "retired"}
+_CLEANUP_STATUSES = {"completed", "missed"}
 
 
 def _schedule_for_record(
@@ -344,6 +345,21 @@ def plan_program_weeks(
                             date=record.get("date"),
                         )
 
+    for key, record in sorted(records.items()):
+        if not isinstance(record, dict) or record.get("status") not in _CLEANUP_STATUSES:
+            continue
+        name = record.get("name", key)
+        if record.get("schedule_id"):
+            plan.add(
+                "unschedule",
+                name,
+                workout_id=record.get("workout_id"),
+                schedule_id=record["schedule_id"],
+                date=record.get("date"),
+            )
+        if record.get("workout_id"):
+            plan.add("delete", name, workout_id=record["workout_id"])
+
     if prune:
         for key in sorted(set(records) - desired_keys):
             record = records[key]
@@ -383,6 +399,82 @@ def _is_owned(remote: dict[str, Any], record: dict[str, Any]) -> bool:
         remote.get("workoutName") == record.get("name")
         and remote.get("description") == record.get("description")
     )
+
+
+def cleanup_terminal_workouts(
+    client: GarminClient,
+    repository: StateRepository,
+    program_id: str,
+) -> list[SyncAction]:
+    """Remove Garmin schedules/templates while retaining local terminal history."""
+    state = repository.load(program_id)
+    records: dict[str, Any] = state["workouts"]
+    terminal = [
+        (key, record)
+        for key, record in sorted(records.items())
+        if isinstance(record, dict)
+        and record.get("status") in _CLEANUP_STATUSES
+        and (record.get("schedule_id") or record.get("workout_id"))
+    ]
+    if not terminal:
+        return []
+    remote_workouts = get_all_workouts(client)
+    dates = {
+        record["date"]
+        for _, record in terminal
+        if isinstance(record.get("date"), str)
+    }
+    scheduled = scheduled_items_for_dates(client, dates) if dates else []
+    remote_by_id = {
+        item.get("workoutId"): item
+        for item in remote_workouts
+        if item.get("workoutId") is not None
+    }
+
+    # Verify every extant template before making the first destructive call.
+    for _, record in terminal:
+        remote = remote_by_id.get(record.get("workout_id"))
+        if remote is not None and not _is_owned(remote, record):
+            raise RuntimeError(
+                f"Safety stop: workoutId={record.get('workout_id')} "
+                "does not belong to the program"
+            )
+
+    actions: list[SyncAction] = []
+    for key, record in terminal:
+        name = record.get("name", key)
+        workout_id = record.get("workout_id")
+        occurrence = _schedule_for_record(scheduled, record)
+        schedule_id = (
+            occurrence.get("workoutScheduleId", occurrence.get("id"))
+            if occurrence is not None
+            else None
+        )
+        if schedule_id is not None:
+            client.unschedule_workout(schedule_id)
+            actions.append(
+                SyncAction(
+                    "unschedule",
+                    name,
+                    workout_id=workout_id,
+                    schedule_id=schedule_id,
+                    date=record.get("date"),
+                )
+            )
+        if record.pop("schedule_id", None) is not None:
+            repository.save(program_id, state)
+
+        remote = remote_by_id.get(workout_id)
+        if workout_id is not None and remote is not None:
+            client.delete_workout(workout_id)
+            actions.append(SyncAction("delete", name, workout_id=workout_id))
+        changed = False
+        for field in ("workout_id", "content_hash", "description"):
+            if record.pop(field, None) is not None:
+                changed = True
+        if changed:
+            repository.save(program_id, state)
+    return actions
 
 
 def synchronize_program_week(
@@ -677,6 +769,7 @@ def synchronize_program_weeks(
         owner_id=owner_id,
         today=today,
     )
+    cleanup_actions = cleanup_terminal_workouts(client, repository, program_id)
     results: list[SyncResult] = []
     for program, compiled in selections:
         results.append(
@@ -697,7 +790,7 @@ def synchronize_program_weeks(
             for action in result.actions
         }
         reconciliation_actions: list[SyncAction] = []
-        for action in reconciled.actions + selected_reconciled.actions:
+        for action in reconciled.actions + selected_reconciled.actions + cleanup_actions:
             identity = (action.kind, action.name, action.date, action.activity_id)
             if identity not in reported:
                 reconciliation_actions.append(action)
@@ -918,6 +1011,7 @@ def delete_managed_workouts(
 ) -> tuple[int, list[SyncAction]]:
     """Delete all verified workouts owned by a program."""
     program_id = program["program_id"]
+    actions = cleanup_terminal_workouts(client, repository, program_id)
     state = repository.load(program_id)
     records: dict[str, Any] = state["workouts"]
     remote_workouts = get_all_workouts(client)
@@ -949,7 +1043,6 @@ def delete_managed_workouts(
         if isinstance(record, dict) and isinstance(record.get("date"), str)
     }
     scheduled = scheduled_items_for_dates(client, dates) if dates else []
-    actions: list[SyncAction] = []
     deleted = 0
     for key in sorted(list(records)):
         record = records[key]
@@ -1045,6 +1138,7 @@ def delete_all_managed(
 
 
 __all__ = [
+    "cleanup_terminal_workouts",
     "delete_all_managed",
     "delete_managed_workouts",
     "discover_sync_state",

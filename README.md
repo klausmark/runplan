@@ -271,7 +271,10 @@ on the current day. Actual distance and total duration are stored with the
 completed workout in the user's YAML. Past
 workouts without an activity become missed; current and future workouts remain
 active. Completed and missed workouts are retained in local history and are
-never recreated or pruned automatically. Run legacy file-based reconciliation
+never recreated. During sync, Runplan automatically removes their Garmin
+calendar entries and uploaded workout templates after ownership verification;
+it never deletes the recorded activity. The local Garmin workout and schedule
+IDs are then cleared while the activity ID and actual result remain. Run legacy file-based reconciliation
 without scheduling new workouts with:
 
 ```bash
@@ -281,7 +284,9 @@ uv run runplan reconcile ~/.local/share/runplan/programs/morgan-example-5k.yaml
 Use `--prune` only when future managed workouts outside the selected set should
 be removed. Runplan previews the diff and asks for confirmation. For controlled
 non-interactive automation, use `--prune --yes`. Completed history, missed
-workouts, past schedules, and unowned Garmin workouts are never pruned.
+workouts, recorded activities, and unowned Garmin workouts are never pruned.
+Terminal Garmin schedules and workout templates are cleaned automatically by
+the normal sync flow and do not require `--prune`.
 
 Runplan stores lifecycle state, Garmin IDs, and completed results in a
 system-managed `tracking` section on each workout in the user's YAML. Week and
@@ -326,8 +331,9 @@ uv run runplan sync klaus --delete-all --yes
 ```
 
 `--yes` is required for an actual deletion. This command does not delete
-recorded running activities, completed or missed history, or workouts that
-cannot be verified as belonging to the program.
+recorded running activities, completed or missed local history, or workouts
+that cannot be verified as belonging to the program. It does remove verified
+Garmin schedules and uploaded templates for completed and missed workouts.
 
 ## Render a program in the terminal
 
