@@ -1,5 +1,10 @@
 """Public Python API for Runplan."""
 
+import logging
+
+
+logging.getLogger("runplan").addHandler(logging.NullHandler())
+
 from .application.sync import delete_all_managed, reconcile_program, sync_program_week
 from .application.export import ProgramExport, build_program_export
 from .cli import run_sync

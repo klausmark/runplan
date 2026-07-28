@@ -32,6 +32,7 @@ from .application.sync import (
     synchronize_program_weeks,
 )
 from .integrations.garmin.client import login_to_garmin
+from .logging_config import LOG_LEVELS
 from .presentation.json_output import format_json
 from .presentation.overview import format_overview
 from .presentation.program_text import format_program_text
@@ -244,6 +245,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     serve_parser.add_argument("--port", type=int, default=8000, help="Listen port")
     serve_parser.add_argument(
+        "--log-level",
+        choices=LOG_LEVELS,
+        type=str.upper,
+        default=os.getenv("RUNPLAN_LOG_LEVEL", "INFO").upper(),
+        help="Server log level written to stdout (default: RUNPLAN_LOG_LEVEL or INFO)",
+    )
+    serve_parser.add_argument(
         "--program-dir",
         type=Path,
         default=default_program_directory(),
@@ -259,7 +267,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_arguments(argv: Sequence[str] | None = None) -> Namespace:
-    return build_parser().parse_args(argv)
+    parser = build_parser()
+    arguments = parser.parse_args(argv)
+    if (
+        arguments.command == "serve"
+        and arguments.log_level not in LOG_LEVELS
+    ):
+        parser.error(
+            "RUNPLAN_LOG_LEVEL must be one of: " + ", ".join(LOG_LEVELS)
+        )
+    return arguments
 
 
 def run_export(arguments: Namespace) -> int:
@@ -312,7 +329,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "serve":
         from .web import serve
 
-        return serve(arguments.host, arguments.port, arguments.program_dir)
+        return serve(
+            arguments.host,
+            arguments.port,
+            arguments.program_dir,
+            log_level=arguments.log_level,
+        )
     if arguments.command == "reconcile":
         return run_reconcile(arguments)
     return 2

@@ -86,6 +86,15 @@ application can operate every configured user. Consequently this mode must
 remain limited to a trusted private network or sit behind an external
 authentication and TLS proxy.
 
+The server uses hierarchical `runplan.*` loggers with one stdout handler.
+Operational mutations are `INFO`, recoverable remote inconsistencies and client
+errors are `WARNING`, failed operations are `ERROR`, and startup failures are
+`CRITICAL`; `DEBUG` contains read traffic and request access details. Garmin is
+wrapped at the port boundary so partial external transactions are logged before
+an exception can abort the use case. Every caught exception is recorded at the
+nearest context-rich boundary without repeating the same traceback, and the
+formatter redacts secrets from both messages and tracebacks.
+
 The editing sequence deliberately progresses from calendar summaries to sync
 and high-level plan editing. A structured form-based workout editor comes last;
 the focused YAML editor remains the advanced editing path.

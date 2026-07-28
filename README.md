@@ -30,6 +30,24 @@ root directory. It supports plan name,
 description, and start-week editing, drag-and-drop workout scheduling, focused
 workout YAML editing, and YAML, Markdown, and PDF downloads.
 
+`runplan serve` writes operational logs to stdout for container and service
+log collectors. `INFO` is the default and includes YAML changes, user and plan
+changes, Garmin mutations, sync summaries, and server lifecycle events. Use
+`DEBUG` for Garmin reads and HTTP access details, or raise the threshold to
+`WARNING`, `ERROR`, or `CRITICAL`:
+
+```bash
+uv run runplan serve --log-level DEBUG
+RUNPLAN_LOG_LEVEL=WARNING uv run runplan serve
+```
+
+The CLI option overrides `RUNPLAN_LOG_LEVEL`. Recoverable missing or changed
+Garmin IDs are warnings; failed external operations and request exceptions are
+errors. Logs include safe identifiers and dates but redact e-mail addresses,
+passwords, tokens, secret paths, request bodies, YAML content, and Garmin
+payloads. Rotation and retention are delegated to Docker, systemd, or the
+surrounding runtime.
+
 Markdown and PDF downloads are generated from the YAML source and are not
 written into the source checkout. CLI exports should likewise use an output
 path in the server data or download directory.

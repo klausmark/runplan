@@ -319,6 +319,26 @@ class SyncCharacterizationTests(unittest.TestCase):
         self.assertTrue(tracked_ids.isdisjoint(original_ids))
         self.assertTrue(original_ids.issubset({item["workoutId"] for item in client.workouts}))
 
+    def test_missing_tracked_garmin_id_is_logged_before_recreation(self) -> None:
+        client = FakeGarmin()
+        selection = compiled_week(1)
+        synchronize_program_weeks(client, JsonStateRepository(), [selection])
+        missing_id = load_state("characterization-plan")["workouts"][
+            "week-01/mixed"
+        ]["workout_id"]
+        client.workouts = [
+            item for item in client.workouts if item["workoutId"] != missing_id
+        ]
+
+        with self.assertLogs("runplan.application.sync", "WARNING") as logs:
+            synchronize_program_weeks(client, JsonStateRepository(), [selection])
+
+        self.assertTrue(any(
+            f"workout_id={missing_id}" in item
+            and "Tracked Garmin workout not found; recreating" in item
+            for item in logs.output
+        ))
+
     def test_prune_only_removes_future_active_workouts(self) -> None:
         records = {
             "week-08/past": {
@@ -756,13 +776,31 @@ class SyncCharacterizationTests(unittest.TestCase):
         client.workouts[0]["description"] = "Conflicting remote workout"
         client.events.clear()
 
-        synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
+        with self.assertLogs("runplan.application.sync", "WARNING") as logs:
+            synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
 
         self.assertIn(("delete", old_id), client.events)
         record = load_state("characterization-plan")["workouts"]["week-01/mixed"]
         self.assertNotEqual(old_id, record["workout_id"])
         replacement = next(item for item in client.workouts if item["workoutId"] == record["workout_id"])
         self.assertNotIn("[runplan:", replacement.get("description") or "")
+        self.assertTrue(any("Tracked Garmin workout changed; replacing" in item for item in logs.output))
+
+    def test_missing_ids_in_garmin_responses_are_logged_as_errors(self) -> None:
+        class MissingWorkoutId(FakeGarmin):
+            def upload_running_workout(self, workout) -> dict:
+                self.events.append(("upload", workout.workoutName))
+                return {}
+
+        with (
+            self.assertLogs("runplan.application.sync", "ERROR") as logs,
+            self.assertRaisesRegex(RuntimeError, "did not return workoutId"),
+        ):
+            synchronize_program_weeks(
+                MissingWorkoutId(), JsonStateRepository(), [compiled_week(1)]
+            )
+
+        self.assertTrue(any("create response missing workout ID" in item for item in logs.output))
 
     def test_retry_after_partial_failure_reuses_completed_work(self) -> None:
         client = FakeGarmin(fail_upload_number=2)

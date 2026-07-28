@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from datetime import date
 from typing import Any
 
@@ -11,6 +12,9 @@ from .ports import GarminClient, StateRepository
 from .results import ReconcileResult, SyncAction, SyncPlan, SyncResult
 from ..integrations.garmin.client import get_all_workouts, scheduled_items_for_dates
 from ..state.json_repository import JsonStateRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 _CONTENT_FIELDS = (
@@ -106,6 +110,13 @@ def reconcile_program(
                 actual_distance_meters=record["actual_distance_meters"],
                 actual_duration_seconds=record["actual_duration_seconds"],
             )
+            logger.info(
+                "Tracked workout completed program_id=%s workout_id=%s schedule_id=%s activity_id=%s",
+                program_id,
+                record.get("workout_id"),
+                record.get("schedule_id"),
+                activity_id,
+            )
         else:
             record["status"] = "missed"
             result.add(
@@ -114,6 +125,13 @@ def reconcile_program(
                 workout_id=record.get("workout_id"),
                 schedule_id=record.get("schedule_id"),
                 date=record.get("date"),
+            )
+            logger.info(
+                "Tracked workout missed program_id=%s workout_id=%s schedule_id=%s date=%s",
+                program_id,
+                record.get("workout_id"),
+                record.get("schedule_id"),
+                record.get("date"),
             )
         changed = True
     if changed:
@@ -393,6 +411,7 @@ def cleanup_terminal_workouts(
     for key, record in terminal:
         name = record.get("name", key)
         workout_id = record.get("workout_id")
+        stored_schedule_id = record.get("schedule_id")
         occurrence = _schedule_for_record(scheduled, record)
         schedule_id = (
             occurrence.get("workoutScheduleId", occurrence.get("id"))
@@ -411,12 +430,25 @@ def cleanup_terminal_workouts(
                 )
             )
         if record.pop("schedule_id", None) is not None:
+            if schedule_id is None:
+                logger.warning(
+                    "Tracked Garmin schedule not found during terminal cleanup program_id=%s workout_id=%s stored_schedule_id=%s",
+                    program_id,
+                    workout_id,
+                    stored_schedule_id,
+                )
             repository.save(program_id, state)
 
         remote = remote_by_id.get(workout_id)
         if workout_id is not None and remote is not None:
             client.delete_workout(workout_id)
             actions.append(SyncAction("delete", name, workout_id=workout_id))
+        elif workout_id is not None:
+            logger.warning(
+                "Tracked Garmin workout not found during terminal cleanup program_id=%s workout_id=%s",
+                program_id,
+                workout_id,
+            )
         changed = False
         for field in ("workout_id", "content_hash", "description"):
             if record.pop(field, None) is not None:
@@ -502,11 +534,50 @@ def synchronize_program_week(
         if matching is not None and _remote_has_content(matching):
             reusable = reusable and _content_hash(matching) == desired_hash
 
+        if isinstance(previous, dict) and tracked_id is None:
+            logger.warning(
+                "Active workout has no tracked Garmin ID; creating workout program_id=%s key=%s workout_name=%r",
+                program_id,
+                key,
+                definition["name"],
+            )
+        elif tracked_id is not None and matching is None:
+            logger.warning(
+                "Tracked Garmin workout not found; recreating program_id=%s key=%s workout_id=%s workout_name=%r",
+                program_id,
+                key,
+                tracked_id,
+                definition["name"],
+            )
+        elif matching is not None and not reusable:
+            changed_fields: list[str] = []
+            if matching.get("workoutName") != payload.get("workoutName"):
+                changed_fields.append("name")
+            if matching.get("description") != payload.get("description"):
+                changed_fields.append("description")
+            if previous and previous.get("content_hash") != desired_hash:
+                changed_fields.append("planned_content")
+            if _remote_has_content(matching) and _content_hash(matching) != desired_hash:
+                changed_fields.append("remote_content")
+            logger.warning(
+                "Tracked Garmin workout changed; replacing program_id=%s key=%s workout_id=%s fields=%s",
+                program_id,
+                key,
+                tracked_id,
+                ",".join(changed_fields) or "unknown",
+            )
+
         if not reusable:
             replaced = previous
             uploaded = client.upload_running_workout(workout)
             workout_id = uploaded.get("workoutId")
             if not workout_id:
+                logger.error(
+                    "Garmin create response missing workout ID program_id=%s key=%s workout_name=%r",
+                    program_id,
+                    key,
+                    definition["name"],
+                )
                 raise RuntimeError(
                     f"Upload of {definition['name']!r} did not return workoutId"
                 )
@@ -533,6 +604,15 @@ def synchronize_program_week(
             None,
         )
         if schedule is None:
+            if reusable and previous and previous.get("schedule_id"):
+                logger.warning(
+                    "Tracked Garmin schedule not found or moved; recreating program_id=%s key=%s workout_id=%s schedule_id=%s date=%s",
+                    program_id,
+                    key,
+                    workout_id,
+                    previous.get("schedule_id"),
+                    definition["schedule_date"],
+                )
             schedule = client.schedule_workout(workout_id, definition["schedule_date"])
             result.add(
                 "schedule",
@@ -549,6 +629,13 @@ def synchronize_program_week(
             )
         schedule_id = schedule.get("workoutScheduleId", schedule.get("id"))
         if not schedule_id:
+            logger.error(
+                "Garmin schedule response missing schedule ID program_id=%s key=%s workout_id=%s date=%s",
+                program_id,
+                key,
+                workout_id,
+                definition["schedule_date"],
+            )
             raise RuntimeError(
                 f"Scheduling {definition['name']!r} did not return a schedule ID"
             )
@@ -607,6 +694,13 @@ def synchronize_program_week(
         if workout_id and remote is not None:
             client.delete_workout(workout_id)
             result.add("delete", record.get("name", key), workout_id=workout_id)
+        elif workout_id:
+            logger.warning(
+                "Tracked Garmin workout already missing during replacement cleanup program_id=%s key=%s workout_id=%s",
+                program_id,
+                key,
+                workout_id,
+            )
         if records.get(key) is record:
             del records[key]
         repository.save(program_id, state)
@@ -692,6 +786,13 @@ def synchronize_program_weeks(
             if workout_id and remote is not None:
                 client.delete_workout(workout_id)
                 results[-1].add("delete", name, workout_id=workout_id)
+            elif workout_id:
+                logger.warning(
+                    "Tracked Garmin workout not found during prune program_id=%s key=%s workout_id=%s",
+                    program_id,
+                    key,
+                    workout_id,
+                )
             del records[key]
             repository.save(program_id, state)
     return results
@@ -747,6 +848,13 @@ def delete_managed_workouts(
         if workout_id and remote is not None:
             client.delete_workout(workout_id)
             actions.append(SyncAction("delete", name, workout_id))
+        elif workout_id:
+            logger.warning(
+                "Tracked Garmin workout not found during delete program_id=%s key=%s workout_id=%s",
+                program_id,
+                key,
+                workout_id,
+            )
         del records[key]
         deleted += 1
         repository.save(program_id, state)

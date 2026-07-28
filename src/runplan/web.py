@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
@@ -14,6 +15,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import StringIO
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -32,6 +34,9 @@ from .domain.estimates import estimate_steps
 from .domain.selectors import WeekSelection
 from .exporters.markdown import format_program_markdown
 from .exporters.pdf import export_pdf
+from .integrations.garmin.client import login_to_garmin
+from .integrations.garmin.logging_client import LoggingGarminClient
+from .logging_config import configure_server_logging
 from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
 from .state.json_repository import JsonStateRepository
@@ -40,6 +45,7 @@ from .users import RunplanUser, UserRegistry, WebError, load_user_registry
 
 
 ASSET_DIR = Path(__file__).with_name("web_assets")
+logger = logging.getLogger(__name__)
 
 
 def _revision(text: str) -> str:
@@ -143,6 +149,12 @@ class ProgramStore:
         except OSError as exc:
             temporary.unlink(missing_ok=True)
             raise WebError(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not save program") from exc
+        logger.info(
+            "YAML program uploaded file=%s program_id=%s bytes=%d",
+            path,
+            model.id,
+            len(content.encode("utf-8")),
+        )
         return self.get(
             name,
             repository=repository,
@@ -155,7 +167,13 @@ class ProgramStore:
             try:
                 raw, text = self._read(path)
                 model = load_program_model(raw)
-            except (OSError, RoundTripYAMLError, WorkoutDefinitionError):
+            except (OSError, RoundTripYAMLError, WorkoutDefinitionError) as exc:
+                logger.warning(
+                    "Ignoring unreadable YAML program file=%s exception=%s message=%s",
+                    path,
+                    type(exc).__name__,
+                    exc,
+                )
                 continue
             result.append(
                 {"file": path.name, "id": model.id, "name": model.name, "revision": _revision(text)}
@@ -374,6 +392,27 @@ class ProgramStore:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
         rendered = _dump_editable_yaml(raw)
         self._atomic_write(path, rendered)
+        changes: list[str] = []
+        if isinstance(metadata, dict):
+            changes.extend(f"program.{field}" for field in metadata if field in {
+                "name", "short_name", "description", "start_week"
+            })
+        if isinstance(move, dict):
+            changes.append(
+                "move:"
+                f"{move.get('workout_id')}:{move.get('from_week')}->"
+                f"{move.get('to_week')}/day-{move.get('to_day')}"
+            )
+        if isinstance(workout_edit, dict):
+            changes.append(
+                f"workout:{workout_edit.get('week')}/{workout_edit.get('workout_id')}"
+            )
+        logger.info(
+            "YAML program saved file=%s changes=%s bytes=%d",
+            path,
+            ",".join(changes) or "none",
+            len(rendered.encode("utf-8")),
+        )
         return self.get(
             name,
             repository=repository,
@@ -468,31 +507,43 @@ class ProgramStore:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
         stem = path.stem
         if format_name == "markdown":
+            logger.info("Program exported file=%s format=markdown", path)
             return format_program_markdown(export).encode(), "text/markdown; charset=utf-8", f"{stem}.md"
         if format_name == "yaml":
+            logger.info("Program exported file=%s format=yaml", path)
             return path.read_bytes(), "application/yaml; charset=utf-8", path.name
         if format_name == "pdf":
             with tempfile.TemporaryDirectory() as directory:
                 output = Path(directory) / f"{stem}.pdf"
                 export_pdf(export, output, False)
+                logger.info("Program exported file=%s format=pdf", path)
                 return output.read_bytes(), "application/pdf", output.name
         raise WebError(HTTPStatus.BAD_REQUEST, "Format must be yaml, markdown, or pdf")
 
 
 def _login_for_web(user: RunplanUser) -> GarminClient:
     """Log in without allowing an MFA prompt to block the HTTP server."""
-    from .integrations.garmin.client import login_to_garmin
-
     def reject_mfa() -> str:
         raise RuntimeError(
             "Garmin requested MFA; authenticate once with the CLI before web sync"
         )
 
-    return login_to_garmin(
-        prompt_mfa=reject_mfa,
-        credentials_file=user.credentials_file,
-        token_store=user.token_store,
-    )
+    logger.info("Garmin login started user=%s", user.id)
+    try:
+        client = login_to_garmin(
+            prompt_mfa=reject_mfa,
+            credentials_file=user.credentials_file,
+            token_store=user.token_store,
+        )
+    except BaseException as exc:
+        logger.exception("Garmin login failed user=%s", user.id)
+        try:
+            setattr(exc, "_runplan_logged", True)
+        except Exception:
+            pass
+        raise
+    logger.info("Garmin login succeeded user=%s", user.id)
+    return client
 
 
 class WebSyncService:
@@ -542,7 +593,10 @@ class WebSyncService:
 
     def client_for(self, user_id: str | None) -> GarminClient:
         user = self.users.get(user_id or self.users.default_id)
-        return self.client_factory() if self.client_factory else _login_for_web(user)
+        client = self.client_factory() if self.client_factory else _login_for_web(user)
+        if isinstance(client, LoggingGarminClient):
+            return client
+        return LoggingGarminClient(client, user_id=user.id)
 
     def _selections(self, name: str, user_id: str | None = None):
         from .cli import prepare_sync_selections
@@ -598,6 +652,15 @@ class WebSyncService:
                 "The plan or sync state changed; review the sync preview again",
             )
         selections = self._selections(name, user.id)
+        weeks = [program["week"] for program, _ in selections]
+        started = perf_counter()
+        logger.info(
+            "Garmin sync started user=%s file=%s program_id=%s weeks=%s",
+            user.id,
+            name,
+            preview["plan"]["programId"],
+            ",".join(str(week) for week in weeks),
+        )
         try:
             client = self.client_for(user.id)
             results = synchronize_program_weeks(
@@ -607,12 +670,45 @@ class WebSyncService:
                 today=self.today(),
             )
         except SystemExit as exc:
+            logger.error(
+                "Garmin sync failed user=%s file=%s exception=%s message=%s",
+                user.id,
+                name,
+                type(exc).__name__,
+                exc,
+            )
             raise WebError(HTTPStatus.BAD_GATEWAY, str(exc)) from exc
         except Exception as exc:
+            log_method = (
+                logger.error
+                if getattr(exc, "_runplan_logged", False)
+                else logger.exception
+            )
+            log_method(
+                "Garmin sync failed user=%s file=%s exception=%s message=%s duration_ms=%d",
+                user.id,
+                name,
+                type(exc).__name__,
+                exc,
+                round((perf_counter() - started) * 1000),
+            )
             raise WebError(
                 HTTPStatus.BAD_GATEWAY,
                 f"Garmin sync failed: {type(exc).__name__}: {exc}",
             ) from exc
+        counts: dict[str, int] = {}
+        for result in results:
+            for action in result.actions:
+                counts[action.kind] = counts.get(action.kind, 0) + 1
+        logger.info(
+            "Garmin sync completed user=%s file=%s program_id=%s weeks=%s actions=%s duration_ms=%d",
+            user.id,
+            name,
+            preview["plan"]["programId"],
+            ",".join(str(week) for week in weeks),
+            ",".join(f"{kind}:{count}" for kind, count in sorted(counts.items())) or "none",
+            round((perf_counter() - started) * 1000),
+        )
         return {
             "userId": user.id,
             "programId": preview["plan"]["programId"],
@@ -631,12 +727,45 @@ def make_handler(
     class RunplanHandler(BaseHTTPRequestHandler):
         server_version = "RunplanWeb/0.1"
 
+        def log_message(self, format: str, *args: Any) -> None:
+            status = args[1] if len(args) > 1 else "unknown"
+            logger.debug(
+                "HTTP request client=%s method=%s path=%s status=%s",
+                self.client_address[0],
+                self.command,
+                urlsplit(self.path).path,
+                status,
+            )
+
+        def _log_web_error(self, exc: WebError) -> None:
+            cause = exc.__cause__
+            level = logging.ERROR if exc.status >= HTTPStatus.INTERNAL_SERVER_ERROR else logging.WARNING
+            logger.log(
+                level,
+                "HTTP request failed client=%s method=%s path=%s status=%d exception=%s cause=%s message=%s",
+                self.client_address[0],
+                self.command,
+                urlsplit(self.path).path,
+                exc.status,
+                type(exc).__name__,
+                type(cause).__name__ if cause is not None else "none",
+                exc,
+            )
+
         def do_GET(self) -> None:  # noqa: N802
             try:
                 self._get()
             except WebError as exc:
+                self._log_web_error(exc)
                 self._json(exc.status, {"error": str(exc)})
-            except Exception:
+            except Exception as exc:
+                logger.exception(
+                    "Unhandled HTTP exception client=%s method=%s path=%s exception=%s",
+                    self.client_address[0],
+                    self.command,
+                    urlsplit(self.path).path,
+                    type(exc).__name__,
+                )
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Internal server error"})
 
         def do_POST(self) -> None:  # noqa: N802
@@ -699,8 +828,16 @@ def make_handler(
                     return
                 raise WebError(HTTPStatus.NOT_FOUND, "Not found")
             except WebError as exc:
+                self._log_web_error(exc)
                 self._json(exc.status, {"error": str(exc)})
-            except Exception:
+            except Exception as exc:
+                logger.exception(
+                    "Unhandled HTTP exception client=%s method=%s path=%s exception=%s",
+                    self.client_address[0],
+                    self.command,
+                    urlsplit(self.path).path,
+                    type(exc).__name__,
+                )
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Internal server error"})
 
         def _get(self) -> None:
@@ -811,21 +948,43 @@ def make_handler(
     return RunplanHandler
 
 
-def serve(host: str, port: int, program_dir: Path) -> int:
+def serve(host: str, port: int, program_dir: Path, *, log_level: str = "INFO") -> int:
     """Serve the web frontend until interrupted."""
-    users = load_user_registry()
-    program_dir = program_dir.expanduser()
-    program_dir.mkdir(parents=True, exist_ok=True)
-    store = ProgramStore(program_dir, user_scoped=True)
-    server = ThreadingHTTPServer((host, port), make_handler(store, users=users))
-    print("WARNING: Runplan web has no authentication; use only on a trusted network.")
-    print(f"Serving {store.root} for {len(users.list())} user(s) on http://{host}:{port}")
+    configure_server_logging(log_level)
+    try:
+        users = load_user_registry()
+        program_dir = program_dir.expanduser()
+        program_dir.mkdir(parents=True, exist_ok=True)
+        store = ProgramStore(program_dir, user_scoped=True)
+        server = ThreadingHTTPServer((host, port), make_handler(store, users=users))
+    except BaseException:
+        logger.critical(
+            "Runplan server startup failed host=%s port=%s program_dir=%s",
+            host,
+            port,
+            program_dir,
+            exc_info=True,
+        )
+        raise
+    logger.warning("Runplan web has no authentication; use only on a trusted network")
+    logger.info(
+        "Runplan server started root=%s users=%d url=http://%s:%s log_level=%s",
+        store.root,
+        len(users.list()),
+        host,
+        port,
+        log_level,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping Runplan web.")
+        logger.info("Runplan server interrupted")
+    except BaseException:
+        logger.exception("Runplan server failed while serving")
+        raise
     finally:
         server.server_close()
+        logger.info("Runplan server stopped")
     return 0
 
 

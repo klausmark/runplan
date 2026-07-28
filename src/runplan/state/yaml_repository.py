@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from io import StringIO
@@ -11,6 +12,9 @@ from typing import Any
 from ruamel.yaml import YAML
 
 from .json_repository import JsonStateRepository, new_state
+
+
+logger = logging.getLogger(__name__)
 
 
 def _yaml() -> YAML:
@@ -167,6 +171,18 @@ class YamlStateRepository:
             temporary.replace(self.program_path)
         finally:
             temporary.unlink(missing_ok=True)
+        status_counts: dict[str, int] = {}
+        for record in records.values():
+            if isinstance(record, dict):
+                status = str(record.get("status", "unknown"))
+                status_counts[status] = status_counts.get(status, 0) + 1
+        logger.info(
+            "YAML tracking saved file=%s program_id=%s records=%d statuses=%s",
+            self.program_path,
+            program_id,
+            len(records),
+            ",".join(f"{key}:{value}" for key, value in sorted(status_counts.items())),
+        )
         if self.legacy is not None:
             self.legacy.delete(program_id)
 

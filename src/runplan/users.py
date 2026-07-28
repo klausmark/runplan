@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import threading
@@ -13,6 +14,9 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .parsing.values import parse_pace
+
+
+logger = logging.getLogger(__name__)
 
 
 class WebError(Exception):
@@ -89,6 +93,7 @@ class UserRegistry:
             updated = {**self._users, user.id: updated_user}
             self._write(updated.values())
             self._users = updated
+        logger.info("Active program changed user=%s file=%s", user.id, filename)
         return updated_user
 
     def create(self, username: Any, full_name: Any) -> dict[str, str | None]:
@@ -121,6 +126,7 @@ class UserRegistry:
             updated = {**self._users, username: user}
             self._write(updated.values())
             self._users = updated
+        logger.info("Runplan user created user=%s", username)
         return user.public()
 
     def settings(self, user_id: str | None) -> dict[str, Any]:
@@ -164,13 +170,22 @@ class UserRegistry:
             self._write_credentials(user.credentials_file, email.strip(), effective_password)
             self._write(updated.values())
             self._users = updated
+        logger.info(
+            "User settings saved user=%s password_changed=%s",
+            user.id,
+            bool(password),
+        )
         return {"user": updated_user.public(), "settings": self.settings(user.id)}
 
     @staticmethod
     def _read_credentials(path: Path) -> dict[str, str]:
         try:
             value = tomllib.loads(path.read_text(encoding="utf-8-sig"))
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
+            logger.debug(
+                "Garmin credentials file not found exception=%s",
+                type(exc).__name__,
+            )
             return {}
         except (OSError, tomllib.TOMLDecodeError) as exc:
             raise WebError(
