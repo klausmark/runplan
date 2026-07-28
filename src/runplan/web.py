@@ -7,6 +7,7 @@ import json
 import os
 import re
 import tempfile
+import copy
 from argparse import Namespace
 from datetime import date, timedelta
 from http import HTTPStatus
@@ -36,7 +37,7 @@ from .exporters.pdf import export_pdf
 from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
 from .state.json_repository import JsonStateRepository
-from .state.yaml_repository import YamlStateRepository
+from .state.yaml_repository import YamlStateRepository, tracking_from_record
 from .users import RunplanUser, UserRegistry, WebError, load_user_registry
 
 
@@ -216,7 +217,7 @@ class ProgramStore:
             for workout, raw_workout in zip(week.workouts, raw_week["workouts"], strict=True):
                 estimate = estimate_steps(workout.steps, fallback_pace)
                 record = lifecycle.get((week.number, workout.id), {})
-                status = record.get("status", "planned")
+                status = record.get("display_status", record.get("status", "planned"))
                 actual_distance = record.get("actual_distance_meters")
                 actual_duration = record.get("actual_duration_seconds")
                 if status == "completed" and actual_distance is not None and actual_duration is not None:
@@ -230,8 +231,9 @@ class ProgramStore:
                     effective_distance = estimate.distance_meters
                     effective_duration = estimate.duration_seconds
                     actual = False
-                editable = dict(raw_workout)
-                editable.pop("tracking", None)
+                editable = copy.deepcopy(raw_workout)
+                if "tracking" not in editable and record:
+                    editable["tracking"] = tracking_from_record(record)
                 workouts.append(
                     {
                         "id": workout.id,
@@ -326,13 +328,13 @@ class ProgramStore:
                 if status in terminal:
                     statuses[(week, definition["id"])] = view_record
                 elif record.get("date") != definition["schedule_date"]:
-                    view_record["status"] = "changed"
+                    view_record["display_status"] = "changed"
                     statuses[(week, definition["id"])] = view_record
                 elif (
                     record.get("content_hash")
                     and record["content_hash"] != workout_content_hash(workout)
                 ):
-                    view_record["status"] = "changed"
+                    view_record["display_status"] = "changed"
                     statuses[(week, definition["id"])] = view_record
                 elif record.get("schedule_id"):
                     view_record["status"] = "scheduled"
@@ -433,9 +435,6 @@ class ProgramStore:
             if workout.get("id") == workout_id:
                 if replacement.get("id") != workout_id:
                     raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Workout ID cannot be changed")
-                replacement.pop("tracking", None)
-                if "tracking" in workout:
-                    replacement["tracking"] = workout["tracking"]
                 week["workouts"][index] = replacement
                 week["workouts"].sort(key=lambda item: item.get("day", 0))
                 return

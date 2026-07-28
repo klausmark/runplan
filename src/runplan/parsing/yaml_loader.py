@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +40,56 @@ def normalize_workout(raw: Any, location: str) -> dict[str, Any]:
         status = tracking.get("status")
         if status not in {"planned", "scheduled", "completed", "missed", "retired"}:
             raise WorkoutDefinitionError(f"{location}.tracking.status: invalid status")
+        normalized_tracking = dict(tracking)
+        synced_week = tracking.get("synced_week")
+        if synced_week is not None and (
+            not isinstance(synced_week, int)
+            or isinstance(synced_week, bool)
+            or synced_week <= 0
+        ):
+            raise WorkoutDefinitionError(
+                f"{location}.tracking.synced_week: must be a positive integer"
+            )
+        scheduled_date = tracking.get("scheduled_date")
+        if scheduled_date is not None:
+            try:
+                if isinstance(scheduled_date, datetime):
+                    raise ValueError
+                parsed_date = (
+                    scheduled_date
+                    if isinstance(scheduled_date, date)
+                    else date.fromisoformat(scheduled_date)
+                )
+            except (TypeError, ValueError) as exc:
+                raise WorkoutDefinitionError(
+                    f"{location}.tracking.scheduled_date: must be an ISO date"
+                ) from exc
+            normalized_tracking["scheduled_date"] = parsed_date.isoformat()
+        content_hash = tracking.get("synced_content_hash")
+        if content_hash is not None and (
+            not isinstance(content_hash, str)
+            or re.fullmatch(r"[0-9a-fA-F]{64}", content_hash) is None
+        ):
+            raise WorkoutDefinitionError(
+                f"{location}.tracking.synced_content_hash: must be a SHA-256 hash"
+            )
+        garmin = tracking.get("garmin")
+        if garmin is not None:
+            if not isinstance(garmin, dict):
+                raise WorkoutDefinitionError(
+                    f"{location}.tracking.garmin: must be an object"
+                )
+            for field in ("workout_id", "schedule_id", "activity_id"):
+                value = garmin.get(field)
+                if value is not None and (
+                    not isinstance(value, int) or isinstance(value, bool) or value <= 0
+                ):
+                    raise WorkoutDefinitionError(
+                        f"{location}.tracking.garmin.{field}: must be a positive integer"
+                    )
         actual = tracking.get("actual")
+        if actual is not None and not isinstance(actual, dict):
+            raise WorkoutDefinitionError(f"{location}.tracking.actual: must be an object")
         if status == "completed":
             if not isinstance(actual, dict):
                 raise WorkoutDefinitionError(f"{location}.tracking.actual: required when completed")
@@ -48,7 +97,34 @@ def normalize_workout(raw: Any, location: str) -> dict[str, Any]:
                 value = actual.get(field)
                 if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
                     raise WorkoutDefinitionError(f"{location}.tracking.actual.{field}: must be positive")
-        result["tracking"] = tracking
+        elif isinstance(actual, dict):
+            for field in ("distance_meters", "duration_seconds"):
+                value = actual.get(field)
+                if value is not None and (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or value <= 0
+                ):
+                    raise WorkoutDefinitionError(
+                        f"{location}.tracking.actual.{field}: must be positive"
+                    )
+        if isinstance(actual, dict):
+            normalized_actual = dict(actual)
+            completed_at = actual.get("completed_at")
+            if completed_at is not None:
+                try:
+                    parsed_completed = (
+                        completed_at
+                        if isinstance(completed_at, datetime)
+                        else datetime.fromisoformat(completed_at)
+                    )
+                except (TypeError, ValueError) as exc:
+                    raise WorkoutDefinitionError(
+                        f"{location}.tracking.actual.completed_at: must be an ISO timestamp"
+                    ) from exc
+                normalized_actual["completed_at"] = parsed_completed.isoformat()
+            normalized_tracking["actual"] = normalized_actual
+        result["tracking"] = normalized_tracking
     return result
 
 

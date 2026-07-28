@@ -48,7 +48,7 @@ def _record_from_tracking(
     return {key: value for key, value in record.items() if value is not None}
 
 
-def _tracking_from_record(record: dict[str, Any]) -> dict[str, Any]:
+def tracking_from_record(record: dict[str, Any]) -> dict[str, Any]:
     tracking: dict[str, Any] = {"status": record.get("status", "planned")}
     if isinstance(record.get("week"), int):
         tracking["synced_week"] = record["week"]
@@ -147,7 +147,7 @@ class YamlStateRepository:
                 key = f"week-{week['week']:02d}/{workout['id']}"
                 record = records.get(key)
                 if isinstance(record, dict):
-                    workout["tracking"] = _tracking_from_record(record)
+                    workout["tracking"] = tracking_from_record(record)
                     written.add(key)
                 else:
                     workout.pop("tracking", None)
@@ -185,4 +185,4 @@ class YamlStateRepository:
         self.save(program_id, state)
 
 
-__all__ = ["YamlStateRepository"]
+__all__ = ["YamlStateRepository", "tracking_from_record"]

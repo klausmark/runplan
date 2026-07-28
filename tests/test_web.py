@@ -316,7 +316,97 @@ class ProgramStoreTests(unittest.TestCase):
         self.assertEqual(3000.0, week["effective_distance_meters"])
         self.assertEqual(1200.0, week["effective_duration_seconds"])
         self.assertTrue(week["workouts"][0]["totals_are_actual"])
-        self.assertNotIn("tracking:", week["workouts"][0]["yaml"])
+        self.assertIn("tracking:", week["workouts"][0]["yaml"])
+        self.assertIn("distance_meters: 3000.0", week["workouts"][0]["yaml"])
+
+        edited_yaml = week["workouts"][0]["yaml"].replace(
+            "distance_meters: 3000.0", "distance_meters: 3500.0"
+        )
+        updated = self.store.edit(
+            "plan.yaml",
+            {
+                "revision": loaded["revision"],
+                "workout": {"week": 1, "workout_id": "mixed", "yaml": edited_yaml},
+            },
+            repository=YamlStateRepository(self.path),
+        )
+        self.assertEqual(3500.0, updated["weeks"][0]["effective_distance_meters"])
+
+    def test_editor_can_remove_tracking_to_reset_a_workout_to_planned(self) -> None:
+        raw = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+        raw["weeks"][0]["workouts"][0]["tracking"] = {
+            "status": "missed", "scheduled_date": "2026-12-28"
+        }
+        self.path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        repository = YamlStateRepository(self.path)
+        loaded = ProgramStore(self.root, repository=repository).get("plan.yaml")
+        editable = yaml.safe_load(loaded["weeks"][0]["workouts"][0]["yaml"])
+        editable.pop("tracking")
+
+        updated = self.store.edit(
+            "plan.yaml",
+            {
+                "revision": loaded["revision"],
+                "workout": {
+                    "week": 1,
+                    "workout_id": "mixed",
+                    "yaml": yaml.safe_dump(editable, sort_keys=False),
+                },
+            },
+            repository=repository,
+        )
+
+        self.assertEqual("planned", updated["weeks"][0]["workouts"][0]["status"])
+
+    def test_editor_includes_tracking_merged_from_legacy_state(self) -> None:
+        state = self.repository.load("characterization-plan")
+        state["workouts"]["week-01/mixed"] = {
+            "week": 1,
+            "date": "2026-12-28",
+            "status": "completed",
+            "workout_id": 10,
+            "schedule_id": 20,
+            "activity_id": 30,
+            "completed_at": "2026-12-28T12:00:00",
+            "actual_distance_meters": 3100.0,
+            "actual_duration_seconds": 1250.0,
+        }
+
+        loaded = self.store.get("plan.yaml")
+        editor_yaml = loaded["weeks"][0]["workouts"][0]["yaml"]
+
+        self.assertIn("tracking:", editor_yaml)
+        self.assertIn("activity_id: 30", editor_yaml)
+        self.assertIn("distance_meters: 3100.0", editor_yaml)
+        self.assertIn("duration_seconds: 1250.0", editor_yaml)
+
+    def test_editor_rejects_invalid_tracking_without_changing_the_program(self) -> None:
+        loaded = self.store.get("plan.yaml")
+        base = yaml.safe_load(loaded["weeks"][0]["workouts"][0]["yaml"])
+        invalid_values = (
+            {"status": "scheduled", "synced_week": 0},
+            {"status": "scheduled", "scheduled_date": "not-a-date"},
+            {"status": "scheduled", "synced_content_hash": "short"},
+            {"status": "scheduled", "garmin": {"workout_id": -1}},
+            {"status": "completed", "actual": {"distance_meters": 10, "duration_seconds": 0}},
+            {"status": "completed", "actual": {"distance_meters": 10, "duration_seconds": 20, "completed_at": "not-a-time"}},
+        )
+
+        for tracking in invalid_values:
+            replacement = {**base, "tracking": tracking}
+            with self.subTest(tracking=tracking), self.assertRaises(WebError):
+                self.store.edit(
+                    "plan.yaml",
+                    {
+                        "revision": loaded["revision"],
+                        "workout": {
+                            "week": 1,
+                            "workout_id": "mixed",
+                            "yaml": yaml.safe_dump(replacement, sort_keys=False),
+                        },
+                    },
+                )
+        self.assertEqual(loaded["revision"], self.store.get("plan.yaml")["revision"])
 
     def test_user_default_pace_changes_time_based_estimates(self) -> None:
         normal = self.store.get("plan.yaml", fallback_pace_value="6:00 min/km")
