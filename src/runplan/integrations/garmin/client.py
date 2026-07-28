@@ -113,6 +113,69 @@ def scheduled_items_for_dates(
                 ),
             }
         )
+    relevant_workouts = {
+        item.get("workoutId"): item
+        for item in normalized
+        if item.get("date") in dates and item.get("workoutId") is not None
+    }
+    associated: set[Any] = set()
+    for item in items:
+        if item.get("itemType") != "activity" or item.get("date") not in dates:
+            continue
+        activity_id = item.get("id")
+        if activity_id is None:
+            continue
+        summary = client.get_activity(str(activity_id))
+        metadata = summary.get("metadataDTO")
+        details = summary.get("summaryDTO")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        details = details if isinstance(details, dict) else {}
+        workout_id = metadata.get("associatedWorkoutId")
+        occurrence = relevant_workouts.get(workout_id)
+        if occurrence is None:
+            continue
+        if workout_id in associated:
+            raise RuntimeError(
+                f"Multiple Garmin activities are associated with workoutId={workout_id}"
+            )
+        distance = details.get("distance")
+        duration = details.get("duration")
+        if (
+            not isinstance(distance, (int, float))
+            or isinstance(distance, bool)
+            or distance <= 0
+            or not isinstance(duration, (int, float))
+            or isinstance(duration, bool)
+            or duration <= 0
+        ):
+            raise RuntimeError(
+                f"Garmin activity {activity_id} has invalid distance or duration"
+            )
+        occurrence["associatedActivityId"] = summary.get("activityId", activity_id)
+        occurrence["associatedActivityDateTime"] = details.get(
+            "startTimeLocal", item.get("startTimestampLocal")
+        )
+        occurrence["actualDistanceMeters"] = float(distance)
+        occurrence["actualDurationSeconds"] = float(duration)
+        associated.add(workout_id)
+
+    # Older Garmin responses expose the activity ID directly on the workout.
+    # Fetch its summary as well so every completed record has actual totals.
+    for occurrence in normalized:
+        activity_id = occurrence.get("associatedActivityId")
+        if activity_id is None or occurrence.get("actualDistanceMeters") is not None:
+            continue
+        summary = client.get_activity(str(activity_id))
+        details = summary.get("summaryDTO")
+        details = details if isinstance(details, dict) else {}
+        distance, duration = details.get("distance"), details.get("duration")
+        if not isinstance(distance, (int, float)) or distance <= 0 or not isinstance(duration, (int, float)) or duration <= 0:
+            raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
+        occurrence["actualDistanceMeters"] = float(distance)
+        occurrence["actualDurationSeconds"] = float(duration)
+        occurrence["associatedActivityDateTime"] = occurrence.get(
+            "associatedActivityDateTime"
+        ) or details.get("startTimeLocal")
     return normalized
 
 

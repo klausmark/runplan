@@ -393,7 +393,11 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
                     day_content,
                     workout_content,
                     Paragraph(
-                        html.escape(format_model_totals(workout.steps)),
+                        html.escape(
+                            f"{'Actual' if workout.totals_are_actual else 'Planned'} "
+                            f"{format_estimated_distance(workout.effective_distance_meters)} · "
+                            f"{format_seconds_compact(workout.effective_duration_seconds)}"
+                        ),
                         workout_total_style,
                     ),
                 ]],

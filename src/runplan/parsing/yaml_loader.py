@@ -28,11 +28,28 @@ def normalize_workout(raw: Any, location: str) -> dict[str, Any]:
         raise WorkoutDefinitionError(f"{location}.description: must be text or null")
     if not isinstance(steps, list) or not steps:
         raise WorkoutDefinitionError(f"{location}.steps: must be a non-empty list")
-    return {
+    result = {
         "name": name.strip(),
         "description": description.strip() if isinstance(description, str) else None,
         "steps": steps,
     }
+    tracking = raw.get("tracking")
+    if tracking is not None:
+        if not isinstance(tracking, dict):
+            raise WorkoutDefinitionError(f"{location}.tracking: must be an object")
+        status = tracking.get("status")
+        if status not in {"planned", "scheduled", "completed", "missed", "retired"}:
+            raise WorkoutDefinitionError(f"{location}.tracking.status: invalid status")
+        actual = tracking.get("actual")
+        if status == "completed":
+            if not isinstance(actual, dict):
+                raise WorkoutDefinitionError(f"{location}.tracking.actual: required when completed")
+            for field in ("distance_meters", "duration_seconds"):
+                value = actual.get(field)
+                if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+                    raise WorkoutDefinitionError(f"{location}.tracking.actual.{field}: must be positive")
+        result["tracking"] = tracking
+    return result
 
 
 def parse_iso_week(value: Any, location: str = "program.start_week") -> tuple[str, date]:
@@ -244,6 +261,13 @@ def program_model(normalized: dict[str, Any]) -> Program:
                         for index, step in enumerate(workout["steps"], start=1)
                     ),
                     schedule_date=date.fromisoformat(workout["schedule_date"]),
+                    status=workout.get("tracking", {}).get("status", "planned"),
+                    garmin_workout_id=workout.get("tracking", {}).get("garmin", {}).get("workout_id"),
+                    garmin_schedule_id=workout.get("tracking", {}).get("garmin", {}).get("schedule_id"),
+                    activity_id=workout.get("tracking", {}).get("garmin", {}).get("activity_id"),
+                    completed_at=workout.get("tracking", {}).get("actual", {}).get("completed_at"),
+                    actual_distance_meters=workout.get("tracking", {}).get("actual", {}).get("distance_meters"),
+                    actual_duration_seconds=workout.get("tracking", {}).get("actual", {}).get("duration_seconds"),
                 )
                 for workout in week["workouts"]
             ),

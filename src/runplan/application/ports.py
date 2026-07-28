@@ -12,6 +12,8 @@ class GarminClient(Protocol):
 
     def get_scheduled_workouts(self, year: int, month: int) -> dict[str, Any]: ...
 
+    def get_activity(self, activity_id: str) -> dict[str, Any]: ...
+
     def upload_running_workout(self, workout: Any) -> dict[str, Any]: ...
 
     def schedule_workout(self, workout_id: int, scheduled_date: str) -> dict[str, Any]: ...
@@ -32,4 +34,3 @@ class StateRepository(Protocol):
 
 
 __all__ = ["GarminClient", "StateRepository"]
-

@@ -64,6 +64,18 @@ class FakeGarmin:
             )
         }
 
+    def get_activity(self, activity_id: str) -> dict:
+        self.events.append(("get_activity", activity_id))
+        return {
+            "activityId": int(activity_id),
+            "summaryDTO": {
+                "distance": 10_000.0,
+                "duration": 3_600.0,
+                "startTimeLocal": "2026-07-20T18:30:00",
+            },
+            "metadataDTO": {},
+        }
+
     def upload_running_workout(self, workout) -> dict:
         self.upload_count += 1
         self.events.append(("upload", workout.workoutName))
@@ -1020,12 +1032,46 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
                     ]
                 }
 
+            def get_activity(self, activity_id: str) -> dict:
+                return {
+                    "activityId": int(activity_id),
+                    "summaryDTO": {"distance": 5000, "duration": 1800},
+                }
+
         result = scheduled_items_for_dates(CalendarClient(), {"2026-07-20"})
 
         self.assertEqual("2026-07-20", result[0]["date"])
         self.assertEqual(10, result[0]["workoutId"])
         self.assertEqual(20, result[0]["workoutScheduleId"])
         self.assertEqual(900, result[0]["associatedActivityId"])
+
+    def test_calendar_activity_is_joined_to_workout_through_activity_summary(self) -> None:
+        class CalendarClient:
+            def get_scheduled_workouts(self, year: int, month: int) -> dict:
+                return {"calendarItems": [
+                    {"itemType": "workout", "date": "2026-07-28", "id": 20, "workoutId": 10},
+                    {"itemType": "activity", "date": "2026-07-28", "id": 900, "startTimestampLocal": "2026-07-28T17:35:02.0"},
+                    {"itemType": "activity", "date": "2026-07-28", "id": 901},
+                ]}
+
+            def get_activity(self, activity_id: str) -> dict:
+                if activity_id == "901":
+                    return {"activityId": 901, "metadataDTO": {}, "summaryDTO": {}}
+                return {
+                    "activityId": 900,
+                    "metadataDTO": {"associatedWorkoutId": 10},
+                    "summaryDTO": {
+                        "distance": 11158.74,
+                        "duration": 4057.619,
+                        "startTimeLocal": "2026-07-28T17:35:02.0",
+                    },
+                }
+
+        result = scheduled_items_for_dates(CalendarClient(), {"2026-07-28"})
+
+        self.assertEqual(900, result[0]["associatedActivityId"])
+        self.assertEqual(11158.74, result[0]["actualDistanceMeters"])
+        self.assertEqual(4057.619, result[0]["actualDurationSeconds"])
 
 
 if __name__ == "__main__":

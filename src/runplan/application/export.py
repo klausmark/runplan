@@ -24,6 +24,12 @@ class ExportWorkout:
     source_week: int
     source_day: int
     source_name: str
+    status: str
+    estimated_duration_seconds: float
+    estimated_distance_meters: float
+    effective_duration_seconds: float
+    effective_distance_meters: float
+    totals_are_actual: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,14 +66,10 @@ class ProgramExport:
 def _summary(
     workouts: tuple[ExportWorkout, ...], fallback_pace_seconds_per_km: float
 ) -> ExportSummary:
-    totals = [
-        estimate_steps(workout.steps, fallback_pace_seconds_per_km)
-        for workout in workouts
-    ]
     return ExportSummary(
         workout_count=len(workouts),
-        estimated_duration_seconds=sum(item.duration_seconds for item in totals),
-        estimated_distance_meters=sum(item.distance_meters for item in totals),
+        estimated_duration_seconds=sum(item.effective_duration_seconds for item in workouts),
+        estimated_distance_meters=sum(item.effective_distance_meters for item in workouts),
     )
 
 
@@ -90,8 +92,16 @@ def build_program_export(
     )
     export_weeks = []
     for week in selected_weeks:
-        workouts = tuple(
-            ExportWorkout(
+        export_items = []
+        for item in week.workouts:
+            estimate = estimate_steps(item.workout.steps, fallback_pace_seconds_per_km)
+            completed = (
+                item.workout.status == "completed"
+                and item.workout.actual_distance_meters is not None
+                and item.workout.actual_duration_seconds is not None
+            )
+            terminal_zero = item.workout.status in ("missed", "retired")
+            export_items.append(ExportWorkout(
                 id=item.workout.id,
                 date=item.workout.schedule_date,
                 name=item.name,
@@ -100,9 +110,14 @@ def build_program_export(
                 source_week=item.source_week,
                 source_day=item.source_day,
                 source_name=item.source_name,
-            )
-            for item in week.workouts
-        )
+                status=item.workout.status,
+                estimated_duration_seconds=estimate.duration_seconds,
+                estimated_distance_meters=estimate.distance_meters,
+                effective_duration_seconds=(item.workout.actual_duration_seconds if completed else 0.0 if terminal_zero else estimate.duration_seconds),
+                effective_distance_meters=(item.workout.actual_distance_meters if completed else 0.0 if terminal_zero else estimate.distance_meters),
+                totals_are_actual=completed,
+            ))
+        workouts = tuple(export_items)
         export_weeks.append(
             ExportWeek(
                 number=week.number,

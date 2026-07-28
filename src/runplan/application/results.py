@@ -29,6 +29,8 @@ class SyncAction:
     date: str | None = None
     activity_id: int | None = None
     completed_at: str | None = None
+    actual_distance_meters: float | None = None
+    actual_duration_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {key: value for key, value in asdict(self).items() if value is not None}

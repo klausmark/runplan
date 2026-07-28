@@ -36,6 +36,7 @@ from .exporters.pdf import export_pdf
 from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
 from .state.json_repository import JsonStateRepository
+from .state.yaml_repository import YamlStateRepository
 from .users import RunplanUser, UserRegistry, WebError, load_user_registry
 
 
@@ -128,9 +129,14 @@ class ProgramStore:
         if not isinstance(raw, dict):
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Program YAML must be an object")
         try:
-            load_program_model(raw)
+            model = load_program_model(raw)
         except WorkoutDefinitionError as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
+        if any(item["id"] == model.id for item in self.list()):
+            raise WebError(
+                HTTPStatus.CONFLICT,
+                f"A program with ID {model.id!r} already exists for this user",
+            )
         temporary = path.with_suffix(path.suffix + ".tmp")
         try:
             temporary.write_text(content, encoding="utf-8")
@@ -209,6 +215,23 @@ class ProgramStore:
             workouts = []
             for workout, raw_workout in zip(week.workouts, raw_week["workouts"], strict=True):
                 estimate = estimate_steps(workout.steps, fallback_pace)
+                record = lifecycle.get((week.number, workout.id), {})
+                status = record.get("status", "planned")
+                actual_distance = record.get("actual_distance_meters")
+                actual_duration = record.get("actual_duration_seconds")
+                if status == "completed" and actual_distance is not None and actual_duration is not None:
+                    effective_distance = actual_distance
+                    effective_duration = actual_duration
+                    actual = True
+                elif status in ("missed", "retired"):
+                    effective_distance = effective_duration = 0.0
+                    actual = False
+                else:
+                    effective_distance = estimate.distance_meters
+                    effective_duration = estimate.duration_seconds
+                    actual = False
+                editable = dict(raw_workout)
+                editable.pop("tracking", None)
                 workouts.append(
                     {
                         "id": workout.id,
@@ -220,8 +243,13 @@ class ProgramStore:
                         "estimated_duration_seconds": estimate.duration_seconds,
                         "distance_is_approximate": estimate.distance_is_approximate,
                         "duration_is_approximate": estimate.duration_is_approximate,
-                        "status": lifecycle.get((week.number, workout.id), "planned"),
-                        "yaml": _dump_editable_yaml(raw_workout),
+                        "status": status,
+                        "actual_distance_meters": actual_distance,
+                        "actual_duration_seconds": actual_duration,
+                        "effective_distance_meters": effective_distance,
+                        "effective_duration_seconds": effective_duration,
+                        "totals_are_actual": actual,
+                        "yaml": _dump_editable_yaml(editable),
                     }
                 )
             weeks.append(
@@ -231,8 +259,14 @@ class ProgramStore:
                         model.start_date + timedelta(weeks=week.number - 1)
                     ).isoformat(),
                     "focus": week.focus,
+                    "effective_distance_meters": sum(
+                        workout["effective_distance_meters"] for workout in workouts
+                    ),
+                    "effective_duration_seconds": sum(
+                        workout["effective_duration_seconds"] for workout in workouts
+                    ),
                     "estimated_distance_meters": sum(
-                        workout["estimated_distance_meters"] for workout in workouts
+                        workout["effective_distance_meters"] for workout in workouts
                     ),
                     "distance_is_approximate": any(
                         workout["distance_is_approximate"] for workout in workouts
@@ -260,7 +294,7 @@ class ProgramStore:
         repository: StateRepository,
         *,
         fallback_pace_value: str | None = None,
-    ) -> dict[tuple[int, str], str]:
+    ) -> dict[tuple[int, str], dict[str, Any]]:
         """Derive offline calendar states from the current plan and sync state."""
         from .cli import prepare_sync_selections
 
@@ -279,7 +313,7 @@ class ProgramStore:
         except (SystemExit, WorkoutDefinitionError, ValueError) as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
 
-        statuses: dict[tuple[int, str], str] = {}
+        statuses: dict[tuple[int, str], dict[str, Any]] = {}
         terminal = {"completed", "missed", "retired"}
         for program, compiled in selections:
             week = program["week"]
@@ -288,17 +322,21 @@ class ProgramStore:
                 if not isinstance(record, dict):
                     continue
                 status = record.get("status")
+                view_record = dict(record)
                 if status in terminal:
-                    statuses[(week, definition["id"])] = status
+                    statuses[(week, definition["id"])] = view_record
                 elif record.get("date") != definition["schedule_date"]:
-                    statuses[(week, definition["id"])] = "changed"
+                    view_record["status"] = "changed"
+                    statuses[(week, definition["id"])] = view_record
                 elif (
                     record.get("content_hash")
                     and record["content_hash"] != workout_content_hash(workout)
                 ):
-                    statuses[(week, definition["id"])] = "changed"
+                    view_record["status"] = "changed"
+                    statuses[(week, definition["id"])] = view_record
                 elif record.get("schedule_id"):
-                    statuses[(week, definition["id"])] = "scheduled"
+                    view_record["status"] = "scheduled"
+                    statuses[(week, definition["id"])] = view_record
         return statuses
 
     def edit(
@@ -395,6 +433,9 @@ class ProgramStore:
             if workout.get("id") == workout_id:
                 if replacement.get("id") != workout_id:
                     raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Workout ID cannot be changed")
+                replacement.pop("tracking", None)
+                if "tracking" in workout:
+                    replacement["tracking"] = workout["tracking"]
                 week["workouts"][index] = replacement
                 week["workouts"].sort(key=lambda item: item.get("day", 0))
                 return
@@ -489,9 +530,19 @@ class WebSyncService:
         user = self.users.get(user_id or self.users.default_id)
         return self.store.for_user(user.id)
 
-    def repository_for(self, user_id: str | None) -> StateRepository:
+    def repository_for(self, user_id: str | None, name: str | None = None) -> StateRepository:
         user = self.users.get(user_id or self.users.default_id)
-        return self.repository or JsonStateRepository(user.state_directory)
+        if self.repository is not None:
+            return self.repository
+        if name is None:
+            if user.active_program is None:
+                return JsonStateRepository(user.state_directory)
+            name = user.active_program
+        return YamlStateRepository(
+            self.store_for(user.id).path(name),
+            legacy_directory=user.state_directory,
+            owner_id=user.id,
+        )
 
     def client_for(self, user_id: str | None) -> GarminClient:
         user = self.users.get(user_id or self.users.default_id)
@@ -542,7 +593,7 @@ class WebSyncService:
         selections = self._selections(name, user.id)
         try:
             plan = plan_program_weeks(
-                self.repository_for(user.id), selections, today=self.today()
+                self.repository_for(user.id, name), selections, today=self.today()
             ).to_dict()
         except SystemExit as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
@@ -570,7 +621,7 @@ class WebSyncService:
             client = self.client_for(user.id)
             results = synchronize_program_weeks(
                 client,
-                self.repository_for(user.id),
+                self.repository_for(user.id, name),
                 selections,
                 today=self.today(),
                 owner_id=user.id,
@@ -625,7 +676,7 @@ class WebSyncService:
                 "Garmin data or the local plan changed; review recovery again",
             )
         discovery = {**preview["discovery"], "records": preview["_records"]}
-        state = rebuild_sync_state(self.repository_for(user.id), discovery)
+        state = rebuild_sync_state(self.repository_for(user.id, name), discovery)
         return {
             "userId": user.id,
             "programId": discovery["programId"],
@@ -669,7 +720,7 @@ def make_handler(
                     uploaded = sync.store_for(user.id).upload(
                         payload.get("filename"),
                         payload.get("content"),
-                        repository=sync.repository_for(user.id),
+                        repository=sync.repository_for(user.id, payload.get("filename")),
                         fallback_pace_value=user.default_pace,
                     )
                     self._json(HTTPStatus.CREATED, uploaded)
@@ -697,7 +748,7 @@ def make_handler(
                 parts = self._api_program_parts()
                 if len(parts) == 1:
                     user = registry.get(payload.get("userId"))
-                    repository = sync.repository_for(user.id)
+                    repository = sync.repository_for(user.id, parts[0])
                     self._json(
                         HTTPStatus.OK,
                         sync.store_for(user.id).edit(
@@ -747,7 +798,7 @@ def make_handler(
                         HTTPStatus.OK,
                         sync.store_for(user.id).get(
                             parts[0],
-                            repository=sync.repository_for(user.id),
+                            repository=sync.repository_for(user.id, parts[0]),
                             fallback_pace_value=user.default_pace,
                         ),
                     )

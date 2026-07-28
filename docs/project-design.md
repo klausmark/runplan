@@ -243,7 +243,10 @@ workouts, and past schedules are preserved. State is persisted after each
 externally successful operation so retries can continue safely.
 
 Every real sync first reconciles historical managed schedules. A Garmin
-`associatedActivityId` marks a workout completed; a past occurrence without an
+`associatedActivityId`, or an activity summary whose
+`metadataDTO.associatedWorkoutId` matches the managed workout, marks a workout
+completed. The completed record includes Garmin's actual distance and total
+duration; a past occurrence without an
 associated activity becomes missed. Both are terminal for automatic sync and
 prune. Compact completed history remains in local state so later syncs cannot
 recreate it and future reporting can compare planned and completed training.
@@ -258,7 +261,7 @@ continues after failures while returning a failure status for a partial batch.
 
 ## Recoverable Garmin ownership
 
-Local JSON or future database state is a cache of synchronization knowledge,
+The user's YAML embeds synchronization knowledge and completed results, but is
 not the sole proof that Runplan owns a Garmin object. Every Garmin workout
 created or updated by Runplan must carry a versioned ownership envelope in a
 strictly delimited suffix of its description. The visible workout title remains

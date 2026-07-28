@@ -26,6 +26,7 @@ from .integrations.garmin.mapper import build_workout
 from .parsing.yaml_loader import load_definition, load_definition_model
 from .parsing.values import parse_pace
 from .application.preview import build_preview
+from .application.ports import StateRepository
 from .application.sync import (
     discover_sync_state,
     plan_program_weeks,
@@ -38,6 +39,7 @@ from .presentation.json_output import format_json
 from .presentation.overview import format_overview
 from .presentation.program_text import format_program_text
 from .state.json_repository import JsonStateRepository
+from .state.yaml_repository import YamlStateRepository
 
 
 def default_program_directory() -> Path:
@@ -168,7 +170,7 @@ def run_multi_week_sync(
     prune: bool = False,
     today: date | None = None,
     owner_id: str = "local-default",
-    repository: JsonStateRepository | None = None,
+    repository: StateRepository | None = None,
     credentials_file: Path | None = None,
     token_store: Path | None = None,
 ) -> int:
@@ -376,7 +378,7 @@ def _sync_one_user(arguments: Namespace, user: Any) -> int:
     values.update(
         yaml_file=path,
         owner_id=user.id,
-        repository=JsonStateRepository(user.state_directory),
+        repository=YamlStateRepository(path, legacy_directory=user.state_directory, owner_id=user.id),
         credentials_file=user.credentials_file,
         token_store=user.token_store,
         fallback_pace_value=user.default_pace,
@@ -427,7 +429,7 @@ def run_reconcile(arguments: Namespace) -> int:
     try:
         program = load_definition_model(arguments.yaml_file)
         client = login_to_garmin()
-        result = reconcile_program(client, JsonStateRepository(), program.id)
+        result = reconcile_program(client, YamlStateRepository(arguments.yaml_file), program.id)
     except (WorkoutDefinitionError, ValueError) as exc:
         print(f"Invalid program definition: {exc}", file=sys.stderr)
         return 2
@@ -461,7 +463,7 @@ def run_rebuild_state(arguments: Namespace) -> int:
         public = {key: value for key, value in discovery.items() if key != "records"}
         print(json.dumps(public, ensure_ascii=False, indent=2))
         if arguments.yes:
-            rebuild_sync_state(JsonStateRepository(), discovery)
+            rebuild_sync_state(YamlStateRepository(arguments.yaml_file), discovery)
             print(f"Rebuilt local state for {discovery['programId']}.")
         else:
             print("Preview only. Run again with --yes to rebuild local state.")

@@ -18,9 +18,12 @@ from .domain.selectors import WeekSelectionError
 from .integrations.garmin.client import login_to_garmin
 from .presentation.text import format_step_overview, format_totals, format_weekday
 from .state.json_repository import load_state
+from .state.yaml_repository import YamlStateRepository
 
 
 def run_sync(args: argparse.Namespace) -> int:
+    if getattr(args, "repository", None) is None and getattr(args, "yaml_file", None):
+        args.repository = YamlStateRepository(args.yaml_file)
     try:
         from .cli import prepare_sync_selections
 

@@ -291,7 +291,7 @@ function render(program) {
     focus.textContent = week.focus || "";
     const total = document.createElement("strong");
     total.className = "week-distance";
-    total.textContent = distanceLabel(week.estimated_distance_meters, week.distance_is_approximate);
+    total.textContent = `${distanceLabel(week.effective_distance_meters, week.distance_is_approximate)} · ${durationLabel(week.effective_duration_seconds, week.distance_is_approximate)}`;
     details.append(focus, total);
     heading.append(title, details);
     const days = document.createElement("div");
@@ -334,7 +334,10 @@ function workoutCard(week, workout) {
   description.textContent = workout.description || "Structured workout";
   const summary = document.createElement("div");
   summary.className = "workout-summary";
-  summary.textContent = `${distanceLabel(workout.estimated_distance_meters, workout.distance_is_approximate)} · ${durationLabel(workout.estimated_duration_seconds, workout.duration_is_approximate)}`;
+  const shownDistance = workout.totals_are_actual ? workout.actual_distance_meters : workout.estimated_distance_meters;
+  const shownDuration = workout.totals_are_actual ? workout.actual_duration_seconds : workout.estimated_duration_seconds;
+  const totalsKind = workout.totals_are_actual ? "Actual" : "Planned";
+  summary.textContent = `${totalsKind} · ${distanceLabel(shownDistance, workout.totals_are_actual ? false : workout.distance_is_approximate)} · ${durationLabel(shownDuration, workout.totals_are_actual ? false : workout.duration_is_approximate)}`;
   const edit = document.createElement("button");
   edit.className = "edit-workout";
   edit.type = "button";

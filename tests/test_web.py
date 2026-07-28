@@ -12,6 +12,7 @@ from helpers import program_data
 from runplan.application.results import SyncResult
 from runplan.application.sync import workout_content_hash
 from runplan.state.json_repository import new_state
+from runplan.state.yaml_repository import YamlStateRepository
 from runplan.web import (
     ASSET_DIR,
     ProgramStore,
@@ -296,6 +297,27 @@ class ProgramStoreTests(unittest.TestCase):
         self.assertAlmostEqual(7633.33, week["estimated_distance_meters"], places=1)
         self.assertTrue(week["distance_is_approximate"])
 
+    def test_completed_actual_and_missed_zero_replace_estimates_in_week_totals(self) -> None:
+        raw = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+        raw["weeks"][0]["workouts"][0]["tracking"] = {
+            "status": "completed",
+            "actual": {
+                "completed_at": "2026-12-28T12:00:00",
+                "distance_meters": 3000.0,
+                "duration_seconds": 1200.0,
+            },
+        }
+        raw["weeks"][0]["workouts"][1]["tracking"] = {"status": "missed"}
+        self.path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+        loaded = ProgramStore(self.root, repository=YamlStateRepository(self.path)).get("plan.yaml")
+        week = loaded["weeks"][0]
+
+        self.assertEqual(3000.0, week["effective_distance_meters"])
+        self.assertEqual(1200.0, week["effective_duration_seconds"])
+        self.assertTrue(week["workouts"][0]["totals_are_actual"])
+        self.assertNotIn("tracking:", week["workouts"][0]["yaml"])
+
     def test_user_default_pace_changes_time_based_estimates(self) -> None:
         normal = self.store.get("plan.yaml", fallback_pace_value="6:00 min/km")
         faster = self.store.get("plan.yaml", fallback_pace_value="5:00 min/km")
@@ -540,6 +562,10 @@ weeks:
             uploads.upload("broken.yaml", "program: [")
         self.assertEqual(422, invalid.exception.status)
         self.assertFalse((empty_root / "broken.yaml").exists())
+
+        with self.assertRaises(WebError) as duplicate_id:
+            uploads.upload("same-id.yaml", self.path.read_text(encoding="utf-8"))
+        self.assertEqual(409, duplicate_id.exception.status)
 
 
 class WebSyncServiceTests(unittest.TestCase):

@@ -97,6 +97,8 @@ def reconcile_program(
             completed_at = occurrence.get("associatedActivityDateTime")
             if completed_at:
                 record["completed_at"] = completed_at
+            record["actual_distance_meters"] = occurrence["actualDistanceMeters"]
+            record["actual_duration_seconds"] = occurrence["actualDurationSeconds"]
             record.pop("content_hash", None)
             record.pop("description", None)
             result.add(
@@ -107,6 +109,8 @@ def reconcile_program(
                 date=record.get("date"),
                 activity_id=activity_id,
                 completed_at=completed_at,
+                actual_distance_meters=record["actual_distance_meters"],
+                actual_duration_seconds=record["actual_duration_seconds"],
             )
         else:
             record["status"] = "missed"
@@ -200,6 +204,8 @@ def reconcile_selected_program(
                 completed["schedule_id"] = schedule_id
             if completed_at:
                 completed["completed_at"] = completed_at
+            completed["actual_distance_meters"] = occurrence["actualDistanceMeters"]
+            completed["actual_duration_seconds"] = occurrence["actualDurationSeconds"]
             records[key] = completed
             result.add(
                 "completed",
@@ -209,6 +215,8 @@ def reconcile_selected_program(
                 date=definition["schedule_date"],
                 activity_id=activity_id,
                 completed_at=completed_at,
+                actual_distance_meters=completed["actual_distance_meters"],
+                actual_duration_seconds=completed["actual_duration_seconds"],
             )
             changed = True
         elif (
@@ -468,6 +476,8 @@ def synchronize_program_week(
                 date=previous.get("date"),
                 activity_id=previous.get("activity_id"),
                 completed_at=previous.get("completed_at"),
+                actual_distance_meters=previous.get("actual_distance_meters"),
+                actual_duration_seconds=previous.get("actual_duration_seconds"),
             )
             continue
         matching = None
@@ -849,6 +859,8 @@ def discover_sync_state(
             if activity_id is not None:
                 record["status"] = "completed"
                 record["activity_id"] = activity_id
+                record["actual_distance_meters"] = occurrence["actualDistanceMeters"]
+                record["actual_duration_seconds"] = occurrence["actualDurationSeconds"]
                 if occurrence.get("associatedActivityDateTime"):
                     record["completed_at"] = occurrence["associatedActivityDateTime"]
             elif record["date"] < reference_date.isoformat():

@@ -265,7 +265,10 @@ Use `--select-weeks` for an explicit selection such as `3`, `1,3,5-7`,
 
 Every real sync first reconciles tracked historical workouts and compares the
 selected plan occurrences with Garmin's scheduled workouts. A Garmin activity
-association marks a workout completed, including on the current day. Past
+association marks a workout completed, including when Garmin exposes that link
+only as `metadataDTO.associatedWorkoutId` on the activity summary and including
+on the current day. Actual distance and total duration are stored with the
+completed workout in the user's YAML. Past
 workouts without an activity become missed; current and future workouts remain
 active. Completed and missed workouts are retained in local history and are
 never recreated or pruned automatically. Run legacy file-based reconciliation
@@ -280,15 +283,17 @@ be removed. Runplan previews the diff and asks for confirmation. For controlled
 non-interactive automation, use `--prune --yes`. Completed history, missed
 workouts, past schedules, and unowned Garmin workouts are never pruned.
 
-Runplan stores Garmin IDs, names, and descriptions in each user's configured
-state directory. Keep this state while the program is
-active because it enables safe reuse and cleanup. New and updated Garmin
+Runplan stores lifecycle state, Garmin IDs, and completed results in a
+system-managed `tracking` section on each workout in the user's YAML. Week and
+program totals use actual values for completed workouts, zero for missed or
+retired workouts, and estimates for remaining workouts. New and updated Garmin
 workouts also contain a compact Runplan ownership marker at the end of the
 description. It contains the non-secret Runplan user ID and plan/workout
 identity, never Garmin credentials. User-based sync always uses the stable
 Runplan user ID as the ownership ID.
 
-If local state is lost after a reinstall, preview recovery from Garmin with:
+Legacy JSON state is migrated into YAML on the next successful write. If YAML
+tracking is lost after a reinstall, preview recovery from Garmin with:
 
 ```bash
 uv run runplan rebuild-state ~/.local/share/runplan/programs/morgan-example-5k.yaml --owner-id local-default

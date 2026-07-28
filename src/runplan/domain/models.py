@@ -47,6 +47,8 @@ class Workout:
     garmin_schedule_id: int | None = None
     activity_id: int | None = None
     completed_at: str | None = None
+    actual_distance_meters: float | None = None
+    actual_duration_seconds: float | None = None
 
     def with_lifecycle(self, record: Mapping[str, Any]) -> Workout:
         """Return this planned workout enriched from local synchronization state."""
@@ -59,6 +61,8 @@ class Workout:
             garmin_schedule_id=record.get("schedule_id"),
             activity_id=record.get("activity_id"),
             completed_at=record.get("completed_at"),
+            actual_distance_meters=record.get("actual_distance_meters"),
+            actual_duration_seconds=record.get("actual_duration_seconds"),
         )
 
 @dataclass(frozen=True, slots=True)

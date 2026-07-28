@@ -9,10 +9,12 @@ from .json_repository import (
     save_state,
     state_path,
 )
+from .yaml_repository import YamlStateRepository
 
 __all__ = [
     "CURRENT_STATE_VERSION",
     "JsonStateRepository",
+    "YamlStateRepository",
     "load_state",
     "migrate_state",
     "new_state",
