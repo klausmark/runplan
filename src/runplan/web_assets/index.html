@@ -110,7 +110,7 @@
         <label>Default pace<input id="user-settings-default-pace" required pattern="[0-9]+:[0-5][0-9](?:-[0-9]+:[0-5][0-9])? min/km" placeholder="6:00 min/km"><small>Used to estimate distance and duration when a workout has no explicit pace.</small></label>
         <label>Garmin email<input id="user-settings-garmin-email" type="email" autocomplete="username" required></label>
         <label>Garmin password<input id="user-settings-garmin-password" type="password" autocomplete="current-password"><small id="user-settings-password-help">Leave blank to keep the saved password.</small></label>
-        <footer><button id="recovery-button" type="button" class="button secondary">Recover sync state</button><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save settings</button></footer>
+        <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save settings</button></footer>
       </form>
     </dialog>
 
@@ -133,16 +133,6 @@
         </div>
         <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Move workout</button></footer>
       </form>
-    </dialog>
-
-    <dialog id="recovery-dialog" class="sync-dialog">
-      <div class="sync-dialog-content">
-        <div class="dialog-heading"><div><p class="eyebrow">Garmin Connect</p><h2>Recover sync state</h2></div><button type="button" class="icon-button close">×</button></div>
-        <p id="recovery-summary" class="editor-help">Reading Garmin without making changes…</p>
-        <div id="recovery-results" class="sync-actions" aria-live="polite"></div>
-        <p id="recovery-error" class="sync-error hidden" role="alert"></p>
-        <footer><button type="button" class="button secondary close">Cancel</button><button id="recovery-confirm" type="button" class="button primary" disabled>Rebuild local state</button></footer>
-      </div>
     </dialog>
 
     <script src="/app.js" defer></script>

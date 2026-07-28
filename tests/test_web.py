@@ -130,14 +130,14 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn(".week-heading:focus-visible", styles)
         self.assertIn("prefers-reduced-motion", styles)
 
-    def test_recovery_review_ui_is_packaged(self) -> None:
+    def test_recovery_ui_is_not_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
 
-        self.assertIn('id="recovery-button"', html)
-        self.assertIn('id="recovery-dialog"', html)
-        self.assertIn("/sync/recovery/preview", script)
-        self.assertIn("recoveryPreview.confirmationToken", script)
+        self.assertNotIn('id="recovery-button"', html)
+        self.assertNotIn('id="recovery-dialog"', html)
+        self.assertNotIn("/sync/recovery", script)
+        self.assertNotIn("recoveryPreview", script)
 
     def test_garmin_sync_is_one_click_without_review_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
@@ -170,7 +170,7 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn('id="undo-move"', html)
         self.assertIn("async function undoLastMove()", script)
         self.assertIn("state.undoMove = { fromWeek: toWeek", script)
-        self.assertGreaterEqual(script.count("userId: state.user.id"), 5)
+        self.assertGreaterEqual(script.count("userId: state.user.id"), 4)
         self.assertIn('payload.workout ? "validation" : "saving"', script)
         self.assertIn('setAppStatus("garmin", "Syncing Garmin…")', script)
         self.assertIn('[data-status="failed"]', styles)
@@ -757,17 +757,13 @@ class WebSyncServiceTests(unittest.TestCase):
         result = SyncResult("characterization-plan", 1)
         result.add("schedule", "Mixed", workout_id=42, date="2026-12-28")
 
-        with patch(
-            "runplan.web.synchronize_program_weeks", return_value=[result]
-        ) as synchronize:
+        with patch("runplan.web.synchronize_program_weeks", return_value=[result]):
             response = self.service.execute(
                 "plan.yaml",
                 {"confirmationToken": preview["confirmationToken"]},
             )
 
         self.client_factory.assert_called_once_with()
-        catalog = synchronize.call_args.kwargs["active_plan_selections"]
-        self.assertEqual([1, 2], [program["week"] for program, _ in catalog])
         self.assertEqual([1, 2], response["weeks"])
         self.assertEqual("schedule", response["results"][0]["actions"][0]["kind"])
 
@@ -837,35 +833,6 @@ class WebSyncServiceTests(unittest.TestCase):
             [action["kind"] for action in alice_preview["plan"]["actions"]],
             [action["kind"] for action in bob_preview["plan"]["actions"]],
         )
-
-    def test_recovery_requires_fresh_preview_before_atomic_rebuild(self) -> None:
-        discovery = {
-            "ownerId": "local-default",
-            "programId": "characterization-plan",
-            "recovered": [{"key": "week-01/mixed"}],
-            "issues": [],
-            "legacyCandidates": [],
-            "records": {
-                "week-01/mixed": {
-                    "week": 1,
-                    "workout_id": 42,
-                    "date": "2026-12-28",
-                    "status": "scheduled",
-                }
-            },
-        }
-        with patch("runplan.web.discover_sync_state", return_value=discovery):
-            preview = self.service.recovery_preview("plan.yaml")
-            response = self.service.recovery_execute(
-                "plan.yaml",
-                {"confirmationToken": preview["confirmationToken"]},
-            )
-
-        self.assertEqual(1, response["recoveredCount"])
-        stored = self.repository.load("characterization-plan")
-        self.assertEqual(42, stored["workouts"]["week-01/mixed"]["workout_id"])
-        self.assertNotIn("records", response["discovery"])
-
 
 if __name__ == "__main__":
     unittest.main()

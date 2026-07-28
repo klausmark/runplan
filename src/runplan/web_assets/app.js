@@ -1,4 +1,4 @@
-const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null, recoveryPreview: null };
+const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null };
 const $ = (selector) => document.querySelector(selector);
 const TOUCH_DRAG_DELAY = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
@@ -621,101 +621,6 @@ async function loadProgram(file) {
   storeValue(programStorageKey(state.user.id), file);
 }
 
-function renderRecovery(discovery) {
-  const recovered = discovery.recovered || [];
-  const issues = discovery.issues || [];
-  const legacy = discovery.legacyCandidates || [];
-  $("#recovery-summary").textContent = `${recovered.length} recoverable · ${issues.length} issues · ${legacy.length} legacy candidates`;
-  const rows = [];
-  for (const item of recovered) {
-    const row = document.createElement("div");
-    row.className = "sync-action sync-schedule";
-    const text = document.createElement("div");
-    const label = document.createElement("strong");
-    label.textContent = item.name;
-    const detail = document.createElement("span");
-    detail.textContent = `${item.status} · ${item.key}`;
-    text.append(label, detail);
-    const date = document.createElement("small");
-    date.textContent = item.date;
-    row.append(text, date);
-    rows.push(row);
-  }
-  for (const item of issues) {
-    const row = document.createElement("div");
-    row.className = "sync-action sync-warning";
-    const text = document.createElement("div");
-    const label = document.createElement("strong");
-    label.textContent = item.code.replaceAll("_", " ");
-    const detail = document.createElement("span");
-    detail.textContent = item.message;
-    text.append(label, detail);
-    const key = document.createElement("small");
-    key.textContent = item.key || (item.workoutId ? `Garmin #${item.workoutId}` : "");
-    row.append(text, key);
-    rows.push(row);
-  }
-  for (const item of legacy) {
-    const row = document.createElement("div");
-    row.className = "sync-action sync-legacy";
-    const text = document.createElement("div");
-    const label = document.createElement("strong");
-    label.textContent = "Legacy candidate — not adopted";
-    const detail = document.createElement("span");
-    detail.textContent = item.name;
-    text.append(label, detail);
-    const id = document.createElement("small");
-    id.textContent = item.workoutId ? `Garmin #${item.workoutId}` : "";
-    row.append(text, id);
-    rows.push(row);
-  }
-  $("#recovery-results").replaceChildren(...rows);
-}
-
-async function openRecovery() {
-  state.recoveryPreview = null;
-  $("#user-settings-dialog").close();
-  $("#recovery-summary").textContent = "Reading Garmin without making changes…";
-  $("#recovery-results").replaceChildren();
-  $("#recovery-error").classList.add("hidden");
-  $("#recovery-confirm").disabled = true;
-  $("#recovery-dialog").showModal();
-  try {
-    const preview = await request(`/api/programs/${encodeURIComponent(state.program.file)}/sync/recovery/preview?${userQuery()}`);
-    state.recoveryPreview = preview;
-    renderRecovery(preview.discovery);
-    $("#recovery-confirm").disabled = false;
-  } catch (error) {
-    $("#recovery-error").textContent = error.message;
-    $("#recovery-error").classList.remove("hidden");
-  }
-}
-
-async function confirmRecovery() {
-  if (!state.recoveryPreview) return;
-  const button = $("#recovery-confirm");
-  button.disabled = true;
-  button.textContent = "Rebuilding…";
-  try {
-    const result = await request(`/api/programs/${encodeURIComponent(state.program.file)}/sync/recovery`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: state.user.id, confirmationToken: state.recoveryPreview.confirmationToken }),
-    });
-    renderRecovery(result.discovery);
-    $("#recovery-summary").textContent = `Local sync state rebuilt · ${result.recoveredCount} workouts recovered`;
-    await loadProgram(state.program.file);
-    button.textContent = "Done";
-    button.disabled = false;
-    state.recoveryPreview = null;
-  } catch (error) {
-    $("#recovery-error").textContent = error.message;
-    $("#recovery-error").classList.remove("hidden");
-    button.textContent = "Rebuild local state";
-    button.disabled = false;
-  }
-}
-
 function fillUserSelects() {
   for (const select of [$("#user-select"), $("#user-choice")]) {
     select.replaceChildren(...state.users.map((user) => {
@@ -843,8 +748,6 @@ $("#user-settings-button").addEventListener("click", async () => {
 });
 $("#sync-button").addEventListener("click", syncGarmin);
 $("#undo-move").addEventListener("click", undoLastMove);
-$("#recovery-button").addEventListener("click", () => openRecovery());
-$("#recovery-confirm").addEventListener("click", () => state.recoveryPreview ? confirmRecovery() : $("#recovery-dialog").close());
 document.querySelectorAll("dialog .close").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
 $("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();

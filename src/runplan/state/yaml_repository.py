@@ -21,9 +21,7 @@ def _yaml() -> YAML:
     return value
 
 
-def _record_from_tracking(
-    week: int, workout: dict[str, Any], *, program_id: str, owner_id: str
-) -> dict[str, Any] | None:
+def _record_from_tracking(week: int, workout: dict[str, Any]) -> dict[str, Any] | None:
     tracking = workout.get("tracking")
     if not isinstance(tracking, dict):
         return None
@@ -41,9 +39,6 @@ def _record_from_tracking(
         "completed_at": actual.get("completed_at"),
         "actual_distance_meters": actual.get("distance_meters"),
         "actual_duration_seconds": actual.get("duration_seconds"),
-        "owner_id": owner_id,
-        "program_id": program_id,
-        "key": f"week-{tracking.get('synced_week', week):02d}/{workout.get('id')}",
     }
     return {key: value for key, value in record.items() if value is not None}
 
@@ -89,12 +84,10 @@ class YamlStateRepository:
         program_path: Path,
         *,
         legacy_directory: Path | None = None,
-        owner_id: str = "local-default",
     ) -> None:
         self.program_path = program_path.expanduser().resolve()
         self.state_directory = legacy_directory.expanduser().resolve() if legacy_directory else None
         self.legacy = JsonStateRepository(legacy_directory) if legacy_directory else None
-        self.owner_id = owner_id
 
     def _document(self) -> dict[str, Any]:
         document = _yaml().load(self.program_path.read_text(encoding="utf-8"))
@@ -113,9 +106,7 @@ class YamlStateRepository:
             for workout in week.get("workouts", []):
                 if not isinstance(workout, dict) or not isinstance(workout.get("id"), str):
                     continue
-                record = _record_from_tracking(
-                    week["week"], workout, program_id=program_id, owner_id=self.owner_id
-                )
+                record = _record_from_tracking(week["week"], workout)
                 if record is not None:
                     state["workouts"][f"week-{week['week']:02d}/{workout['id']}"] = record
         program_tracking = document.get("program", {}).get("tracking", {})

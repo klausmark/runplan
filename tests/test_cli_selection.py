@@ -99,7 +99,7 @@ class CliSelectionTests(unittest.TestCase):
         self.assertEqual(0, result)
         delegated = sync.call_args.args[0]
         self.assertEqual(program, delegated.yaml_file)
-        self.assertEqual("klaus", delegated.owner_id)
+        self.assertFalse(hasattr(delegated, "owner_id"))
         self.assertEqual("5:35 min/km", delegated.fallback_pace_value)
         self.assertEqual(user.credentials_file, delegated.credentials_file)
         self.assertEqual(user.token_store, delegated.token_store)
@@ -241,7 +241,6 @@ class CliSelectionTests(unittest.TestCase):
 
     def test_multi_week_handler_delegates_to_additive_use_case(self) -> None:
         selections = [compiled_week(1), compiled_week(2)]
-        catalog = [compiled_week(1), compiled_week(2)]
         client = object()
 
         with (
@@ -249,16 +248,11 @@ class CliSelectionTests(unittest.TestCase):
             patch("runplan.cli.synchronize_program_weeks") as synchronize,
             redirect_stdout(StringIO()),
         ):
-            result = run_multi_week_sync(
-                selections, active_plan_selections=catalog
-            )
+            result = run_multi_week_sync(selections)
 
         self.assertEqual(0, result)
         self.assertIs(client, synchronize.call_args.args[0])
         self.assertEqual(selections, synchronize.call_args.args[2])
-        self.assertEqual(
-            catalog, synchronize.call_args.kwargs["active_plan_selections"]
-        )
 
 
 if __name__ == "__main__":

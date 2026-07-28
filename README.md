@@ -271,14 +271,10 @@ on the current day. Actual distance and total duration are stored with the
 completed workout in the user's YAML. Past
 workouts without an activity become missed; current and future workouts remain
 active. Completed and missed workouts are retained in local history and are
-never recreated. During sync, Runplan automatically removes their Garmin
-calendar entries and uploaded workout templates after ownership verification;
+never recreated. During sync, Runplan automatically removes their tracked Garmin
+calendar entries and uploaded workout templates;
 it never deletes the recorded activity. The local Garmin workout and schedule
-IDs are then cleared while the activity ID and actual result remain. Normal
-sync also removes workouts owned by the current user and active program when
-their Runplan identity no longer exists anywhere in the active YAML plan.
-Valid later plan weeks are preserved even when they are outside the current
-sync window. Run legacy file-based reconciliation
+IDs are then cleared while the activity ID and actual result remain. Run legacy file-based reconciliation
 without scheduling new workouts with:
 
 ```bash
@@ -290,34 +286,21 @@ be removed. Runplan previews the diff and asks for confirmation. For controlled
 non-interactive automation, use `--prune --yes`. Completed history, missed
 workouts, recorded activities, and unowned Garmin workouts are never pruned.
 Terminal Garmin schedules and workout templates are cleaned automatically by
-the normal sync flow and do not require `--prune`. Automatic orphan cleanup is
-also independent of `--prune`; it removes definitions deleted from the active
-plan, not merely workouts outside the selected weeks.
+the normal sync flow and do not require `--prune`.
 
 Runplan stores lifecycle state, Garmin IDs, and completed results in a
 system-managed `tracking` section on each workout in the user's YAML. Week and
 program totals use actual values for completed workouts, zero for missed or
-retired workouts, and estimates for remaining workouts. New and updated Garmin
-workouts also contain a compact Runplan ownership marker at the end of the
-description. It contains the non-secret Runplan user ID and plan/workout
-identity, never Garmin credentials. User-based sync always uses the stable
-Runplan user ID as the ownership ID. Once Runplan stores a Garmin workout ID,
-that ID is authoritative: a missing object is recreated, while remote edits to
-its name, content, or metadata are replaced with the current planned workout.
-Objects belonging to another user or program remain untouched.
+retired workouts, and estimates for remaining workouts. Local tracking is the
+sole source of Garmin ownership: once Runplan stores a workout or schedule ID,
+that object remains managed even if it is edited remotely. Changed objects are
+replaced from the plan, and missing objects are recreated with new IDs. Garmin
+descriptions contain only the human-readable plan description. Without a
+locally stored ID, Runplan creates a new object instead of adopting one by
+title or description.
 
-Legacy JSON state is migrated into YAML on the next successful write. If YAML
-tracking is lost after a reinstall, preview recovery from Garmin with:
-
-```bash
-uv run runplan rebuild-state ~/.local/share/runplan/programs/morgan-example-5k.yaml --owner-id local-default
-```
-
-Review the JSON report, then repeat with `--yes` to atomically rebuild local
-state. The web UI exposes the same review flow under **User settings → Recover
-sync state** and uses the selected Runplan user's stable ID. Recovery is
-read-only toward Garmin, ignores markers owned by other Runplan users, and
-lists unmarked legacy workouts without adopting them.
+Legacy JSON state is migrated into YAML on the next successful write. Lost YAML
+tracking cannot be reconstructed automatically from Garmin.
 
 Each program has a compact `program.short_name`. Runplan generates Garmin
 workout titles as `<short_name> - W<week> - <workout name> - <distance>`, for

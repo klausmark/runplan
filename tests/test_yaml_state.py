@@ -15,7 +15,7 @@ class YamlStateRepositoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "plan.yaml"
             path.write_text(yaml.safe_dump(program_data(), sort_keys=False), encoding="utf-8")
-            repository = YamlStateRepository(path, owner_id="alice")
+            repository = YamlStateRepository(path)
             state = repository.load("characterization-plan")
             state["workouts"]["week-01/mixed"] = {
                 "week": 1,
@@ -36,7 +36,7 @@ class YamlStateRepositoryTests(unittest.TestCase):
             self.assertEqual("completed", loaded["status"])
             self.assertEqual(30, loaded["activity_id"])
             self.assertEqual(11158.74, loaded["actual_distance_meters"])
-            self.assertEqual("alice", loaded["owner_id"])
+            self.assertNotIn("owner_id", loaded)
             self.assertIn("tracking:", path.read_text(encoding="utf-8"))
 
     def test_preserves_removed_workout_tracking_as_program_orphan(self) -> None:

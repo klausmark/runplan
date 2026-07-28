@@ -4,21 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from .ports import GarminClient, StateRepository
 from .results import ReconcileResult, SyncAction, SyncPlan, SyncResult
-from ..domain.ownership import (
-    OwnershipMetadata,
-    OwnershipMetadataError,
-    description_with_ownership,
-    parse_ownership,
-    strip_ownership,
-)
 from ..integrations.garmin.client import get_all_workouts, scheduled_items_for_dates
-from ..state.json_repository import JsonStateRepository, new_state
+from ..state.json_repository import JsonStateRepository
 
 
 _CONTENT_FIELDS = (
@@ -30,38 +22,6 @@ _CONTENT_FIELDS = (
 
 _TERMINAL_STATUSES = {"completed", "missed", "retired"}
 _CLEANUP_STATUSES = {"completed", "missed"}
-
-
-@dataclass
-class SyncInventory:
-    """One per-sync snapshot of Garmin templates and relevant calendar items."""
-
-    workouts: list[dict[str, Any]]
-    scheduled: list[dict[str, Any]]
-
-    def schedules_for(self, dates: set[str]) -> list[dict[str, Any]]:
-        return [item for item in self.scheduled if item.get("date") in dates]
-
-    def remote(self, workout_id: Any) -> dict[str, Any] | None:
-        return next(
-            (item for item in self.workouts if item.get("workoutId") == workout_id),
-            None,
-        )
-
-    def add_schedule(self, schedule: dict[str, Any]) -> None:
-        self.scheduled.append(schedule)
-
-    def remove_schedule(self, schedule_id: Any) -> None:
-        self.scheduled[:] = [
-            item
-            for item in self.scheduled
-            if item.get("workoutScheduleId", item.get("id")) != schedule_id
-        ]
-
-    def remove_workout(self, workout_id: Any) -> None:
-        self.workouts[:] = [
-            item for item in self.workouts if item.get("workoutId") != workout_id
-        ]
 
 
 def _schedule_for_record(
@@ -97,7 +57,6 @@ def reconcile_program(
     program_id: str,
     *,
     today: date | None = None,
-    inventory: SyncInventory | None = None,
 ) -> ReconcileResult:
     """Update tracked historical workouts from Garmin calendar associations."""
     reference_date = today or date.today()
@@ -112,9 +71,7 @@ def reconcile_program(
         and record.get("status") not in _TERMINAL_STATUSES
     }
     scheduled = (
-        inventory.schedules_for(historical_dates)
-        if inventory is not None
-        else scheduled_items_for_dates(client, historical_dates)
+        scheduled_items_for_dates(client, historical_dates)
         if historical_dates
         else []
     )
@@ -169,9 +126,7 @@ def reconcile_selected_program(
     repository: StateRepository,
     selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
     *,
-    owner_id: str,
     today: date | None = None,
-    inventory: SyncInventory | None = None,
 ) -> ReconcileResult:
     """Reconcile Garmin calendar evidence for every selected plan occurrence."""
     _validate_selections(selections)
@@ -185,42 +140,13 @@ def reconcile_selected_program(
         for definition, _ in compiled
     ]
     dates = {definition["schedule_date"] for _, definition in selected}
-    scheduled = (
-        inventory.schedules_for(dates)
-        if inventory is not None
-        else scheduled_items_for_dates(client, dates) if dates else []
-    )
-    remote_workouts = inventory.workouts if inventory is not None else get_all_workouts(client)
-    owned: dict[str, dict[str, Any]] = {}
-    for remote in remote_workouts:
-        try:
-            metadata = parse_ownership(remote.get("description"))
-        except OwnershipMetadataError:
-            continue
-        if (
-            metadata is not None
-            and metadata.owner_id == owner_id
-            and metadata.program_id == program_id
-        ):
-            owned[f"week-{metadata.week:02d}/{metadata.workout_id}"] = remote
-
+    scheduled = scheduled_items_for_dates(client, dates) if dates else []
     result = ReconcileResult(program_id)
     changed = False
     for week, definition in selected:
         key = f"week-{week:02d}/{definition['id']}"
         record = records.get(key)
         occurrence = _schedule_for_record(scheduled, record) if isinstance(record, dict) else None
-        remote = owned.get(key)
-        if occurrence is None and remote is not None:
-            occurrence = next(
-                (
-                    item
-                    for item in scheduled
-                    if item.get("workoutId") == remote.get("workoutId")
-                    and item.get("date") == definition["schedule_date"]
-                ),
-                None,
-            )
         activity_id = occurrence.get("associatedActivityId") if occurrence else None
         if activity_id is not None:
             if isinstance(record, dict) and record.get("status") == "completed":
@@ -232,13 +158,8 @@ def reconcile_selected_program(
                 "name": definition["name"],
                 "status": "completed",
                 "activity_id": activity_id,
-                "owner_id": owner_id,
-                "program_id": program_id,
-                "key": key,
             }
-            workout_id = occurrence.get("workoutId") or (
-                remote.get("workoutId") if remote else None
-            )
+            workout_id = occurrence.get("workoutId")
             schedule_id = occurrence.get("workoutScheduleId", occurrence.get("id"))
             if workout_id is not None:
                 completed["workout_id"] = workout_id
@@ -314,7 +235,6 @@ def _workout_payload(workout: Any) -> dict[str, Any]:
 
 def _content_hash(payload: dict[str, Any]) -> str:
     canonical = {field: payload.get(field) for field in _CONTENT_FIELDS}
-    canonical["description"] = strip_ownership(canonical.get("description"))[0] or None
     encoded = json.dumps(
         canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
@@ -425,20 +345,15 @@ def _remote_has_content(remote: dict[str, Any]) -> bool:
 
 
 def _is_owned(remote: dict[str, Any], record: dict[str, Any]) -> bool:
-    if record.get("owner_id") and record.get("program_id") and record.get("key"):
-        return remote.get("workoutId") == record.get("workout_id")
-    return (
-        remote.get("workoutName") == record.get("name")
-        and remote.get("description") == record.get("description")
-    )
+    """Treat a remote object as owned only when its ID is tracked locally."""
+    workout_id = record.get("workout_id")
+    return workout_id is not None and remote.get("workoutId") == workout_id
 
 
 def cleanup_terminal_workouts(
     client: GarminClient,
     repository: StateRepository,
     program_id: str,
-    *,
-    inventory: SyncInventory | None = None,
 ) -> list[SyncAction]:
     """Remove Garmin schedules/templates while retaining local terminal history."""
     state = repository.load(program_id)
@@ -452,22 +367,27 @@ def cleanup_terminal_workouts(
     ]
     if not terminal:
         return []
-    remote_workouts = inventory.workouts if inventory is not None else get_all_workouts(client)
+    remote_workouts = get_all_workouts(client)
     dates = {
         record["date"]
         for _, record in terminal
         if isinstance(record.get("date"), str)
     }
-    scheduled = (
-        inventory.schedules_for(dates)
-        if inventory is not None
-        else scheduled_items_for_dates(client, dates) if dates else []
-    )
+    scheduled = scheduled_items_for_dates(client, dates) if dates else []
     remote_by_id = {
         item.get("workoutId"): item
         for item in remote_workouts
         if item.get("workoutId") is not None
     }
+
+    # Verify every extant template before making the first destructive call.
+    for _, record in terminal:
+        remote = remote_by_id.get(record.get("workout_id"))
+        if remote is not None and not _is_owned(remote, record):
+            raise RuntimeError(
+                f"Safety stop: workoutId={record.get('workout_id')} "
+                "does not belong to the program"
+            )
 
     actions: list[SyncAction] = []
     for key, record in terminal:
@@ -477,12 +397,10 @@ def cleanup_terminal_workouts(
         schedule_id = (
             occurrence.get("workoutScheduleId", occurrence.get("id"))
             if occurrence is not None
-            else record.get("schedule_id")
+            else None
         )
         if schedule_id is not None:
             client.unschedule_workout(schedule_id)
-            if inventory is not None:
-                inventory.remove_schedule(schedule_id)
             actions.append(
                 SyncAction(
                     "unschedule",
@@ -498,118 +416,12 @@ def cleanup_terminal_workouts(
         remote = remote_by_id.get(workout_id)
         if workout_id is not None and remote is not None:
             client.delete_workout(workout_id)
-            if inventory is not None:
-                inventory.remove_workout(workout_id)
             actions.append(SyncAction("delete", name, workout_id=workout_id))
         changed = False
         for field in ("workout_id", "content_hash", "description"):
             if record.pop(field, None) is not None:
                 changed = True
         if changed:
-            repository.save(program_id, state)
-    return actions
-
-
-def cleanup_orphaned_workouts(
-    client: GarminClient,
-    repository: StateRepository,
-    program_id: str,
-    *,
-    owner_id: str,
-    desired_keys: set[str],
-    inventory: SyncInventory,
-) -> list[SyncAction]:
-    """Delete owned Garmin objects whose identity left the active plan."""
-    state = repository.load(program_id)
-    records: dict[str, Any] = state["workouts"]
-    targets: dict[int, tuple[str, str | None]] = {}
-    tracked_desired_ids = {
-        record.get("workout_id")
-        for key, record in records.items()
-        if key in desired_keys and isinstance(record, dict)
-    }
-
-    for key, record in records.items():
-        if (
-            key in desired_keys
-            or not isinstance(record, dict)
-            or record.get("status") in _TERMINAL_STATUSES
-        ):
-            continue
-        workout_id = record.get("workout_id")
-        if isinstance(workout_id, int) and not isinstance(workout_id, bool):
-            targets[workout_id] = (key, record.get("name"))
-
-    for remote in inventory.workouts:
-        try:
-            metadata = parse_ownership(remote.get("description"))
-        except OwnershipMetadataError:
-            continue
-        if (
-            metadata is None
-            or metadata.owner_id != owner_id
-            or metadata.program_id != program_id
-        ):
-            continue
-        key = f"week-{metadata.week:02d}/{metadata.workout_id}"
-        workout_id = remote.get("workoutId")
-        if (
-            key not in desired_keys
-            and workout_id not in tracked_desired_ids
-            and isinstance(workout_id, int)
-            and not isinstance(workout_id, bool)
-        ):
-            targets.setdefault(workout_id, (key, remote.get("workoutName")))
-
-    actions: list[SyncAction] = []
-    for workout_id, (key, remote_name) in sorted(targets.items()):
-        record = records.get(key)
-        name = (
-            record.get("name", remote_name or key)
-            if isinstance(record, dict)
-            else remote_name or key
-        )
-        schedule_ids = {
-            item.get("workoutScheduleId", item.get("id"))
-            for item in inventory.scheduled
-            if item.get("workoutId") == workout_id
-        }
-        if isinstance(record, dict) and record.get("schedule_id") is not None:
-            schedule_ids.add(record["schedule_id"])
-        for schedule_id in sorted(item for item in schedule_ids if item is not None):
-            client.unschedule_workout(schedule_id)
-            inventory.remove_schedule(schedule_id)
-            actions.append(
-                SyncAction(
-                    "unschedule",
-                    name,
-                    workout_id=workout_id,
-                    schedule_id=schedule_id,
-                    date=record.get("date") if isinstance(record, dict) else None,
-                )
-            )
-            if (
-                isinstance(record, dict)
-                and record.get("schedule_id") == schedule_id
-            ):
-                record.pop("schedule_id", None)
-                repository.save(program_id, state)
-
-        if inventory.remote(workout_id) is not None:
-            client.delete_workout(workout_id)
-            inventory.remove_workout(workout_id)
-            actions.append(SyncAction("delete", name, workout_id=workout_id))
-        if isinstance(record, dict) and records.get(key) is record:
-            del records[key]
-            repository.save(program_id, state)
-    for key in sorted(set(records) - desired_keys):
-        record = records[key]
-        if (
-            isinstance(record, dict)
-            and record.get("status") not in _TERMINAL_STATUSES
-            and record.get("workout_id") is None
-        ):
-            del records[key]
             repository.save(program_id, state)
     return actions
 
@@ -622,8 +434,6 @@ def synchronize_program_week(
     *,
     prune: bool = False,
     today: date | None = None,
-    owner_id: str = "local-default",
-    inventory: SyncInventory | None = None,
 ) -> SyncResult:
     """Synchronize one week and return actions without performing terminal I/O."""
     if not compiled:
@@ -644,31 +454,15 @@ def synchronize_program_week(
         for record in records.values()
         if isinstance(record, dict) and isinstance(record.get("date"), str)
     }
-    remote_workouts = inventory.workouts if inventory is not None else get_all_workouts(client)
-    scheduled = (
-        inventory.schedules_for(relevant_dates)
-        if inventory is not None
-        else scheduled_items_for_dates(client, relevant_dates)
-    )
+    remote_workouts = get_all_workouts(client)
+    scheduled = scheduled_items_for_dates(client, relevant_dates)
     replaced_records: list[tuple[str, dict[str, Any]]] = []
 
     # Complete and persist the new week before deleting any previous content.
     for definition, workout in compiled:
         key = f"week-{week:02d}/{definition['id']}"
         desired_hash = workout_content_hash(workout)
-        metadata = OwnershipMetadata(
-            owner_id=owner_id,
-            program_id=program_id,
-            week=week,
-            workout_id=definition["id"],
-            date=definition["schedule_date"],
-            content_hash=desired_hash,
-        )
-        managed_description = description_with_ownership(
-            definition.get("base_description"), metadata
-        )
-        managed_workout = workout.model_copy(update={"description": managed_description})
-        payload = _workout_payload(managed_workout)
+        payload = _workout_payload(workout)
         previous = records.get(key)
         if previous is None and definition["schedule_date"] < reference_date.isoformat():
             records[key] = {
@@ -693,89 +487,24 @@ def synchronize_program_week(
                 actual_duration_seconds=previous.get("actual_duration_seconds"),
             )
             continue
-        matching = None
-        legacy_matching = None
         tracked_id = previous.get("workout_id") if isinstance(previous, dict) else None
-        if tracked_id is not None:
-            matching = next(
-                (item for item in remote_workouts if item.get("workoutId") == tracked_id),
-                None,
-            )
-        else:
-            for item in remote_workouts:
-                try:
-                    remote_metadata = parse_ownership(item.get("description"))
-                except OwnershipMetadataError:
-                    continue
-                if (
-                    remote_metadata
-                    and remote_metadata.owner_id == owner_id
-                    and remote_metadata.program_id == program_id
-                    and remote_metadata.week == week
-                    and remote_metadata.workout_id == definition["id"]
-                    and remote_metadata.date == definition["schedule_date"]
-                    and remote_metadata.content_hash == desired_hash
-                ):
-                    matching = item
-                    break
-                if (
-                    remote_metadata is None
-                    and item.get("workoutName") == definition["name"]
-                    and item.get("description") == definition.get("base_description")
-                ):
-                    legacy_matching = item
-            matching = matching or legacy_matching
-        reusable = matching is not None
-        if matching is not None and tracked_id is not None:
-            try:
-                tracked_metadata = parse_ownership(matching.get("description"))
-            except OwnershipMetadataError:
-                tracked_metadata = None
-            reusable = bool(
-                tracked_metadata
-                and tracked_metadata.owner_id == owner_id
-                and tracked_metadata.program_id == program_id
-                and tracked_metadata.week == week
-                and tracked_metadata.workout_id == definition["id"]
-                and tracked_metadata.date == definition["schedule_date"]
-                and tracked_metadata.content_hash == desired_hash
-                and matching.get("workoutName") == definition["name"]
-                and strip_ownership(matching.get("description"))[0]
-                == (definition.get("base_description") or "")
-            )
-        if matching is legacy_matching and legacy_matching is not None:
-            reusable = False
+        matching = next(
+            (item for item in remote_workouts if item.get("workoutId") == tracked_id),
+            None,
+        ) if tracked_id is not None else None
+        reusable = bool(
+            matching is not None
+            and matching.get("workoutName") == payload.get("workoutName")
+            and matching.get("description") == payload.get("description")
+            and previous
+            and previous.get("content_hash") == desired_hash
+        )
         if matching is not None and _remote_has_content(matching):
             reusable = reusable and _content_hash(matching) == desired_hash
-        if previous and previous.get("content_hash"):
-            reusable = reusable and previous["content_hash"] == desired_hash
-        elif matching is not None and _remote_has_content(matching):
-            reusable = _content_hash(matching) == desired_hash
 
         if not reusable:
             replaced = previous
-            if replaced is None and matching is not None:
-                old_schedule = next(
-                    (
-                        item
-                        for item in scheduled
-                        if item.get("workoutId") == matching.get("workoutId")
-                        and item.get("date") == definition["schedule_date"]
-                    ),
-                    None,
-                )
-                replaced = {
-                    "week": week,
-                    "workout_id": matching.get("workoutId"),
-                    "date": definition["schedule_date"],
-                    "name": definition["name"],
-                    "description": definition.get("base_description"),
-                }
-                if old_schedule is not None:
-                    replaced["schedule_id"] = old_schedule.get(
-                        "workoutScheduleId", old_schedule.get("id")
-                    )
-            uploaded = client.upload_running_workout(managed_workout)
+            uploaded = client.upload_running_workout(workout)
             workout_id = uploaded.get("workoutId")
             if not workout_id:
                 raise RuntimeError(
@@ -805,8 +534,6 @@ def synchronize_program_week(
         )
         if schedule is None:
             schedule = client.schedule_workout(workout_id, definition["schedule_date"])
-            if inventory is not None:
-                inventory.add_schedule(schedule)
             result.add(
                 "schedule",
                 definition["name"],
@@ -828,13 +555,10 @@ def synchronize_program_week(
         if (
             previous
             and previous.get("schedule_id")
-            and previous.get("date") != definition["schedule_date"]
             and previous["schedule_id"] != schedule_id
             and not any(replaced_key == key for replaced_key, _ in replaced_records)
         ):
             client.unschedule_workout(previous["schedule_id"])
-            if inventory is not None:
-                inventory.remove_schedule(previous["schedule_id"])
             result.add(
                 "unschedule",
                 definition["name"],
@@ -848,10 +572,7 @@ def synchronize_program_week(
             "schedule_id": schedule_id,
             "date": definition["schedule_date"],
             "name": definition["name"],
-            "description": managed_description,
-            "owner_id": owner_id,
-            "program_id": program_id,
-            "key": key,
+            "description": payload.get("description"),
             "content_hash": desired_hash,
             "status": "scheduled",
         }
@@ -877,8 +598,6 @@ def synchronize_program_week(
         schedule_id = record.get("schedule_id")
         if schedule_id:
             client.unschedule_workout(schedule_id)
-            if inventory is not None:
-                inventory.remove_schedule(schedule_id)
             result.add(
                 "unschedule",
                 record.get("name", key),
@@ -887,8 +606,6 @@ def synchronize_program_week(
             )
         if workout_id and remote is not None:
             client.delete_workout(workout_id)
-            if inventory is not None:
-                inventory.remove_workout(workout_id)
             result.add("delete", record.get("name", key), workout_id=workout_id)
         if records.get(key) is record:
             del records[key]
@@ -905,87 +622,18 @@ def synchronize_program_weeks(
     *,
     prune: bool = False,
     today: date | None = None,
-    owner_id: str = "local-default",
-    active_plan_selections: list[
-        tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]
-    ] | None = None,
 ) -> list[SyncResult]:
     """Synchronize selected weeks additively without pruning other weeks."""
     _validate_selections(selections)
     program_id = selections[0][0]["program_id"]
-    if active_plan_selections is not None:
-        _validate_selections(active_plan_selections)
-        if active_plan_selections[0][0]["program_id"] != program_id:
-            raise ValueError("active plan catalog belongs to another program")
-    reference_date = today or date.today()
-    state = repository.load(program_id)
-    dates = {
-        definition["schedule_date"]
-        for _, compiled in selections
-        for definition, _ in compiled
-    }
-    dates.update(
-        record["date"]
-        for record in state["workouts"].values()
-        if isinstance(record, dict)
-        and isinstance(record.get("date"), str)
-        and record["date"] < reference_date.isoformat()
-        and record.get("status") not in _TERMINAL_STATUSES
-    )
-    desired_keys = (
-        {
-            f"week-{program['week']:02d}/{definition['id']}"
-            for program, compiled in active_plan_selections
-            for definition, _ in compiled
-        }
-        if active_plan_selections is not None
-        else set()
-    )
-    remote_workouts = get_all_workouts(client)
-    if active_plan_selections is not None:
-        for remote in remote_workouts:
-            try:
-                metadata = parse_ownership(remote.get("description"))
-            except OwnershipMetadataError:
-                continue
-            if (
-                metadata is not None
-                and metadata.owner_id == owner_id
-                and metadata.program_id == program_id
-                and f"week-{metadata.week:02d}/{metadata.workout_id}" not in desired_keys
-                and metadata.date >= reference_date.isoformat()
-            ):
-                dates.add(metadata.date)
-    inventory = SyncInventory(
-        remote_workouts,
-        scheduled_items_for_dates(client, dates) if dates else [],
-    )
-    reconciled = reconcile_program(
-        client, repository, program_id, today=today, inventory=inventory
-    )
+    reconciled = reconcile_program(client, repository, program_id, today=today)
     selected_reconciled = reconcile_selected_program(
         client,
         repository,
         selections,
-        owner_id=owner_id,
         today=today,
-        inventory=inventory,
     )
-    cleanup_actions = cleanup_terminal_workouts(
-        client, repository, program_id, inventory=inventory
-    )
-    orphan_actions = (
-        cleanup_orphaned_workouts(
-            client,
-            repository,
-            program_id,
-            owner_id=owner_id,
-            desired_keys=desired_keys,
-            inventory=inventory,
-        )
-        if active_plan_selections is not None
-        else []
-    )
+    cleanup_actions = cleanup_terminal_workouts(client, repository, program_id)
     results: list[SyncResult] = []
     for program, compiled in selections:
         results.append(
@@ -996,8 +644,6 @@ def synchronize_program_weeks(
                 compiled,
                 prune=False,
                 today=today,
-                owner_id=owner_id,
-                inventory=inventory,
             )
         )
     if results:
@@ -1007,27 +653,23 @@ def synchronize_program_weeks(
             for action in result.actions
         }
         reconciliation_actions: list[SyncAction] = []
-        for action in (
-            reconciled.actions
-            + selected_reconciled.actions
-            + cleanup_actions
-            + orphan_actions
-        ):
+        for action in reconciled.actions + selected_reconciled.actions + cleanup_actions:
             identity = (action.kind, action.name, action.date, action.activity_id)
             if identity not in reported:
                 reconciliation_actions.append(action)
                 reported.add(identity)
         results[0].actions[0:0] = reconciliation_actions
     if prune:
-        prune_desired_keys = {
+        reference_date = today or date.today()
+        desired_keys = {
             f"week-{program['week']:02d}/{definition['id']}"
             for program, compiled in selections
             for definition, _ in compiled
         }
         state = repository.load(program_id)
         records: dict[str, Any] = state["workouts"]
-        remote_workouts = inventory.workouts
-        for key in sorted(set(records) - prune_desired_keys):
+        remote_workouts = get_all_workouts(client)
+        for key in sorted(set(records) - desired_keys):
             record = records[key]
             if not _is_prunable(record, reference_date):
                 continue
@@ -1036,190 +678,23 @@ def synchronize_program_weeks(
                 (item for item in remote_workouts if item.get("workoutId") == workout_id),
                 None,
             )
+            if remote is not None and not _is_owned(remote, record):
+                raise RuntimeError(
+                    f"Safety stop: workoutId={workout_id} does not belong to the program"
+                )
             name = record.get("name", key)
             schedule_id = record.get("schedule_id")
             if schedule_id:
                 client.unschedule_workout(schedule_id)
-                inventory.remove_schedule(schedule_id)
                 results[-1].add(
                     "unschedule", name, workout_id=workout_id, schedule_id=schedule_id
                 )
             if workout_id and remote is not None:
                 client.delete_workout(workout_id)
-                inventory.remove_workout(workout_id)
                 results[-1].add("delete", name, workout_id=workout_id)
             del records[key]
             repository.save(program_id, state)
     return results
-
-
-def discover_sync_state(
-    client: GarminClient,
-    selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
-    *,
-    owner_id: str,
-    today: date | None = None,
-) -> dict[str, Any]:
-    """Discover recoverable local state from read-only Garmin data."""
-    _validate_selections(selections)
-    reference_date = today or date.today()
-    program_id = selections[0][0]["program_id"]
-    local: dict[str, dict[str, Any]] = {}
-    dates: set[str] = set()
-    for program, compiled in selections:
-        for definition, workout in compiled:
-            key = f"week-{program['week']:02d}/{definition['id']}"
-            local[key] = {
-                "week": program["week"],
-                "definition": definition,
-                "content_hash": workout_content_hash(workout),
-            }
-            dates.add(definition["schedule_date"])
-
-    remote_workouts = get_all_workouts(client)
-    scheduled = scheduled_items_for_dates(client, dates) if dates else []
-    if dates:
-        first_date, last_date = min(dates), max(dates)
-        scheduled = [
-            item for item in scheduled
-            if isinstance(item.get("date"), str)
-            and first_date <= item["date"] <= last_date
-        ]
-    candidates: dict[str, list[tuple[dict[str, Any], OwnershipMetadata]]] = {}
-    issues: list[dict[str, Any]] = []
-    legacy: list[dict[str, Any]] = []
-
-    def issue(code: str, message: str, *, remote: dict[str, Any] | None = None, key: str | None = None) -> None:
-        item: dict[str, Any] = {"code": code, "message": message}
-        if remote and remote.get("workoutId") is not None:
-            item["workoutId"] = remote["workoutId"]
-        if key:
-            item["key"] = key
-        issues.append(item)
-
-    local_titles = {item["definition"]["name"] for item in local.values()}
-    for remote in remote_workouts:
-        try:
-            metadata = parse_ownership(remote.get("description"))
-        except OwnershipMetadataError as exc:
-            issue(exc.code, str(exc), remote=remote)
-            continue
-        if metadata is None:
-            if remote.get("workoutName") in local_titles:
-                legacy.append({
-                    "workoutId": remote.get("workoutId"),
-                    "name": remote.get("workoutName", "Unknown workout"),
-                })
-            continue
-        key = f"week-{metadata.week:02d}/{metadata.workout_id}"
-        if metadata.owner_id != owner_id:
-            issue("wrong_owner", "Workout belongs to another Runplan owner", remote=remote, key=key)
-            continue
-        if metadata.program_id != program_id:
-            issue("wrong_program", "Workout belongs to another Runplan program", remote=remote, key=key)
-            continue
-        if key not in local:
-            issue("missing_local", "Owned Garmin workout has no local definition", remote=remote, key=key)
-            continue
-        candidates.setdefault(key, []).append((remote, metadata))
-
-    records: dict[str, Any] = {}
-    recovered: list[dict[str, Any]] = []
-    for key, matches in sorted(candidates.items()):
-        if len(matches) != 1:
-            issue("duplicate_identity", "Multiple Garmin workouts have the same Runplan identity", key=key)
-            continue
-        remote, metadata = matches[0]
-        workout_id = remote.get("workoutId")
-        if not isinstance(workout_id, int) or isinstance(workout_id, bool):
-            issue("missing_workout_id", "Garmin workout has no numeric workout ID", remote=remote, key=key)
-            continue
-        if _remote_has_content(remote):
-            actual_hash = _content_hash(remote)
-            if actual_hash != metadata.content_hash:
-                issue("metadata_hash_mismatch", "Garmin workout content no longer matches its ownership hash", remote=remote, key=key)
-                continue
-        else:
-            actual_hash = metadata.content_hash
-            issue("content_unverifiable", "Garmin did not return complete workout content; using the embedded hash", remote=remote, key=key)
-        desired = local[key]
-        if metadata.content_hash != desired["content_hash"]:
-            issue("changed_remote", "Recovered Garmin content differs from the current local workout", remote=remote, key=key)
-        if metadata.date != desired["definition"]["schedule_date"]:
-            issue("date_mismatch", "Recovered Garmin date differs from the current local plan", remote=remote, key=key)
-        occurrences = [item for item in scheduled if item.get("workoutId") == workout_id]
-        if len(occurrences) > 1:
-            issue("conflicting_schedules", "Garmin workout has multiple schedules in the plan range", remote=remote, key=key)
-            continue
-        occurrence = occurrences[0] if occurrences else None
-        record: dict[str, Any] = {
-            "week": metadata.week,
-            "workout_id": workout_id,
-            "date": metadata.date,
-            "name": remote.get("workoutName", desired["definition"]["name"]),
-            "description": remote.get("description"),
-            "owner_id": owner_id,
-            "program_id": program_id,
-            "key": key,
-            "content_hash": actual_hash,
-            "status": "planned",
-        }
-        if occurrence is not None:
-            record["schedule_id"] = occurrence.get("workoutScheduleId", occurrence.get("id"))
-            record["date"] = occurrence.get("date", metadata.date)
-            activity_id = occurrence.get("associatedActivityId")
-            if activity_id is not None:
-                record["status"] = "completed"
-                record["activity_id"] = activity_id
-                record["actual_distance_meters"] = occurrence["actualDistanceMeters"]
-                record["actual_duration_seconds"] = occurrence["actualDurationSeconds"]
-                if occurrence.get("associatedActivityDateTime"):
-                    record["completed_at"] = occurrence["associatedActivityDateTime"]
-            elif record["date"] < reference_date.isoformat():
-                record["status"] = "missed"
-            else:
-                record["status"] = "scheduled"
-        elif metadata.date < reference_date.isoformat():
-            issue("uncertain_history", "Past workout has no Garmin schedule evidence", remote=remote, key=key)
-        records[key] = record
-        recovered.append({
-            "key": key,
-            "name": record["name"],
-            "date": record["date"],
-            "status": record["status"],
-            "workoutId": workout_id,
-            "scheduleId": record.get("schedule_id"),
-        })
-
-    for key in sorted(set(local) - set(candidates)):
-        issue("not_found", "No owned Garmin workout found for local definition", key=key)
-    return {
-        "ownerId": owner_id,
-        "programId": program_id,
-        "recovered": recovered,
-        "issues": issues,
-        "legacyCandidates": legacy,
-        "records": records,
-    }
-
-
-def rebuild_sync_state(repository: StateRepository, discovery: dict[str, Any]) -> dict[str, Any]:
-    """Atomically replace local state with a reviewed discovery result."""
-    program_id = discovery.get("programId")
-    records = discovery.get("records")
-    if not isinstance(program_id, str) or not isinstance(records, dict):
-        raise ValueError("invalid sync-state discovery result")
-    state = new_state(program_id)
-    state["workouts"] = records
-    scheduled_weeks = [
-        record.get("week") for record in records.values()
-        if isinstance(record, dict) and record.get("status") == "scheduled"
-        and isinstance(record.get("week"), int)
-    ]
-    if scheduled_weeks:
-        state["active_week"] = max(scheduled_weeks)
-    repository.save(program_id, state)
-    return state
 
 
 def delete_managed_workouts(
@@ -1234,28 +709,6 @@ def delete_managed_workouts(
     state = repository.load(program_id)
     records: dict[str, Any] = state["workouts"]
     remote_workouts = get_all_workouts(client)
-    for definition, _ in compiled:
-        remote = next(
-            (
-                item
-                for item in remote_workouts
-                if item.get("workoutName") == definition["name"]
-                and item.get("description") == definition.get("base_description")
-            ),
-            None,
-        )
-        if remote is not None:
-            key = f"week-{program['week']:02d}/{definition['id']}"
-            records.setdefault(
-                key,
-                {
-                    "week": program["week"],
-                    "workout_id": remote.get("workoutId"),
-                    "date": definition["schedule_date"],
-                    "name": definition["name"],
-                    "description": definition.get("base_description"),
-                },
-            )
     dates = {
         record["date"]
         for record in records.values()
@@ -1272,10 +725,6 @@ def delete_managed_workouts(
             (item for item in remote_workouts if item.get("workoutId") == workout_id),
             None,
         )
-        if remote is not None and not _is_owned(remote, record):
-            raise RuntimeError(
-                f"Safety stop: workoutId={workout_id} does not belong to the program"
-            )
         schedule_id = record.get("schedule_id")
         if not schedule_id:
             schedule = next(
@@ -1360,11 +809,9 @@ __all__ = [
     "cleanup_terminal_workouts",
     "delete_all_managed",
     "delete_managed_workouts",
-    "discover_sync_state",
     "plan_program_weeks",
     "reconcile_program",
     "reconcile_selected_program",
-    "rebuild_sync_state",
     "sync_program_week",
     "synchronize_program_week",
     "synchronize_program_weeks",

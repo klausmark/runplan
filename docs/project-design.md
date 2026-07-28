@@ -234,25 +234,17 @@ Sync is additive by default:
 - Create, update, reuse, and schedule selected workouts.
 - Preserve already synced weeks outside the selection.
 - Never delete something merely because it was not selected.
-- Remove owned objects whose identity no longer exists in the full active plan.
 
 Removal requires explicit `--prune` intent. Runplan shows the structured diff
 and asks for confirmation; `--yes` is the explicit non-interactive alternative.
 Pruning is calculated against the union of every selected week and deletes only
-future active records whose ownership is verified. Completed history, missed
+future active records tracked by local Garmin IDs. Completed history, missed
 workouts, and recorded activities are preserved locally. Independently of
 prune, normal sync removes owned Garmin calendar entries and uploaded workout
 templates after a workout becomes completed or missed. It then clears those
 remote IDs locally while retaining activity IDs and actual results. State is
 persisted after each externally successful operation so retries can continue
 safely.
-
-Each real sync builds one ephemeral Garmin inventory. Workout templates are
-paginated once, relevant calendar months are fetched once each, and activity
-summaries are reused within the operation. Reconciliation, terminal cleanup,
-orphan cleanup, and selected-week synchronization share this snapshot and
-update it after mutations. This keeps external calls proportional to Garmin
-pages and relevant months rather than multiplying them by sync phase or week.
 
 Every real sync first reconciles historical managed schedules. A Garmin
 `associatedActivityId`, or an activity summary whose
@@ -265,60 +257,27 @@ cleaned up, but recorded activities are never deleted. Compact terminal history
 remains in local state so later syncs cannot recreate it and future reporting
 can compare planned and completed training.
 Selected occurrences are also compared with Garmin before synchronization, so
-an association on the current day or after local state loss is still recorded
-as completed. Matching requires tracked Garmin IDs or valid ownership metadata.
-An ID persisted after a Runplan create response is authoritative ownership even
-if the remote object is later edited. Selected changed objects are replaced by
-creating and scheduling the corrected template before deleting the old one; a
-missing tracked object is recreated. Valid ownership metadata is sufficient to
-clean an untracked orphan for the current user and active program. Other users,
-other programs, and unmarked untracked objects are never adopted or deleted.
+an association on the current day is recorded as completed when its schedule is
+tracked locally. A persisted Garmin workout or schedule ID is authoritative:
+remote edits are replaced from the plan and missing tracked objects are
+recreated. Runplan never adopts an untracked Garmin object by matching metadata,
+title, description, date, or workout content. Garmin workout descriptions
+contain no Runplan metadata.
 
 User-based CLI sync resolves the active program, credentials, tokens, default
-pace, state directory, and ownership ID from the selected profile. `sync --all`
+pace and state directory from the selected profile. `sync --all`
 processes profiles sequentially, skips profiles without an active program, and
 continues after failures while returning a failure status for a partial batch.
 
-## Recoverable Garmin ownership
+## Garmin ownership
 
-The user's YAML embeds synchronization knowledge and completed results, but is
-not the sole proof that Runplan owns a Garmin object. Every Garmin workout
-created or updated by Runplan must carry a versioned ownership envelope in a
-strictly delimited suffix of its description. The visible workout title remains
-human-readable. The envelope contains enough stable information to reconstruct
-identity and verify content after local state is lost: the full program ID,
-source week and workout ID, planned occurrence date, and canonical content
-hash. The representation must be ASCII-safe, escaped deterministically, small
-enough for Garmin's verified description limit, and preserved unchanged by a
-Garmin create/read round trip. Parsing an unknown future version is an explicit
-unsupported result, never a best-effort interpretation.
-
-Recovery is a distinct import operation, not a side effect of ordinary sync.
-For one selected Garmin profile and local program, it reads all Garmin workout
-templates and calendar occurrences covering the program date range, parses
-valid ownership envelopes, joins templates to schedules and associated
-activities, and compares them with the current compiled local plan. It first
-returns a reviewable, non-mutating diff. Explicit confirmation atomically
-rebuilds the profile-and-program state with recovered remote IDs, dates,
-content hashes, and lifecycle evidence. Repeating recovery against unchanged
-Garmin data is idempotent.
-
-The implemented `v1` envelope is an unpadded base64url encoding of canonical,
-compact JSON in a `[runplan:v1:<payload>]` description suffix. Its fields are
-the stable Runplan owner ID (`o`), program ID (`p`), source week (`w`), workout
-ID (`i`), planned date (`d`), and SHA-256 content hash (`h`). The CLI exposes
-preview plus `--yes`; the web flow lives under user settings and requires a
-fresh confirmation token before the per-user program state is replaced.
-
-Recovery is conservative. A valid ownership envelope is required for automatic
-adoption; a matching title, short name, human description, date, or workout
-shape is insufficient. Duplicate identities, multiple schedules, metadata and
-remote-content hash disagreement, missing local workout keys, unsupported
-versions, and incomplete historical evidence are conflicts or unresolved
-records for review. Recovery never changes or deletes Garmin data. Legacy
-Runplan workouts without envelopes may be listed as candidates but cannot be
-claimed automatically; a later confirmed normal sync can migrate them by
-writing current ownership metadata.
+The user's YAML tracking is the sole proof that Runplan owns a Garmin workout
+template or calendar schedule. IDs returned after successful Garmin creates are
+persisted before obsolete objects are removed. Later syncs may therefore trust
+those IDs, overwrite remote changes, and recreate missing tracked objects
+without re-verifying titles or descriptions. Objects without locally persisted
+IDs remain outside Runplan's control. Losing local tracking is irreversible and
+does not enable discovery or recovery from Garmin.
 
 ## Export
 
@@ -353,9 +312,8 @@ than reproduce domain behavior in browser code. Keep these boundaries explicit:
 - HTML output can serve as a server-rendered preview.
 - Credentials, tokens, generated plans, and audit data have explicit ownership
   and tenant boundaries.
-- Garmin ownership metadata and recovered sync state are scoped by Runplan user
-  as well as program; recovery for one user cannot observe or adopt another
-  user's objects.
+- Garmin credentials and YAML tracking are scoped by Runplan user; one profile
+  cannot use another profile's locally tracked IDs.
 - Browser clients never receive Garmin credentials or tokens.
 - Program writes use document revisions or equivalent optimistic concurrency;
   a stale browser must not silently overwrite a newer revision.

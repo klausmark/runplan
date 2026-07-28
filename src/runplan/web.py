@@ -23,9 +23,7 @@ from ruamel.yaml.error import YAMLError as RoundTripYAMLError
 from .application.export import build_program_export
 from .application.ports import GarminClient, StateRepository
 from .application.sync import (
-    discover_sync_state,
     plan_program_weeks,
-    rebuild_sync_state,
     synchronize_program_weeks,
     workout_content_hash,
 )
@@ -540,7 +538,6 @@ class WebSyncService:
         return YamlStateRepository(
             self.store_for(user.id).path(name),
             legacy_directory=user.state_directory,
-            owner_id=user.id,
         )
 
     def client_for(self, user_id: str | None) -> GarminClient:
@@ -565,21 +562,6 @@ class WebSyncService:
             )
         except (WorkoutDefinitionError, WeekSelectionError, ValueError) as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
-
-    def _all_selections(self, name: str, user_id: str):
-        from .cli import prepare_sync_selections
-
-        user = self.users.get(user_id)
-        return prepare_sync_selections(
-            Namespace(
-                yaml_file=self.store_for(user.id).path(name),
-                select_weeks="all",
-                weeks_ahead=None,
-                delete_all=False,
-                today=self.today(),
-            ),
-            fallback_pace_value=user.default_pace,
-        )
 
     @staticmethod
     def _token(user_id: str, revision: str, plan: dict[str, Any]) -> str:
@@ -623,8 +605,6 @@ class WebSyncService:
                 self.repository_for(user.id, name),
                 selections,
                 today=self.today(),
-                owner_id=user.id,
-                active_plan_selections=self._all_selections(name, user.id),
             )
         except SystemExit as exc:
             raise WebError(HTTPStatus.BAD_GATEWAY, str(exc)) from exc
@@ -639,51 +619,6 @@ class WebSyncService:
             "weeks": preview["plan"]["weeks"],
             "results": [result.to_dict() for result in results],
         }
-
-    def recovery_preview(self, name: str, user_id: str | None = None) -> dict[str, Any]:
-        user = self.users.get(user_id or self.users.default_id)
-        revision = self.store_for(user.id).revision(name)
-        try:
-            discovery = discover_sync_state(
-                self.client_for(user.id),
-                self._all_selections(name, user.id),
-                owner_id=user.id,
-                today=self.today(),
-            )
-        except Exception as exc:
-            raise WebError(
-                HTTPStatus.BAD_GATEWAY,
-                f"Garmin recovery failed: {type(exc).__name__}: {exc}",
-            ) from exc
-        token = self._token(user.id, revision, discovery)
-        return {
-            "userId": user.id,
-            "revision": revision,
-            "confirmationToken": token,
-            "discovery": {key: value for key, value in discovery.items() if key != "records"},
-            "_records": discovery["records"],
-        }
-
-    def recovery_execute(self, name: str, request: dict[str, Any]) -> dict[str, Any]:
-        user = self.users.get(request.get("userId") or self.users.default_id)
-        token = request.get("confirmationToken")
-        if not isinstance(token, str):
-            raise WebError(HTTPStatus.BAD_REQUEST, "Recovery requires a preview confirmation token")
-        preview = self.recovery_preview(name, user.id)
-        if token != preview["confirmationToken"]:
-            raise WebError(
-                HTTPStatus.CONFLICT,
-                "Garmin data or the local plan changed; review recovery again",
-            )
-        discovery = {**preview["discovery"], "records": preview["_records"]}
-        state = rebuild_sync_state(self.repository_for(user.id, name), discovery)
-        return {
-            "userId": user.id,
-            "programId": discovery["programId"],
-            "recoveredCount": len(state["workouts"]),
-            "discovery": preview["discovery"],
-        }
-
 
 def make_handler(
     store: ProgramStore,
@@ -762,9 +697,6 @@ def make_handler(
                 if len(parts) == 2 and parts[1] == "sync":
                     self._json(HTTPStatus.OK, sync.execute(parts[0], payload))
                     return
-                if len(parts) == 3 and parts[1:] == ["sync", "recovery"]:
-                    self._json(HTTPStatus.OK, sync.recovery_execute(parts[0], payload))
-                    return
                 raise WebError(HTTPStatus.NOT_FOUND, "Not found")
             except WebError as exc:
                 self._json(exc.status, {"error": str(exc)})
@@ -819,11 +751,6 @@ def make_handler(
                     return
                 if len(parts) == 3 and parts[1:] == ["sync", "preview"]:
                     self._json(HTTPStatus.OK, sync.preview(parts[0], user_id))
-                    return
-                if len(parts) == 4 and parts[1:] == ["sync", "recovery", "preview"]:
-                    preview = sync.recovery_preview(parts[0], user_id)
-                    preview.pop("_records", None)
-                    self._json(HTTPStatus.OK, preview)
                     return
             assets = {
                 "/": ("index.html", "text/html"),

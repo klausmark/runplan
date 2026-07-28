@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from argparse import Namespace
@@ -28,10 +27,8 @@ from .parsing.values import parse_pace
 from .application.preview import build_preview
 from .application.ports import StateRepository
 from .application.sync import (
-    discover_sync_state,
     plan_program_weeks,
     reconcile_program,
-    rebuild_sync_state,
     synchronize_program_weeks,
 )
 from .integrations.garmin.client import login_to_garmin
@@ -167,12 +164,8 @@ def run_preview(
 def run_multi_week_sync(
     selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
     *,
-    active_plan_selections: list[
-        tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]
-    ] | None = None,
     prune: bool = False,
     today: date | None = None,
-    owner_id: str = "local-default",
     repository: StateRepository | None = None,
     credentials_file: Path | None = None,
     token_store: Path | None = None,
@@ -184,7 +177,6 @@ def run_multi_week_sync(
         )
         results = synchronize_program_weeks(
             client, repository or JsonStateRepository(), selections, prune=prune, today=today,
-            owner_id=owner_id, active_plan_selections=active_plan_selections,
         )
         for result in results:
             for action in result.actions:
@@ -263,16 +255,6 @@ def build_parser() -> argparse.ArgumentParser:
     reconcile_parser.add_argument(
         "yaml_file", type=Path, help="Path to the program YAML file"
     )
-    rebuild_parser = commands.add_parser(
-        "rebuild-state", help="Rebuild local sync state from Garmin metadata"
-    )
-    rebuild_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
-    rebuild_parser.add_argument(
-        "--owner-id", default=os.getenv("RUNPLAN_OWNER_ID", "local-default")
-    )
-    rebuild_parser.add_argument(
-        "--yes", action="store_true", help="Apply the reviewed recovery result"
-    )
     return parser
 
 
@@ -333,8 +315,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return serve(arguments.host, arguments.port, arguments.program_dir)
     if arguments.command == "reconcile":
         return run_reconcile(arguments)
-    if arguments.command == "rebuild-state":
-        return run_rebuild_state(arguments)
     return 2
 
 
@@ -380,8 +360,7 @@ def _sync_one_user(arguments: Namespace, user: Any) -> int:
     values = vars(arguments).copy()
     values.update(
         yaml_file=path,
-        owner_id=user.id,
-        repository=YamlStateRepository(path, legacy_directory=user.state_directory, owner_id=user.id),
+        repository=YamlStateRepository(path, legacy_directory=user.state_directory),
         credentials_file=user.credentials_file,
         token_store=user.token_store,
         fallback_pace_value=user.default_pace,
@@ -447,38 +426,6 @@ def run_reconcile(arguments: Namespace) -> int:
     return 0
 
 
-def run_rebuild_state(arguments: Namespace) -> int:
-    """Preview or apply recovery of local sync state from Garmin."""
-    try:
-        selections = prepare_sync_selections(
-            Namespace(
-                yaml_file=arguments.yaml_file,
-                select_weeks="all",
-                weeks_ahead=None,
-                delete_all=False,
-                today=None,
-            )
-        )
-        client = login_to_garmin()
-        discovery = discover_sync_state(
-            client, selections, owner_id=arguments.owner_id
-        )
-        public = {key: value for key, value in discovery.items() if key != "records"}
-        print(json.dumps(public, ensure_ascii=False, indent=2))
-        if arguments.yes:
-            rebuild_sync_state(YamlStateRepository(arguments.yaml_file), discovery)
-            print(f"Rebuilt local state for {discovery['programId']}.")
-        else:
-            print("Preview only. Run again with --yes to rebuild local state.")
-        return 0
-    except (WorkoutDefinitionError, ValueError) as exc:
-        print(f"Recovery failed: {exc}", file=sys.stderr)
-        return 2
-    except Exception as exc:
-        print(f"Recovery failed: {type(exc).__name__}: {exc}", file=sys.stderr)
-        return 99
-
-
 __all__ = [
     "build_parser",
     "add_week_selectors",
@@ -489,7 +436,6 @@ __all__ = [
     "run_multi_week_sync",
     "run_preview",
     "run_reconcile",
-    "run_rebuild_state",
     "run_sync",
     "run_user_command",
     "run_user_sync",
