@@ -28,7 +28,11 @@ from runplan.application.sync import (
     synchronize_program_week,
     synchronize_program_weeks,
 )
-from runplan.domain.ownership import parse_ownership
+from runplan.domain.ownership import (
+    OwnershipMetadata,
+    description_with_ownership,
+    parse_ownership,
+)
 from runplan.state.json_repository import CURRENT_STATE_VERSION, JsonStateRepository
 from runplan.integrations.garmin.client import (
     get_all_workouts,
@@ -455,12 +459,12 @@ class SyncCharacterizationTests(unittest.TestCase):
             client, JsonStateRepository(), "characterization-plan"
         )
 
-        self.assertEqual([], actions)
+        self.assertEqual(["unschedule"], [action.kind for action in actions])
         cleaned = load_state("characterization-plan")["workouts"]["week-01/missed"]
         self.assertNotIn("schedule_id", cleaned)
         self.assertNotIn("workout_id", cleaned)
 
-    def test_terminal_cleanup_preflights_ownership_before_deleting_anything(self) -> None:
+    def test_terminal_cleanup_treats_tracked_id_as_authoritative(self) -> None:
         record = {
             **self._old_record(),
             "workout_id": 10,
@@ -478,11 +482,10 @@ class SyncCharacterizationTests(unittest.TestCase):
             schedules=[{"itemType": "workout", "workoutId": 10, "workoutScheduleId": 20, "date": "2026-07-20"}],
         )
 
-        with self.assertRaisesRegex(RuntimeError, "does not belong"):
-            cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
+        cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
 
-        self.assertNotIn(("unschedule", 20), client.events)
-        self.assertNotIn(("delete", 10), client.events)
+        self.assertIn(("unschedule", 20), client.events)
+        self.assertIn(("delete", 10), client.events)
 
     def test_terminal_cleanup_checkpoints_unschedule_before_delete_failure(self) -> None:
         record = {
@@ -586,7 +589,7 @@ class SyncCharacterizationTests(unittest.TestCase):
         self.assertIn("week-09/old", state["workouts"])
         self.assertIn("week-01/mixed", state["workouts"])
 
-    def test_cleanup_stops_if_remote_workout_no_longer_matches_state(self) -> None:
+    def test_prune_treats_tracked_id_as_authoritative(self) -> None:
         old = self._old_record()
         save_state(
             "characterization-plan",
@@ -607,16 +610,14 @@ class SyncCharacterizationTests(unittest.TestCase):
         )
         program, compiled = compiled_week(1)
 
-        with self.assertRaisesRegex(RuntimeError, "does not belong to the program"), redirect_stdout(
-            StringIO()
-        ):
+        with redirect_stdout(StringIO()):
             synchronize_program_weeks(
                 client, JsonStateRepository(), [(program, compiled)], prune=True
             )
 
-        self.assertNotIn(("delete", 99), client.events)
-        self.assertNotIn(("unschedule", 199), client.events)
-        self.assertIn("week-09/old", load_state("characterization-plan")["workouts"])
+        self.assertIn(("delete", 99), client.events)
+        self.assertIn(("unschedule", 199), client.events)
+        self.assertNotIn("week-09/old", load_state("characterization-plan")["workouts"])
 
     def test_delete_all_unschedules_then_deletes_only_owned_records(self) -> None:
         old = self._old_record()
@@ -713,6 +714,170 @@ class SyncCharacterizationTests(unittest.TestCase):
             set(load_state("characterization-plan")["workouts"]),
         )
 
+    def test_active_plan_catalog_removes_tracked_orphan(self) -> None:
+        client = FakeGarmin()
+        full_catalog = compiled_week(1)
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [full_catalog],
+            active_plan_selections=[full_catalog],
+        )
+        easy_id = load_state("characterization-plan")["workouts"]["week-01/easy"]["workout_id"]
+        selected = copy.deepcopy(compiled_week(1))
+        selected[1][:] = [item for item in selected[1] if item[0]["id"] != "easy"]
+        client.events.clear()
+
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [selected],
+            active_plan_selections=[selected],
+        )
+
+        self.assertIn(("delete", easy_id), client.events)
+        self.assertNotIn(
+            "week-01/easy", load_state("characterization-plan")["workouts"]
+        )
+
+    def test_active_plan_catalog_removes_untracked_owned_orphan(self) -> None:
+        client = FakeGarmin(workouts=[{
+            "workoutId": 77,
+            "workoutName": "Removed workout",
+            "description": description_with_ownership(
+                "Removed",
+                OwnershipMetadata(
+                    owner_id="test-owner",
+                    program_id="characterization-plan",
+                    week=9,
+                    workout_id="removed",
+                    date="2027-03-01",
+                    content_hash="a" * 64,
+                ),
+            ),
+        }])
+
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [compiled_week(1)],
+            active_plan_selections=[compiled_week(1)],
+            owner_id="test-owner",
+            today=date(2026, 12, 28),
+        )
+
+        self.assertIn(("delete", 77), client.events)
+
+    def test_orphan_cleanup_preserves_completed_result_without_remote_ids(self) -> None:
+        record = {
+            **self._old_record(),
+            "status": "completed",
+            "activity_id": 900,
+            "actual_distance_meters": 6000.0,
+            "actual_duration_seconds": 2100.0,
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-09/old": record}},
+        )
+        client = FakeGarmin(workouts=[{
+            "workoutId": 99,
+            "workoutName": "Edited tracked workout",
+            "description": "Edited",
+        }])
+
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [compiled_week(1)],
+            active_plan_selections=[compiled_week(1)],
+        )
+
+        preserved = load_state("characterization-plan")["workouts"]["week-09/old"]
+        self.assertEqual(900, preserved["activity_id"])
+        self.assertEqual(6000.0, preserved["actual_distance_meters"])
+        self.assertNotIn("workout_id", preserved)
+        self.assertNotIn("schedule_id", preserved)
+        self.assertNotIn(("delete", 900), client.events)
+
+    def test_orphan_cleanup_checkpoints_unschedule_before_delete_failure(self) -> None:
+        record = {**self._old_record(), "status": "scheduled"}
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-09/old": record}},
+        )
+
+        class DeleteFailure(FakeGarmin):
+            def delete_workout(self, workout_id: int) -> None:
+                self.events.append(("delete_failed", workout_id))
+                raise RuntimeError("simulated orphan delete failure")
+
+        client = DeleteFailure(
+            workouts=[{"workoutId": 99, "workoutName": "Edited", "description": "Edited"}],
+            schedules=[{
+                "itemType": "workout",
+                "workoutId": 99,
+                "workoutScheduleId": 199,
+                "date": "2026-11-01",
+            }],
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "simulated orphan delete failure"):
+            synchronize_program_weeks(
+                client,
+                JsonStateRepository(),
+                [compiled_week(1)],
+                active_plan_selections=[compiled_week(1)],
+                today=date(2026, 10, 1),
+            )
+
+        checkpoint = load_state("characterization-plan")["workouts"]["week-09/old"]
+        self.assertNotIn("schedule_id", checkpoint)
+        self.assertEqual(99, checkpoint["workout_id"])
+
+    def test_active_plan_catalog_preserves_valid_unselected_week(self) -> None:
+        client = FakeGarmin()
+        week_two = compiled_week(2)
+        synchronize_program_weeks(client, JsonStateRepository(), [week_two])
+        week_two_id = load_state("characterization-plan")["workouts"]["week-02/long"]["workout_id"]
+        client.events.clear()
+
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [compiled_week(1)],
+            active_plan_selections=[compiled_week(1), compiled_week(2)],
+        )
+
+        self.assertNotIn(("delete", week_two_id), client.events)
+        self.assertIn("week-02/long", load_state("characterization-plan")["workouts"])
+
+    def test_multi_week_sync_fetches_inventory_once(self) -> None:
+        client = FakeGarmin(workouts=[
+            {"workoutId": item, "workoutName": f"Unmanaged {item}"}
+            for item in range(250)
+        ])
+
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [compiled_week(1), compiled_week(2)],
+            active_plan_selections=[compiled_week(1), compiled_week(2)],
+        )
+
+        self.assertEqual(
+            [
+                ("get_workouts", 0, 100),
+                ("get_workouts", 100, 100),
+                ("get_workouts", 200, 100),
+            ],
+            [event for event in client.events if event[0] == "get_workouts"],
+        )
+        self.assertEqual(
+            [("get_scheduled_workouts", 2026, 12), ("get_scheduled_workouts", 2027, 1)],
+            [event for event in client.events if event[0] == "get_scheduled_workouts"],
+        )
+
     def test_skipping_then_syncing_a_later_week_preserves_existing_state(self) -> None:
         client = FakeGarmin()
 
@@ -759,20 +924,92 @@ class SyncCharacterizationTests(unittest.TestCase):
 
         self.assertEqual([], client.events)
 
-    def test_remote_ownership_conflict_stops_before_mutation(self) -> None:
+    def test_changed_tracked_remote_is_replaced(self) -> None:
         client = FakeGarmin()
         synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
-        client.workouts[0]["description"] = "Conflicting remote workout"
+        old_id = client.workouts[0]["workoutId"]
+        client.workouts[0]["description"] = description_with_ownership(
+            "Conflicting remote workout",
+            OwnershipMetadata(
+                owner_id="local-default",
+                program_id="characterization-plan",
+                week=9,
+                workout_id="wrong-key",
+                date="2027-03-01",
+                content_hash="c" * 64,
+            ),
+        )
         client.events.clear()
 
-        with self.assertRaisesRegex(RuntimeError, "does not belong to the program"):
-            synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [compiled_week(1)],
+            active_plan_selections=[compiled_week(1)],
+        )
 
-        self.assertFalse(any(event[0] in ("upload", "schedule", "delete", "unschedule") for event in client.events))
+        self.assertTrue(any(event[0] == "upload" for event in client.events))
+        self.assertIn(("delete", old_id), client.events)
+        self.assertLess(
+            next(index for index, event in enumerate(client.events) if event[0] == "schedule"),
+            client.events.index(("delete", old_id)),
+        )
         self.assertEqual(
             {"week-01/mixed", "week-01/easy"},
             set(load_state("characterization-plan")["workouts"]),
         )
+
+    def test_missing_tracked_remote_is_recreated_with_a_new_id(self) -> None:
+        client = FakeGarmin()
+        synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
+        state = load_state("characterization-plan")
+        old_id = state["workouts"]["week-01/mixed"]["workout_id"]
+        client.workouts = [
+            item for item in client.workouts if item.get("workoutId") != old_id
+        ]
+        client.events.clear()
+
+        synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
+
+        new_id = load_state("characterization-plan")["workouts"]["week-01/mixed"]["workout_id"]
+        self.assertNotEqual(old_id, new_id)
+        self.assertTrue(any(event[0] == "upload" for event in client.events))
+        self.assertTrue(any(event[0] == "schedule" and event[1] == new_id for event in client.events))
+
+    def test_orphan_cleanup_leaves_other_owner_and_program_untouched(self) -> None:
+        workouts = []
+        for workout_id, owner_id, program_id in (
+            (71, "other-owner", "characterization-plan"),
+            (72, "test-owner", "other-plan"),
+        ):
+            workouts.append({
+                "workoutId": workout_id,
+                "workoutName": "Not ours in this sync",
+                "description": description_with_ownership(
+                    None,
+                    OwnershipMetadata(
+                        owner_id=owner_id,
+                        program_id=program_id,
+                        week=9,
+                        workout_id="removed",
+                        date="2027-03-01",
+                        content_hash="b" * 64,
+                    ),
+                ),
+            })
+        client = FakeGarmin(workouts=workouts)
+
+        synchronize_program_weeks(
+            client,
+            JsonStateRepository(),
+            [compiled_week(1)],
+            active_plan_selections=[compiled_week(1)],
+            owner_id="test-owner",
+            today=date(2026, 12, 28),
+        )
+
+        self.assertNotIn(("delete", 71), client.events)
+        self.assertNotIn(("delete", 72), client.events)
 
     def test_rebuild_recovers_state_from_owned_garmin_metadata(self) -> None:
         client = FakeGarmin()

@@ -167,6 +167,9 @@ def run_preview(
 def run_multi_week_sync(
     selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
     *,
+    active_plan_selections: list[
+        tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]
+    ] | None = None,
     prune: bool = False,
     today: date | None = None,
     owner_id: str = "local-default",
@@ -181,7 +184,7 @@ def run_multi_week_sync(
         )
         results = synchronize_program_weeks(
             client, repository or JsonStateRepository(), selections, prune=prune, today=today,
-            owner_id=owner_id,
+            owner_id=owner_id, active_plan_selections=active_plan_selections,
         )
         for result in results:
             for action in result.actions:

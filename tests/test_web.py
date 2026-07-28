@@ -757,13 +757,17 @@ class WebSyncServiceTests(unittest.TestCase):
         result = SyncResult("characterization-plan", 1)
         result.add("schedule", "Mixed", workout_id=42, date="2026-12-28")
 
-        with patch("runplan.web.synchronize_program_weeks", return_value=[result]):
+        with patch(
+            "runplan.web.synchronize_program_weeks", return_value=[result]
+        ) as synchronize:
             response = self.service.execute(
                 "plan.yaml",
                 {"confirmationToken": preview["confirmationToken"]},
             )
 
         self.client_factory.assert_called_once_with()
+        catalog = synchronize.call_args.kwargs["active_plan_selections"]
+        self.assertEqual([1, 2], [program["week"] for program, _ in catalog])
         self.assertEqual([1, 2], response["weeks"])
         self.assertEqual("schedule", response["results"][0]["actions"][0]["kind"])
 

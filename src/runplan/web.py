@@ -624,6 +624,7 @@ class WebSyncService:
                 selections,
                 today=self.today(),
                 owner_id=user.id,
+                active_plan_selections=self._all_selections(name, user.id),
             )
         except SystemExit as exc:
             raise WebError(HTTPStatus.BAD_GATEWAY, str(exc)) from exc

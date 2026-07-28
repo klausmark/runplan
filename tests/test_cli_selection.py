@@ -241,6 +241,7 @@ class CliSelectionTests(unittest.TestCase):
 
     def test_multi_week_handler_delegates_to_additive_use_case(self) -> None:
         selections = [compiled_week(1), compiled_week(2)]
+        catalog = [compiled_week(1), compiled_week(2)]
         client = object()
 
         with (
@@ -248,11 +249,16 @@ class CliSelectionTests(unittest.TestCase):
             patch("runplan.cli.synchronize_program_weeks") as synchronize,
             redirect_stdout(StringIO()),
         ):
-            result = run_multi_week_sync(selections)
+            result = run_multi_week_sync(
+                selections, active_plan_selections=catalog
+            )
 
         self.assertEqual(0, result)
         self.assertIs(client, synchronize.call_args.args[0])
         self.assertEqual(selections, synchronize.call_args.args[2])
+        self.assertEqual(
+            catalog, synchronize.call_args.kwargs["active_plan_selections"]
+        )
 
 
 if __name__ == "__main__":

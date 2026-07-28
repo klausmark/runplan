@@ -30,6 +30,12 @@ def run_sync(args: argparse.Namespace) -> int:
         compiled_selections = prepare_sync_selections(
             args, fallback_pace_value=getattr(args, "fallback_pace_value", None)
         )
+        catalog_values = vars(args).copy()
+        catalog_values.update(select_weeks="all", weeks_ahead=None, delete_all=False)
+        active_plan_selections = prepare_sync_selections(
+            argparse.Namespace(**catalog_values),
+            fallback_pace_value=getattr(args, "fallback_pace_value", None),
+        )
         definition, compiled = compiled_selections[0]
     except WeekSelectionError as exc:
         print(f"Cannot select sync weeks: {exc}", file=sys.stderr)
@@ -58,6 +64,7 @@ def run_sync(args: argparse.Namespace) -> int:
 
             return run_multi_week_sync(
                 compiled_selections,
+                active_plan_selections=active_plan_selections,
                 prune=True,
                 today=getattr(args, "today", None),
                 owner_id=getattr(args, "owner_id", "local-default"),
@@ -74,6 +81,7 @@ def run_sync(args: argparse.Namespace) -> int:
 
             return run_multi_week_sync(
                 compiled_selections,
+                active_plan_selections=active_plan_selections,
                 today=getattr(args, "today", None),
                 owner_id=getattr(args, "owner_id", "local-default"),
                 repository=getattr(args, "repository", None),

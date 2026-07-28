@@ -274,7 +274,11 @@ active. Completed and missed workouts are retained in local history and are
 never recreated. During sync, Runplan automatically removes their Garmin
 calendar entries and uploaded workout templates after ownership verification;
 it never deletes the recorded activity. The local Garmin workout and schedule
-IDs are then cleared while the activity ID and actual result remain. Run legacy file-based reconciliation
+IDs are then cleared while the activity ID and actual result remain. Normal
+sync also removes workouts owned by the current user and active program when
+their Runplan identity no longer exists anywhere in the active YAML plan.
+Valid later plan weeks are preserved even when they are outside the current
+sync window. Run legacy file-based reconciliation
 without scheduling new workouts with:
 
 ```bash
@@ -286,7 +290,9 @@ be removed. Runplan previews the diff and asks for confirmation. For controlled
 non-interactive automation, use `--prune --yes`. Completed history, missed
 workouts, recorded activities, and unowned Garmin workouts are never pruned.
 Terminal Garmin schedules and workout templates are cleaned automatically by
-the normal sync flow and do not require `--prune`.
+the normal sync flow and do not require `--prune`. Automatic orphan cleanup is
+also independent of `--prune`; it removes definitions deleted from the active
+plan, not merely workouts outside the selected weeks.
 
 Runplan stores lifecycle state, Garmin IDs, and completed results in a
 system-managed `tracking` section on each workout in the user's YAML. Week and
@@ -295,7 +301,10 @@ retired workouts, and estimates for remaining workouts. New and updated Garmin
 workouts also contain a compact Runplan ownership marker at the end of the
 description. It contains the non-secret Runplan user ID and plan/workout
 identity, never Garmin credentials. User-based sync always uses the stable
-Runplan user ID as the ownership ID.
+Runplan user ID as the ownership ID. Once Runplan stores a Garmin workout ID,
+that ID is authoritative: a missing object is recreated, while remote edits to
+its name, content, or metadata are replaced with the current planned workout.
+Objects belonging to another user or program remain untouched.
 
 Legacy JSON state is migrated into YAML on the next successful write. If YAML
 tracking is lost after a reinstall, preview recovery from Garmin with:

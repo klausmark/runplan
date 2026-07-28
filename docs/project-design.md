@@ -234,6 +234,7 @@ Sync is additive by default:
 - Create, update, reuse, and schedule selected workouts.
 - Preserve already synced weeks outside the selection.
 - Never delete something merely because it was not selected.
+- Remove owned objects whose identity no longer exists in the full active plan.
 
 Removal requires explicit `--prune` intent. Runplan shows the structured diff
 and asks for confirmation; `--yes` is the explicit non-interactive alternative.
@@ -245,6 +246,13 @@ templates after a workout becomes completed or missed. It then clears those
 remote IDs locally while retaining activity IDs and actual results. State is
 persisted after each externally successful operation so retries can continue
 safely.
+
+Each real sync builds one ephemeral Garmin inventory. Workout templates are
+paginated once, relevant calendar months are fetched once each, and activity
+summaries are reused within the operation. Reconciliation, terminal cleanup,
+orphan cleanup, and selected-week synchronization share this snapshot and
+update it after mutations. This keeps external calls proportional to Garmin
+pages and relevant months rather than multiplying them by sync phase or week.
 
 Every real sync first reconciles historical managed schedules. A Garmin
 `associatedActivityId`, or an activity summary whose
@@ -259,6 +267,12 @@ can compare planned and completed training.
 Selected occurrences are also compared with Garmin before synchronization, so
 an association on the current day or after local state loss is still recorded
 as completed. Matching requires tracked Garmin IDs or valid ownership metadata.
+An ID persisted after a Runplan create response is authoritative ownership even
+if the remote object is later edited. Selected changed objects are replaced by
+creating and scheduling the corrected template before deleting the old one; a
+missing tracked object is recreated. Valid ownership metadata is sufficient to
+clean an untracked orphan for the current user and active program. Other users,
+other programs, and unmarked untracked objects are never adopted or deleted.
 
 User-based CLI sync resolves the active program, credentials, tokens, default
 pace, state directory, and ownership ID from the selected profile. `sync --all`
