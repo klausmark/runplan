@@ -165,13 +165,16 @@ land independently from feature work.
 
 ## Test overview
 
-| Lines | Test module | Future migration boundary |
-| ---: | --- | --- |
-| 1226 | `test_sync_characterization.py` | Split by planning, execution, cleanup, state, and Garmin boundary after production seams exist |
-| 853 | `test_web.py` | Split by assets, program documents, user registry, sync service, and HTTP adapter |
-| 386 | `test_program_characterization.py` | Keep parser behavior together initially; migrate scenario groups module by module |
-| 253 | `test_cli_selection.py` | Natural unit for one complete pytest migration |
+The test-suite migration is complete. All tests use pytest style; no `unittest.TestCase`
+classes or unittest lifecycle hooks remain. The former characterization monoliths now follow
+the production subsystem and behavior boundaries:
 
-The largest individual test is 69 lines. Large tests generally describe multi-step safety
-scenarios, so they should be shortened only when fixtures or domain helpers improve the story.
-Do not split assertions that jointly describe one outcome.
+- Sync tests are split into planning, execution, cleanup, reconciliation, state, and Garmin
+  client modules, with shared setup in `sync_helpers.py` and `fakes.py`.
+- Web tests are split into assets, program store, user registry, and sync service modules.
+- Program characterization is split into parsing, Garmin payload, and CLI preview modules.
+- CLI user workflows and week-selection behavior have separate modules.
+
+Large safety scenarios may retain multiple related assertions when those assertions jointly
+describe one outcome. Extract setup only when a fixture or domain helper makes the story easier
+to read; do not hide the action or important expectations behind helpers.

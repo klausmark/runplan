@@ -27,10 +27,14 @@ formatting as part of an unrelated change.
 
 ## Tests
 
-- Use pytest for new test modules. Name tests `test_<situation>_<expected_result>`.
+- Use pytest for every test module. Name tests `test_<situation>_<expected_result>`.
 - Keep each test focused on one behavior and make setup, action, and result easy to read.
-- Existing `unittest` modules may remain until they need substantial changes. When migrating,
-  convert the whole module instead of mixing styles within it.
+- Prefer plain test functions. Use small non-inheriting `Test...` classes only when they provide
+  useful behavioral grouping.
+- Use fixtures for shared setup and cleanup, `tmp_path` and `monkeypatch` for isolated resources,
+  `pytest.mark.parametrize` for equivalent cases, and `pytest.raises` for expected failures.
+- Keep the action and important assertions visible in the test; helpers and fixtures must not
+  hide the behavior being specified.
 - Never contact a real Garmin account from a test. Use fakes or mocks at external boundaries.
 
 ## Safety and compatibility

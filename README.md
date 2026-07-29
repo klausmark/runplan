@@ -164,8 +164,8 @@ Run formatting, lint, and the complete test suite with one command:
 uv run python scripts/check.py
 ```
 
-Pytest remains available directly with `uv run pytest`, including during the
-gradual migration of existing `unittest` tests. The development principles are documented in
+Pytest is available directly with `uv run pytest`. The complete test suite uses
+pytest-style tests and fixtures. The development principles are documented in
 [development-standards.md](docs/development-standards.md).
 
 ## Select and preview a user's active program

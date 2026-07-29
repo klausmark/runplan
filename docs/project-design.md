@@ -335,6 +335,10 @@ than reproduce domain behavior in browser code. Keep these boundaries explicit:
 ## Quality requirements
 
 - No test contacts a real Garmin account.
+- Tests use pytest style: direct assertions, `pytest.raises`, focused fixtures, and
+  parametrization where several cases express the same behavior.
+- Test modules follow subsystem boundaries. Large end-to-end safety scenarios may retain
+  multiple related assertions when those assertions jointly describe one outcome.
 - External objects use stable internal keys.
 - Parser errors identify the precise YAML location.
 - Domain behavior has strong unit coverage; adapters use contract or integration
