@@ -1,13 +1,8 @@
-from __future__ import annotations
-
 import logging
-import os
-import tempfile
-import unittest
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
 
+import pytest
 import yaml
 
 from runplan.cli import parse_arguments
@@ -52,105 +47,102 @@ class FakeGarmin:
         pass
 
 
-class ServerLoggingTests(unittest.TestCase):
-    def tearDown(self) -> None:
-        logger = logging.getLogger("runplan")
-        logger.handlers.clear()
-        logger.addHandler(logging.NullHandler())
-        logger.setLevel(logging.NOTSET)
+@pytest.fixture(autouse=True)
+def reset_runplan_logger():
+    yield
+    logger = logging.getLogger("runplan")
+    logger.handlers.clear()
+    logger.addHandler(logging.NullHandler())
+    logger.setLevel(logging.NOTSET)
 
-    def test_server_logging_filters_levels_and_writes_to_configured_stdout(self) -> None:
-        output = StringIO()
-        configure_server_logging("INFO", stream=output)
-        logger = logging.getLogger("runplan.test")
 
-        logger.debug("hidden")
-        logger.info("visible event=save")
+def test_server_logging_filters_levels_and_writes_to_configured_stdout() -> None:
+    output = StringIO()
+    configure_server_logging("INFO", stream=output)
+    logger = logging.getLogger("runplan.test")
 
-        rendered = output.getvalue()
-        self.assertIn("INFO runplan.test visible event=save", rendered)
-        self.assertNotIn("hidden", rendered)
+    logger.debug("hidden")
+    logger.info("visible event=save")
 
-    def test_log_formatter_redacts_secrets_in_messages_and_tracebacks(self) -> None:
-        output = StringIO()
-        configure_server_logging("DEBUG", stream=output)
-        logger = logging.getLogger("runplan.test")
+    rendered = output.getvalue()
+    assert "INFO runplan.test visible event=save" in rendered
+    assert "hidden" not in rendered
 
-        try:
-            raise RuntimeError(
-                "email runner@example.com password=hunter2 token=abc123 "
-                "path=/srv/users/klaus/credentials.toml"
-            )
-        except RuntimeError:
-            logger.exception("Authentication failed for runner@example.com")
 
-        rendered = output.getvalue()
-        for secret in ("runner@example.com", "hunter2", "abc123", "credentials.toml"):
-            self.assertNotIn(secret, rendered)
-        self.assertIn("<redacted-email>", rendered)
-        self.assertIn("<redacted>", rendered)
+def test_log_formatter_redacts_secrets_in_messages_and_tracebacks() -> None:
+    output = StringIO()
+    configure_server_logging("DEBUG", stream=output)
+    logger = logging.getLogger("runplan.test")
 
-    def test_garmin_mutations_and_exceptions_are_logged_with_ids(self) -> None:
-        output = StringIO()
-        configure_server_logging("INFO", stream=output)
-        client = LoggingGarminClient(FakeGarmin(), user_id="klaus")
-        workout = type("Workout", (), {"workoutName": "Easy run"})()
-
-        created = client.upload_running_workout(workout)
-        client.schedule_workout(created["workoutId"], "2026-07-30")
-        client.unschedule_workout(84)
-        client.delete_workout(42)
-
-        rendered = output.getvalue()
-        self.assertIn(
-            "Garmin workout created user=klaus workout_name='Easy run' workout_id=42", rendered
+    try:
+        raise RuntimeError(
+            "email runner@example.com password=hunter2 token=abc123 "
+            "path=/srv/users/klaus/credentials.toml"
         )
-        self.assertIn("schedule_id=84 date=2026-07-30", rendered)
-        self.assertIn("Garmin unschedule_workout succeeded user=klaus schedule_id=84", rendered)
-        self.assertIn("Garmin delete_workout succeeded user=klaus workout_id=42", rendered)
+    except RuntimeError:
+        logger.exception("Authentication failed for runner@example.com")
 
-        class BrokenGarmin(FakeGarmin):
-            def delete_workout(self, workout_id: int) -> None:
-                raise RuntimeError("remote exploded")
-
-        with self.assertRaisesRegex(RuntimeError, "remote exploded"):
-            LoggingGarminClient(BrokenGarmin(), user_id="klaus").delete_workout(99)
-        self.assertIn("Garmin delete_workout failed user=klaus workout_id=99", output.getvalue())
-        self.assertIn("RuntimeError: remote exploded", output.getvalue())
-
-    def test_yaml_upload_and_user_edit_are_logged_without_yaml_content(self) -> None:
-        output = StringIO()
-        configure_server_logging("INFO", stream=output)
-        with tempfile.TemporaryDirectory() as directory:
-            store = ProgramStore(Path(directory), repository=MemoryRepository())
-            content = yaml.safe_dump(program_data(), sort_keys=False)
-            uploaded = store.upload("plan.yaml", content)
-            store.edit(
-                "plan.yaml",
-                {
-                    "revision": uploaded["revision"],
-                    "program": {"name": "Secret training name"},
-                },
-            )
-
-        rendered = output.getvalue()
-        self.assertIn("YAML program uploaded", rendered)
-        self.assertIn("YAML program saved", rendered)
-        self.assertIn("changes=program.name", rendered)
-        self.assertNotIn("weeks:", rendered)
-
-    def test_serve_log_level_uses_environment_and_cli_override(self) -> None:
-        with patch.dict(os.environ, {"RUNPLAN_LOG_LEVEL": "warning"}):
-            from_environment = parse_arguments(["serve"])
-            explicit = parse_arguments(["serve", "--log-level", "debug"])
-
-        self.assertEqual("WARNING", from_environment.log_level)
-        self.assertEqual("DEBUG", explicit.log_level)
-
-        with patch.dict(os.environ, {"RUNPLAN_LOG_LEVEL": "verbose"}):
-            with self.assertRaises(SystemExit):
-                parse_arguments(["serve"])
+    rendered = output.getvalue()
+    for secret in ("runner@example.com", "hunter2", "abc123", "credentials.toml"):
+        assert secret not in rendered
+    assert "<redacted-email>" in rendered
+    assert "<redacted>" in rendered
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_garmin_mutations_and_exceptions_are_logged_with_ids() -> None:
+    output = StringIO()
+    configure_server_logging("INFO", stream=output)
+    client = LoggingGarminClient(FakeGarmin(), user_id="klaus")
+    workout = type("Workout", (), {"workoutName": "Easy run"})()
+
+    created = client.upload_running_workout(workout)
+    client.schedule_workout(created["workoutId"], "2026-07-30")
+    client.unschedule_workout(84)
+    client.delete_workout(42)
+
+    rendered = output.getvalue()
+    assert "Garmin workout created user=klaus workout_name='Easy run' workout_id=42" in rendered
+    assert "schedule_id=84 date=2026-07-30" in rendered
+    assert "Garmin unschedule_workout succeeded user=klaus schedule_id=84" in rendered
+    assert "Garmin delete_workout succeeded user=klaus workout_id=42" in rendered
+
+    class BrokenGarmin(FakeGarmin):
+        def delete_workout(self, workout_id: int) -> None:
+            raise RuntimeError("remote exploded")
+
+    with pytest.raises(RuntimeError, match="remote exploded"):
+        LoggingGarminClient(BrokenGarmin(), user_id="klaus").delete_workout(99)
+    assert "Garmin delete_workout failed user=klaus workout_id=99" in output.getvalue()
+    assert "RuntimeError: remote exploded" in output.getvalue()
+
+
+def test_yaml_upload_and_user_edit_are_logged_without_yaml_content(tmp_path: Path) -> None:
+    output = StringIO()
+    configure_server_logging("INFO", stream=output)
+    store = ProgramStore(tmp_path, repository=MemoryRepository())
+    content = yaml.safe_dump(program_data(), sort_keys=False)
+
+    uploaded = store.upload("plan.yaml", content)
+    store.edit(
+        "plan.yaml",
+        {"revision": uploaded["revision"], "program": {"name": "Secret training name"}},
+    )
+
+    rendered = output.getvalue()
+    assert "YAML program uploaded" in rendered
+    assert "YAML program saved" in rendered
+    assert "changes=program.name" in rendered
+    assert "weeks:" not in rendered
+
+
+def test_serve_log_level_uses_environment_and_cli_override(monkeypatch) -> None:
+    monkeypatch.setenv("RUNPLAN_LOG_LEVEL", "warning")
+    from_environment = parse_arguments(["serve"])
+    explicit = parse_arguments(["serve", "--log-level", "debug"])
+
+    assert from_environment.log_level == "WARNING"
+    assert explicit.log_level == "DEBUG"
+
+    monkeypatch.setenv("RUNPLAN_LOG_LEVEL", "verbose")
+    with pytest.raises(SystemExit):
+        parse_arguments(["serve"])
