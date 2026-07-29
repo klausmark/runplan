@@ -22,6 +22,8 @@ formatting as part of an unrelated change.
 - Keep dependencies pointing inward as described in [docs/project-design.md](docs/project-design.md).
 - Follow the detailed guidance in
   [docs/development-standards.md](docs/development-standards.md).
+- Use [docs/code-quality-audit.md](docs/code-quality-audit.md) to choose and scope structural
+  refactoring. Refresh its measurements with `uv run python scripts/audit_structure.py`.
 
 ## Tests
 

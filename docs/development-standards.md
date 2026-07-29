@@ -88,4 +88,5 @@ English; Conventional Commits are not required.
 The current web, synchronization, export, and CLI areas contain large units that need a
 responsibility audit against these standards. Treat decomposition as separate,
 behavior-preserving work backed by characterization tests. Do not mix those refactors into
-unrelated feature changes.
+unrelated feature changes. The measured inventory and prioritized responsibility assessment
+live in [code-quality-audit.md](code-quality-audit.md).
