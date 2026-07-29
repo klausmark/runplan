@@ -13,10 +13,9 @@ Use `--all` to print the complete production inventory.
 
 ## Refactoring status
 
-The synchronization and user-configuration findings were reviewed first. The current
-working-tree measurement after those changes is 51 production modules, four module-size
-signals, 31 function/method signals, and seven class review candidates. The increase in total
-symbols is intentional: previously fused workflows now have named collaborators.
+The synchronization, user-configuration, and web findings have been reviewed. Measurements
+are refreshed after each committed stage; the increase in total symbols is intentional:
+previously fused workflows now have named collaborators.
 
 | Original finding | Decision | Result |
 | --- | --- | --- |
@@ -26,8 +25,12 @@ symbols is intentional: previously fused workflows now have named collaborators.
 | `users.py` (308 lines) | Split persistence concerns | Credential I/O and registry TOML serialization moved to dedicated modules |
 | `UserRegistry` | Retain as transaction boundary | The class coordinates validation, locking, and atomic user updates while delegating persistence formats; rationale is documented in its docstring |
 | `WeekSynchronizer` | Retain as transaction boundary | Its state exists for one week transaction and preserves checkpoint/call ordering; matching and scheduling policy are delegated; rationale is documented in its docstring |
+| `web.py` (1005 lines) | Split | Public facade and sync boundary are separated from HTTP routing, document storage, projection, editing, YAML round-tripping, export, and sync execution; no web module exceeds 300 lines |
+| `make_handler` and route dispatchers | Split | The factory only binds dependencies; a top-level HTTP adapter delegates endpoint operations to focused methods and application services |
+| `ProgramStore` projection/edit/export findings | Split | Storage retains compatibility methods while projector, editor, and exporter own their distinct rules |
+| Web adapter/service class size signals | Retain after split | Each remaining class has one adapter or transaction-boundary responsibility; rationale is documented in its docstring |
 
-The remaining web, PDF, CLI, YAML-parser, Garmin-query, renderer, export-view-model, and YAML
+The remaining PDF, CLI, YAML-parser, Garmin-query, renderer, export-view-model, and YAML
 repository findings below are still open. A size signal is not considered resolved merely by
 documenting it; an exception is accepted only where the code has one cohesive reason to
 change.
