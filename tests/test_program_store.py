@@ -281,6 +281,99 @@ class TestProgramStore:
                 },
             )
 
+    def test_adds_a_valid_workout_and_sorts_the_week_by_day(self) -> None:
+        loaded = self.store.get("plan.yaml")
+        updated = self.store.edit(
+            "plan.yaml",
+            {
+                "revision": loaded["revision"],
+                "add_workout": {
+                    "week": 1,
+                    "yaml": (
+                        "id: workout-1\n"
+                        "day: 2\n"
+                        "name: New workout\n"
+                        "description: Keep this easy.\n"
+                        "steps:\n"
+                        "  - warmup: 5m\n"
+                        "  - run: 20m\n"
+                        "  - cooldown: 5m\n"
+                    ),
+                },
+            },
+        )
+
+        assert [1, 2, 4] == [item["day"] for item in updated["weeks"][0]["workouts"]]
+        assert "New workout" == updated["weeks"][0]["workouts"][1]["name"]
+
+    @pytest.mark.parametrize(
+        ("yaml_text", "message"),
+        [
+            ("id: mixed\nday: 2\nname: Duplicate ID\nsteps:\n  - run: 5m\n", "already used"),
+            ("id: workout-1\nday: 1\nname: Duplicate day\nsteps:\n  - run: 5m\n", "already used"),
+            ("program: [", "Invalid workout YAML"),
+        ],
+    )
+    def test_rejects_invalid_workout_additions_without_changing_the_file(
+        self, yaml_text: str, message: str
+    ) -> None:
+        loaded = self.store.get("plan.yaml")
+        original = self.path.read_text(encoding="utf-8")
+
+        with pytest.raises(WebError, match=message):
+            self.store.edit(
+                "plan.yaml",
+                {
+                    "revision": loaded["revision"],
+                    "add_workout": {"week": 1, "yaml": yaml_text},
+                },
+            )
+
+        assert original == self.path.read_text(encoding="utf-8")
+
+    def test_deletes_a_workout_and_preserves_synced_tracking_for_cleanup(self) -> None:
+        raw = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+        raw["weeks"][0]["workouts"][0]["tracking"] = {
+            "status": "scheduled",
+            "scheduled_date": "2026-12-28",
+            "garmin": {"workout_id": 42, "schedule_id": 43},
+        }
+        self.path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        loaded = self.store.get("plan.yaml")
+
+        updated = self.store.edit(
+            "plan.yaml",
+            {
+                "revision": loaded["revision"],
+                "delete_workout": {"week": 1, "workout_id": "mixed"},
+            },
+        )
+
+        assert ["easy"] == [item["id"] for item in updated["weeks"][0]["workouts"]]
+        saved = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+        orphan = saved["program"]["tracking"]["orphaned_workouts"]["week-01/mixed"]
+        assert orphan["pending_deletion"] is True
+        assert orphan["workout_id"] == 42
+        assert orphan["schedule_id"] == 43
+
+    def test_rejects_deleting_the_last_workout_in_a_week(self) -> None:
+        raw = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+        raw["weeks"][1]["workouts"] = raw["weeks"][1]["workouts"][:1]
+        self.path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        loaded = self.store.get("plan.yaml")
+
+        with pytest.raises(WebError, match="at least one workout"):
+            self.store.edit(
+                "plan.yaml",
+                {
+                    "revision": loaded["revision"],
+                    "delete_workout": {
+                        "week": 2,
+                        "workout_id": loaded["weeks"][1]["workouts"][0]["id"],
+                    },
+                },
+            )
+
     def test_editor_round_trips_yaml_formatting_and_comments(self) -> None:
         self.path.write_text(
             "# Program document comment\nprogram:\n  id: characterization-plan\n  name: Characterization Plan\n  short_name: CHAR\n  description: >-\n    Keep this folded program description\n    formatted as a block.\n  start_week: 2026-W53\nweeks:\n  - week: 1\n    focus: Mixed steps\n    workouts:\n      # Workout comment\n      - id: mixed\n        day: 1\n        name: Week 1 - Mixed\n        description: >-\n          Keep this workout description\n          formatted as a block.\n        steps:\n          - warmup: 5m\n          - run: 10m\n          - cooldown: 5m\n",

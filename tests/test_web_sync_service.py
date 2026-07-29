@@ -69,6 +69,24 @@ class TestWebSyncService:
         assert context.value.status == 409
         self.client_factory.assert_not_called()
 
+    def test_preview_includes_a_workout_marked_for_deletion(self) -> None:
+        state = self.repository.load("characterization-plan")
+        state["workouts"]["week-01/removed"] = {
+            "name": "Removed workout",
+            "status": "scheduled",
+            "workout_id": 42,
+            "schedule_id": 43,
+            "date": "2027-01-01",
+            "pending_deletion": True,
+        }
+
+        preview = self.service.preview("plan.yaml")
+
+        cleanup = [
+            action for action in preview["plan"]["actions"] if action.get("workout_id") == 42
+        ]
+        assert ["unschedule", "delete"] == [action["kind"] for action in cleanup]
+
     def test_garmin_error_is_actionable(self) -> None:
         preview = self.service.preview("plan.yaml")
         self.client_factory.side_effect = RuntimeError("login unavailable")

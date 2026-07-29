@@ -24,7 +24,8 @@ def _yaml() -> YAML:
     return value
 
 
-def _record_from_tracking(week: int, workout: dict[str, Any]) -> dict[str, Any] | None:
+def record_from_workout_tracking(week: int, workout: dict[str, Any]) -> dict[str, Any] | None:
+    """Convert embedded workout tracking to the synchronization record shape."""
     tracking = workout.get("tracking")
     if not isinstance(tracking, dict):
         return None
@@ -169,7 +170,7 @@ class YamlStateRepository:
             for workout in week.get("workouts", []):
                 if not isinstance(workout, dict) or not isinstance(workout.get("id"), str):
                     continue
-                record = _record_from_tracking(week["week"], workout)
+                record = record_from_workout_tracking(week["week"], workout)
                 if record is not None:
                     state["workouts"][f"week-{week['week']:02d}/{workout['id']}"] = record
         program_tracking = document.get("program", {}).get("tracking", {})
@@ -213,4 +214,4 @@ class YamlStateRepository:
         self.save(program_id, state)
 
 
-__all__ = ["YamlStateRepository", "tracking_from_record"]
+__all__ = ["YamlStateRepository", "record_from_workout_tracking", "tracking_from_record"]

@@ -81,6 +81,9 @@ def _remove_terminal_record(
     for field in ("workout_id", "content_hash", "description"):
         if record.pop(field, None) is not None:
             changed = True
+    if record.get("pending_deletion") is True:
+        del state["workouts"][key]
+        changed = True
     if changed:
         repository.save(program_id, state)
     return actions
@@ -98,7 +101,7 @@ def cleanup_terminal_workouts(
         (key, record)
         for key, record in sorted(records.items())
         if isinstance(record, dict)
-        and record.get("status") in CLEANUP_STATUSES
+        and (record.get("status") in CLEANUP_STATUSES or record.get("pending_deletion") is True)
         and (record.get("schedule_id") or record.get("workout_id"))
     ]
     if not terminal:

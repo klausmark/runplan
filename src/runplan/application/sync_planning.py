@@ -108,7 +108,9 @@ def plan_program_weeks(
             )
 
     for key, record in sorted(records.items()):
-        if isinstance(record, dict) and record.get("status") in CLEANUP_STATUSES:
+        if isinstance(record, dict) and (
+            record.get("status") in CLEANUP_STATUSES or record.get("pending_deletion") is True
+        ):
             _plan_record_removal(plan, key, record)
 
     if prune:

@@ -15,6 +15,7 @@ from ruamel.yaml.error import YAMLError as RoundTripYAMLError
 from .application.ports import StateRepository
 from .domain.errors import WorkoutDefinitionError
 from .parsing.yaml_loader import load_program_model
+from .state.yaml_repository import record_from_workout_tracking
 from .users import WebError
 from .web_yaml import dump_editable_yaml, load_editable_yaml
 
@@ -65,11 +66,13 @@ class ProgramEditor:
         raw, text = self._read(path)
         if request.get("revision") != _revision(text):
             raise WebError(HTTPStatus.CONFLICT, "The program changed; reload before saving")
-        metadata, move, workout_edit = self._apply_request(raw, request)
+        metadata, move, workout_edit, workout_add, workout_delete = self._apply_request(
+            raw, request
+        )
         self._validate(raw)
         rendered = dump_editable_yaml(raw)
         self._atomic_write(path, rendered)
-        changes = self._change_names(metadata, move, workout_edit)
+        changes = self._change_names(metadata, move, workout_edit, workout_add, workout_delete)
         logger.info(
             "YAML program saved file=%s changes=%s bytes=%d",
             path,
@@ -82,7 +85,9 @@ class ProgramEditor:
             fallback_pace_value=fallback_pace_value,
         )
 
-    def _apply_request(self, raw: dict[str, Any], request: dict[str, Any]) -> tuple[Any, Any, Any]:
+    def _apply_request(
+        self, raw: dict[str, Any], request: dict[str, Any]
+    ) -> tuple[Any, Any, Any, Any, Any]:
         metadata = request.get("program")
         if metadata is not None:
             if not isinstance(metadata, dict):
@@ -98,7 +103,15 @@ class ProgramEditor:
         workout_edit = request.get("workout")
         if workout_edit is not None:
             self._replace_workout(raw, workout_edit)
-        return metadata, move, workout_edit
+
+        workout_add = request.get("add_workout")
+        if workout_add is not None:
+            self._add_workout(raw, workout_add)
+
+        workout_delete = request.get("delete_workout")
+        if workout_delete is not None:
+            self._delete_workout(raw, workout_delete)
+        return metadata, move, workout_edit, workout_add, workout_delete
 
     @staticmethod
     def _validate(raw: dict[str, Any]) -> None:
@@ -108,7 +121,13 @@ class ProgramEditor:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     @staticmethod
-    def _change_names(metadata: Any, move: Any, workout_edit: Any) -> list[str]:
+    def _change_names(
+        metadata: Any,
+        move: Any,
+        workout_edit: Any,
+        workout_add: Any,
+        workout_delete: Any,
+    ) -> list[str]:
         changes: list[str] = []
         if isinstance(metadata, dict):
             changes.extend(
@@ -124,6 +143,12 @@ class ProgramEditor:
             )
         if isinstance(workout_edit, dict):
             changes.append(f"workout:{workout_edit.get('week')}/{workout_edit.get('workout_id')}")
+        if isinstance(workout_add, dict):
+            changes.append(f"add-workout:{workout_add.get('week')}")
+        if isinstance(workout_delete, dict):
+            changes.append(
+                f"delete-workout:{workout_delete.get('week')}/{workout_delete.get('workout_id')}"
+            )
         return changes
 
     @staticmethod
@@ -185,6 +210,44 @@ class ProgramEditor:
                 week["workouts"].sort(key=lambda item: item.get("day", 0))
                 return
         raise WebError(HTTPStatus.BAD_REQUEST, "Workout not found")
+
+    def _add_workout(self, raw: dict[str, Any], addition: Any) -> None:
+        if not isinstance(addition, dict):
+            raise WebError(HTTPStatus.BAD_REQUEST, "add_workout must be an object")
+        try:
+            week = self._find_week(raw, int(addition["week"]))
+            workout = load_editable_yaml(addition["yaml"])
+        except (KeyError, TypeError, ValueError, RoundTripYAMLError) as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, f"Invalid workout YAML: {exc}") from exc
+        if not isinstance(workout, dict):
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Workout YAML must be an object")
+        week["workouts"].append(workout)
+        week["workouts"].sort(key=lambda item: item.get("day", 0))
+
+    def _delete_workout(self, raw: dict[str, Any], deletion: Any) -> None:
+        if not isinstance(deletion, dict):
+            raise WebError(HTTPStatus.BAD_REQUEST, "delete_workout must be an object")
+        try:
+            week_number = int(deletion["week"])
+            workout_id = str(deletion["workout_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise WebError(HTTPStatus.BAD_REQUEST, "Invalid workout deletion") from exc
+        week = self._find_week(raw, week_number)
+        workout = next((item for item in week["workouts"] if item.get("id") == workout_id), None)
+        if workout is None:
+            raise WebError(HTTPStatus.BAD_REQUEST, "Workout not found")
+        if len(week["workouts"]) == 1:
+            raise WebError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "A week must contain at least one workout",
+            )
+        record = record_from_workout_tracking(week_number, workout)
+        if record is not None and (record.get("workout_id") or record.get("schedule_id")):
+            record["pending_deletion"] = True
+            tracking = raw.setdefault("program", {}).setdefault("tracking", {})
+            orphaned = tracking.setdefault("orphaned_workouts", {})
+            orphaned[f"week-{week_number:02d}/{workout_id}"] = record
+        week["workouts"].remove(workout)
 
     @staticmethod
     def _atomic_write(path: Path, text: str) -> None:

@@ -124,6 +124,43 @@ class TestSyncCleanup(SyncTestBase):
         assert "workout_id" not in cleaned
         assert ("delete", 900) not in client.events
 
+    def test_pending_deletion_removes_remote_objects_and_orphaned_record(self) -> None:
+        record = {
+            **self.old_record(),
+            "workout_id": 10,
+            "schedule_id": 20,
+            "date": "2026-12-28",
+            "name": "Deleted from plan",
+            "status": "scheduled",
+            "pending_deletion": True,
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-01/deleted": record}},
+        )
+        client = FakeGarmin(
+            workouts=[
+                {
+                    "workoutId": 10,
+                    "workoutName": record["name"],
+                    "description": record["description"],
+                }
+            ],
+            schedules=[
+                {
+                    "itemType": "workout",
+                    "workoutId": 10,
+                    "workoutScheduleId": 20,
+                    "date": "2026-12-28",
+                }
+            ],
+        )
+
+        actions = cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
+
+        assert ["unschedule", "delete"] == [action.kind for action in actions]
+        assert "week-01/deleted" not in load_state("characterization-plan")["workouts"]
+
     def test_terminal_cleanup_clears_ids_when_remote_objects_are_already_missing(self) -> None:
         save_state(
             "characterization-plan",
