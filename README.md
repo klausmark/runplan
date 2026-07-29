@@ -156,6 +156,18 @@ uv sync
 Dependencies are defined in `pyproject.toml`, while `uv.lock` pins the exact
 versions. A `requirements.txt` file is therefore not needed.
 
+## Development checks
+
+Pytest is the project's test runner, including during the gradual migration of
+existing `unittest` tests:
+
+```bash
+uv run pytest
+```
+
+The development principles and the staged Ruff adoption are documented in
+[development-standards.md](docs/development-standards.md).
+
 ## Select and preview a user's active program
 
 Programs are isolated below the configured program root by user ID. Select the
