@@ -32,8 +32,10 @@ previously fused workflows now have named collaborators.
 | `cli.py` (452 lines) | Split | Parser construction and sync selection/compilation now live in dedicated modules; the facade retains command dispatch and public imports |
 | `cli_sync.run_sync` (197 lines) | Split | A small dispatcher selects focused preview, prune, multi-week, or guarded-delete workflows; unreachable legacy single-week branches were removed |
 | CLI parser and selection review signals | Split | Command-specific parser builders and selection/compilation helpers are independently named and below the review threshold |
+| `parsing/yaml_loader.py` (372 lines) | Split | Tracking normalization and typed-model construction now have dedicated modules; the loader facade is below 300 lines |
+| `normalize_workout` and `load_program` | Split | Tracking fields, program metadata, week validation, workout identity, scheduling dates, and model construction are focused helpers below the review threshold |
 
-The remaining PDF, YAML-parser, Garmin-query, renderer, export-view-model, and YAML
+The remaining PDF, Garmin-query, renderer, export-view-model, and YAML
 repository findings below are still open. A size signal is not considered resolved merely by
 documenting it; an exception is accepted only where the code has one cohesive reason to
 change.
