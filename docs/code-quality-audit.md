@@ -29,8 +29,11 @@ previously fused workflows now have named collaborators.
 | `make_handler` and route dispatchers | Split | The factory only binds dependencies; a top-level HTTP adapter delegates endpoint operations to focused methods and application services |
 | `ProgramStore` projection/edit/export findings | Split | Storage retains compatibility methods while projector, editor, and exporter own their distinct rules |
 | Web adapter/service class size signals | Retain after split | Each remaining class has one adapter or transaction-boundary responsibility; rationale is documented in its docstring |
+| `cli.py` (452 lines) | Split | Parser construction and sync selection/compilation now live in dedicated modules; the facade retains command dispatch and public imports |
+| `cli_sync.run_sync` (197 lines) | Split | A small dispatcher selects focused preview, prune, multi-week, or guarded-delete workflows; unreachable legacy single-week branches were removed |
+| CLI parser and selection review signals | Split | Command-specific parser builders and selection/compilation helpers are independently named and below the review threshold |
 
-The remaining PDF, CLI, YAML-parser, Garmin-query, renderer, export-view-model, and YAML
+The remaining PDF, YAML-parser, Garmin-query, renderer, export-view-model, and YAML
 repository findings below are still open. A size signal is not considered resolved merely by
 documenting it; an exception is accepted only where the code has one cohesive reason to
 change.

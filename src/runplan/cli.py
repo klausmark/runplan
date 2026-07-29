@@ -13,26 +13,23 @@ from typing import Any
 
 from .application.export import build_program_export
 from .application.ports import StateRepository
-from .application.presentation_weeks import build_presentation_weeks, presentation_start
 from .application.preview import build_preview
 from .application.sync import (
     plan_program_weeks,
     reconcile_program,
     synchronize_program_weeks,
 )
+from .cli_parser import add_week_selectors
+from .cli_selection import prepare_sync_selections, week_selection
 from .cli_sync import run_sync
 from .domain.errors import WorkoutDefinitionError
-from .domain.estimates import estimate_steps
-from .domain.selectors import WeekSelection
-from .domain.workout_titles import garmin_workout_title
 from .exporters.html import export_html
 from .exporters.markdown import export_markdown
 from .exporters.pdf import export_pdf
 from .integrations.garmin.client import login_to_garmin
-from .integrations.garmin.mapper import build_workout
 from .logging_config import LOG_LEVELS
 from .parsing.values import parse_pace
-from .parsing.yaml_loader import load_definition, load_definition_model
+from .parsing.yaml_loader import load_definition_model
 from .presentation.json_output import format_json
 from .presentation.overview import format_overview
 from .presentation.program_text import format_program_text
@@ -48,97 +45,6 @@ def default_program_directory() -> Path:
     data_home = os.getenv("XDG_DATA_HOME")
     base = Path(data_home).expanduser() if data_home else Path.home() / ".local" / "share"
     return base / "runplan" / "programs"
-
-
-def week_selection(arguments: Namespace, *, default_all: bool = False) -> WeekSelection:
-    """Translate parsed CLI selector options to a domain value object."""
-    expression = getattr(arguments, "select_weeks", None)
-    if expression is not None:
-        return WeekSelection.parse(expression)
-    weeks_ahead = getattr(arguments, "weeks_ahead", None)
-    if weeks_ahead is not None:
-        return WeekSelection.ahead(weeks_ahead)
-    return WeekSelection.all() if default_all else WeekSelection.ahead(1)
-
-
-def add_week_selectors(parser: argparse.ArgumentParser, *, allow_weeks_ahead: bool = False) -> None:
-    """Add the shared calendar-week selector options."""
-    selectors = parser.add_mutually_exclusive_group()
-    selectors.add_argument(
-        "--select-weeks",
-        help="Plan weeks (1,3,5-7) or current, next, or all",
-    )
-    if allow_weeks_ahead:
-        selectors.add_argument(
-            "--weeks-ahead",
-            type=int,
-            help="Current plan week plus this many subsequent weeks (default: 1)",
-        )
-
-
-def prepare_sync_selections(
-    arguments: Namespace,
-    *,
-    fallback_pace_value: str | None = None,
-) -> list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]]:
-    """Load, select, and compile weeks without terminal or Garmin I/O."""
-    model = load_definition_model(arguments.yaml_file)
-    fallback_pace = parse_pace(
-        fallback_pace_value or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
-        "RUNPLAN_DEFAULT_PACE",
-    )
-    fallback_pace_seconds_per_km = sum(fallback_pace) / len(fallback_pace)
-    presentation_weeks = build_presentation_weeks(model)
-    selection = (
-        WeekSelection.all()
-        if getattr(arguments, "delete_all", False)
-        and getattr(arguments, "select_weeks", None) is None
-        and getattr(arguments, "weeks_ahead", None) is None
-        else week_selection(arguments)
-    )
-    selected_weeks = selection.resolve(
-        tuple(week.number for week in presentation_weeks),
-        start_date=presentation_start(model),
-        today=getattr(arguments, "today", None),
-    )
-    selected_items = [
-        (week.number, item)
-        for week in presentation_weeks
-        if week.number in selected_weeks
-        for item in week.workouts
-    ]
-    selections = []
-    source_weeks = sorted({item.source_week for _, item in selected_items})
-    for source_week in source_weeks:
-        definition = load_definition(arguments.yaml_file, source_week)
-        presented = {
-            item.workout.id: (presentation_week, item)
-            for presentation_week, item in selected_items
-            if item.source_week == source_week
-        }
-        definition["workouts"] = [
-            workout for workout in definition["workouts"] if workout["id"] in presented
-        ]
-        compiled = []
-        for workout in definition["workouts"]:
-            presentation_week, item = presented[workout["id"]]
-            workout["presentation_week"] = presentation_week
-            workout["presentation_name"] = item.name
-            workout["base_description"] = workout.get("description")
-            estimate = estimate_steps(item.workout.steps, fallback_pace_seconds_per_km)
-            workout["estimated_duration_seconds"] = estimate.duration_seconds
-            workout["estimated_distance_meters"] = estimate.distance_meters
-            workout["estimated_distance_is_approximate"] = estimate.distance_is_approximate
-            workout["name"] = garmin_workout_title(
-                model.short_name,
-                presentation_week,
-                item.workout,
-                fallback_pace_seconds_per_km,
-                workout_name=item.name,
-            )
-            compiled.append((workout, build_workout(workout)))
-        selections.append((definition, compiled))
-    return selections
 
 
 def run_preview(
@@ -190,68 +96,9 @@ def run_multi_week_sync(
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser without reading process-global arguments."""
-    parser = argparse.ArgumentParser(
-        prog="runplan",
-        description="Validate, export, and sync YAML running programs.",
-    )
-    commands = parser.add_subparsers(dest="command", required=True)
-    sync_parser = commands.add_parser("sync", help="Sync program weeks with Garmin Connect")
-    sync_target = sync_parser.add_mutually_exclusive_group(required=True)
-    sync_target.add_argument("user_id", nargs="?", help="Configured Runplan user ID")
-    sync_target.add_argument(
-        "--all", dest="all_users", action="store_true", help="Sync every configured user"
-    )
-    sync_parser.add_argument("--dry-run", action="store_true")
-    sync_parser.add_argument("--output", choices=("overview", "json"), default="overview")
-    sync_parser.add_argument("--delete-all", action="store_true")
-    sync_parser.add_argument("--prune", action="store_true")
-    sync_parser.add_argument("--yes", action="store_true")
-    add_week_selectors(sync_parser, allow_weeks_ahead=True)
+    from .cli_parser import build_parser as build_cli_parser
 
-    user_parser = commands.add_parser("user", help="Manage configured Runplan users")
-    user_commands = user_parser.add_subparsers(dest="user_command", required=True)
-    set_plan_parser = user_commands.add_parser("set-plan", help="Set a user's active program")
-    set_plan_parser.add_argument("user_id")
-    set_plan_parser.add_argument("filename")
-
-    export_parser = commands.add_parser("export", help="Render selected program weeks")
-    export_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
-    export_parser.add_argument(
-        "--format", choices=("pdf", "text", "html", "markdown"), default="pdf"
-    )
-    export_parser.add_argument(
-        "--output",
-        type=Path,
-        help="Output file (required for PDF, HTML, and Markdown; unavailable for text)",
-    )
-    export_parser.add_argument("--force", action="store_true")
-    add_week_selectors(export_parser)
-
-    serve_parser = commands.add_parser(
-        "serve", help="Run the local web frontend (no authentication)"
-    )
-    serve_parser.add_argument(
-        "--host", default="127.0.0.1", help="Listen address (use 0.0.0.0 for remote access)"
-    )
-    serve_parser.add_argument("--port", type=int, default=8000, help="Listen port")
-    serve_parser.add_argument(
-        "--log-level",
-        choices=LOG_LEVELS,
-        type=str.upper,
-        default=os.getenv("RUNPLAN_LOG_LEVEL", "INFO").upper(),
-        help="Server log level written to stdout (default: RUNPLAN_LOG_LEVEL or INFO)",
-    )
-    serve_parser.add_argument(
-        "--program-dir",
-        type=Path,
-        default=default_program_directory(),
-        help="Directory containing editable YAML programs (default: RUNPLAN_PROGRAM_DIR or the user data directory)",
-    )
-    reconcile_parser = commands.add_parser(
-        "reconcile", help="Refresh completed and missed workouts from Garmin"
-    )
-    reconcile_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
-    return parser
+    return build_cli_parser(default_program_directory())
 
 
 def parse_arguments(argv: Sequence[str] | None = None) -> Namespace:
