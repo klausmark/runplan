@@ -39,7 +39,10 @@ def build_preview(
     selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
     sync_plan: SyncPlan | None = None,
 ) -> PreviewResult:
-    """Build a stable preview from selected, compiled program weeks."""
+    """Build a stable preview from selected, compiled program weeks.
+
+    Structural rationale: workout, week, and total fields form one preview projection.
+    """
     if not selections:
         raise ValueError("preview requires at least one selected week")
     grouped: dict[int, list[PreviewWorkout]] = {}

@@ -9,7 +9,11 @@ from ..domain.errors import WorkoutDefinitionError
 
 
 def parse_duration(value: Any, location: str) -> float:
-    """Convert a duration to seconds while retaining legacy input formats."""
+    """Convert a duration to seconds while retaining legacy input formats.
+
+    Structural rationale: every branch recognizes one supported representation of the
+    same duration value and produces the same unit.
+    """
     if isinstance(value, bool):
         raise WorkoutDefinitionError(f"{location}: a duration cannot be true/false")
 

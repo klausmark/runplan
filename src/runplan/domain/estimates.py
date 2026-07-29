@@ -21,7 +21,11 @@ def estimate_steps(
     steps: tuple[Step, ...],
     fallback_pace_seconds_per_km: float = DEFAULT_PACE_SECONDS_PER_KM,
 ) -> WorkoutEstimate:
-    """Estimate complete totals and record use of fallback pace for distance."""
+    """Estimate complete totals and record use of fallback pace for distance.
+
+    Structural rationale: recursion and approximation flags are inseparable parts of
+    calculating one workout estimate.
+    """
     duration = 0.0
     distance = 0.0
     distance_is_approximate = False

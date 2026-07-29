@@ -21,6 +21,11 @@ def _escape(value: str) -> str:
 
 
 def format_program_markdown(program: ProgramExport) -> str:
+    """Render one complete export model as Markdown.
+
+    Structural rationale: the function performs one deterministic serialization; its
+    length reflects the document sections rather than independent business rules.
+    """
     lines = [f"# {_escape(program.name)}"]
     if program.description:
         lines.extend(("", _escape(program.description)))

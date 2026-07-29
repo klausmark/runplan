@@ -88,113 +88,130 @@ def get_all_workouts(client: GarminClient) -> list[dict[str, Any]]:
 
 def scheduled_items_for_dates(client: GarminClient, dates: set[str]) -> list[dict[str, Any]]:
     """Return workout calendar items from every month represented by dates."""
+    items = _unique_calendar_items(_calendar_items(client, dates), dates)
+    workouts = _normalized_workouts(items, dates)
+    _associate_calendar_activities(client, items, workouts, dates)
+    _enrich_direct_activities(client, workouts)
+    return workouts
+
+
+def _calendar_items(client: GarminClient, dates: set[str]) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for month_key in sorted({value[:7] for value in dates}):
         year, month = (int(part) for part in month_key.split("-"))
         calendar = client.get_scheduled_workouts(year, month)
         items.extend(calendar.get("calendarItems", []))
-    unique_items: list[dict[str, Any]] = []
-    seen_items: set[tuple[Any, ...]] = set()
+    return items
+
+
+def _unique_calendar_items(items: list[dict[str, Any]], dates: set[str]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    seen: set[tuple[Any, ...]] = set()
     for item in items:
         item_date = item.get("date", item.get("calendarDate"))
         if item_date not in dates:
             continue
-        item_type = item.get("itemType")
-        item_id = item.get("id")
         workout = item.get("workout") if isinstance(item.get("workout"), dict) else {}
-        workout_id = item.get("workoutId", workout.get("workoutId"))
+        item_id = item.get("id")
         identity = (
-            (item_type, "id", item_id)
+            (item.get("itemType"), "id", item_id)
             if item_id is not None
-            else (item_type, "fallback", item_date, workout_id)
+            else (
+                item.get("itemType"),
+                "fallback",
+                item_date,
+                item.get("workoutId", workout.get("workoutId")),
+            )
         )
-        if identity in seen_items:
-            continue
-        seen_items.add(identity)
-        unique_items.append(item)
-    items = unique_items
-    normalized = []
+        if identity not in seen:
+            seen.add(identity)
+            result.append(item)
+    return result
+
+
+def _normalized_workouts(items: list[dict[str, Any]], dates: set[str]) -> list[dict[str, Any]]:
+    result = []
     for item in items:
         if item.get("itemType") != "workout":
             continue
         workout = item.get("workout") if isinstance(item.get("workout"), dict) else {}
-        normalized.append(
-            {
-                **item,
-                "date": item.get("date", item.get("calendarDate")),
-                "workoutId": item.get("workoutId", workout.get("workoutId")),
-                "workoutScheduleId": item.get("workoutScheduleId", item.get("id")),
-            }
-        )
-    relevant_workouts = {
+        normalized = {
+            **item,
+            "date": item.get("date", item.get("calendarDate")),
+            "workoutId": item.get("workoutId", workout.get("workoutId")),
+            "workoutScheduleId": item.get("workoutScheduleId", item.get("id")),
+        }
+        if normalized["date"] in dates:
+            result.append(normalized)
+    return result
+
+
+def _associate_calendar_activities(
+    client: GarminClient,
+    items: list[dict[str, Any]],
+    workouts: list[dict[str, Any]],
+    dates: set[str],
+) -> None:
+    occurrences = {
         (item.get("workoutId"), item.get("date")): item
-        for item in normalized
-        if item.get("date") in dates and item.get("workoutId") is not None
+        for item in workouts
+        if item.get("workoutId") is not None
     }
     associated: set[tuple[Any, str]] = set()
     for item in items:
-        if item.get("itemType") != "activity" or item.get("date") not in dates:
+        if (
+            item.get("itemType") != "activity"
+            or item.get("date") not in dates
+            or item.get("id") is None
+        ):
             continue
-        activity_id = item.get("id")
-        if activity_id is None:
-            continue
-        summary = client.get_activity(str(activity_id))
-        metadata = summary.get("metadataDTO")
-        details = summary.get("summaryDTO")
-        metadata = metadata if isinstance(metadata, dict) else {}
-        details = details if isinstance(details, dict) else {}
-        workout_id = metadata.get("associatedWorkoutId")
-        occurrence_key = (workout_id, item.get("date"))
-        occurrence = relevant_workouts.get(occurrence_key)
+        summary = client.get_activity(str(item["id"]))
+        metadata = (
+            summary.get("metadataDTO") if isinstance(summary.get("metadataDTO"), dict) else {}
+        )
+        key = (metadata.get("associatedWorkoutId"), item.get("date"))
+        occurrence = occurrences.get(key)
         if occurrence is None:
             continue
-        if occurrence_key in associated:
+        if key in associated:
             raise RuntimeError(
-                "Multiple Garmin activities are associated with "
-                f"workoutId={workout_id} on {item.get('date')}"
+                f"Multiple Garmin activities are associated with workoutId={key[0]} on {key[1]}"
             )
-        distance = details.get("distance")
-        duration = details.get("duration")
-        if (
-            not isinstance(distance, (int, float))
-            or isinstance(distance, bool)
-            or distance <= 0
-            or not isinstance(duration, (int, float))
-            or isinstance(duration, bool)
-            or duration <= 0
-        ):
-            raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
-        occurrence["associatedActivityId"] = summary.get("activityId", activity_id)
-        occurrence["associatedActivityDateTime"] = details.get(
-            "startTimeLocal", item.get("startTimestampLocal")
-        )
-        occurrence["actualDistanceMeters"] = float(distance)
-        occurrence["actualDurationSeconds"] = float(duration)
-        associated.add(occurrence_key)
+        _apply_activity(occurrence, summary, item["id"], item.get("startTimestampLocal"))
+        associated.add(key)
 
-    # Older Garmin responses expose the activity ID directly on the workout.
-    # Fetch its summary as well so every completed record has actual totals.
-    for occurrence in normalized:
+
+def _enrich_direct_activities(client: GarminClient, workouts: list[dict[str, Any]]) -> None:
+    """Fill actual totals for older responses that expose an activity ID on the workout."""
+    for occurrence in workouts:
         activity_id = occurrence.get("associatedActivityId")
         if activity_id is None or occurrence.get("actualDistanceMeters") is not None:
             continue
         summary = client.get_activity(str(activity_id))
-        details = summary.get("summaryDTO")
-        details = details if isinstance(details, dict) else {}
-        distance, duration = details.get("distance"), details.get("duration")
-        if (
-            not isinstance(distance, (int, float))
-            or distance <= 0
-            or not isinstance(duration, (int, float))
-            or duration <= 0
-        ):
-            raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
-        occurrence["actualDistanceMeters"] = float(distance)
-        occurrence["actualDurationSeconds"] = float(duration)
-        occurrence["associatedActivityDateTime"] = occurrence.get(
-            "associatedActivityDateTime"
-        ) or details.get("startTimeLocal")
-    return normalized
+        existing_time = occurrence.get("associatedActivityDateTime")
+        _apply_activity(occurrence, summary, activity_id, existing_time)
+        if existing_time is not None:
+            occurrence["associatedActivityDateTime"] = existing_time
+
+
+def _apply_activity(
+    occurrence: dict[str, Any], summary: dict[str, Any], activity_id: Any, fallback_time: Any
+) -> None:
+    details = summary.get("summaryDTO") if isinstance(summary.get("summaryDTO"), dict) else {}
+    distance, duration = details.get("distance"), details.get("duration")
+    if (
+        not isinstance(distance, (int, float))
+        or isinstance(distance, bool)
+        or distance <= 0
+        or not isinstance(duration, (int, float))
+        or isinstance(duration, bool)
+        or duration <= 0
+    ):
+        raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
+    occurrence["associatedActivityId"] = summary.get("activityId", activity_id)
+    occurrence["associatedActivityDateTime"] = details.get("startTimeLocal", fallback_time)
+    occurrence["actualDistanceMeters"] = float(distance)
+    occurrence["actualDurationSeconds"] = float(duration)
 
 
 __all__ = [

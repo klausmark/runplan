@@ -210,52 +210,62 @@ def load_user_registry(path: Path | None = None) -> UserRegistry:
     entries = raw.get("users")
     if not isinstance(entries, list) or not entries:
         raise ValueError(f"{configured}: 'users' must be a non-empty array of tables")
-    users: list[RunplanUser] = []
-    for index, entry in enumerate(entries, 1):
-        if not isinstance(entry, dict):
-            raise ValueError(f"{configured}: users[{index}] must be a table")
-        user_id, name = entry.get("id"), entry.get("name")
-        if not isinstance(user_id, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", user_id):
-            raise ValueError(f"{configured}: users[{index}].id is invalid")
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError(f"{configured}: users[{index}].name is required")
-        default_pace = entry.get("default_pace", os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"))
-        if not isinstance(default_pace, str):
-            raise ValueError(f"{configured}: users[{index}].default_pace is invalid")
-        try:
-            parse_pace(default_pace, f"users[{index}].default_pace")
-        except ValueError as exc:
-            raise ValueError(f"{configured}: {exc}") from exc
-        active_program = entry.get("active_program")
-        if active_program is not None and (
-            not isinstance(active_program, str)
-            or Path(active_program).name != active_program
-            or not active_program.endswith((".yaml", ".yml"))
-        ):
-            raise ValueError(f"{configured}: users[{index}].active_program is invalid")
-
-        users.append(
-            RunplanUser(
-                id=user_id,
-                name=name.strip(),
-                credentials_file=_configured_user_path(
-                    configured,
-                    entry,
-                    index,
-                    "credentials_file",
-                    f"credentials-{user_id}.toml",
-                ),
-                token_store=_configured_user_path(
-                    configured, entry, index, "token_store", f"tokens/{user_id}"
-                ),
-                state_directory=_configured_user_path(
-                    configured, entry, index, "state_dir", f"state/{user_id}"
-                ),
-                default_pace=default_pace,
-                active_program=active_program,
-            )
-        )
+    users = [_user_from_entry(configured, entry, index) for index, entry in enumerate(entries, 1)]
     return UserRegistry(users, config_path=configured)
+
+
+def _user_from_entry(configured: Path, entry: Any, index: int) -> RunplanUser:
+    if not isinstance(entry, dict):
+        raise ValueError(f"{configured}: users[{index}] must be a table")
+    user_id, name = _user_identity(configured, entry, index)
+    default_pace = _user_pace(configured, entry, index)
+    active_program = _active_program(configured, entry, index)
+    return RunplanUser(
+        id=user_id,
+        name=name,
+        credentials_file=_configured_user_path(
+            configured, entry, index, "credentials_file", f"credentials-{user_id}.toml"
+        ),
+        token_store=_configured_user_path(
+            configured, entry, index, "token_store", f"tokens/{user_id}"
+        ),
+        state_directory=_configured_user_path(
+            configured, entry, index, "state_dir", f"state/{user_id}"
+        ),
+        default_pace=default_pace,
+        active_program=active_program,
+    )
+
+
+def _user_identity(configured: Path, entry: dict[str, Any], index: int) -> tuple[str, str]:
+    user_id, name = entry.get("id"), entry.get("name")
+    if not isinstance(user_id, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", user_id):
+        raise ValueError(f"{configured}: users[{index}].id is invalid")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(f"{configured}: users[{index}].name is required")
+    return user_id, name.strip()
+
+
+def _user_pace(configured: Path, entry: dict[str, Any], index: int) -> str:
+    value = entry.get("default_pace", os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"))
+    if not isinstance(value, str):
+        raise ValueError(f"{configured}: users[{index}].default_pace is invalid")
+    try:
+        parse_pace(value, f"users[{index}].default_pace")
+    except ValueError as exc:
+        raise ValueError(f"{configured}: {exc}") from exc
+    return value
+
+
+def _active_program(configured: Path, entry: dict[str, Any], index: int) -> str | None:
+    value = entry.get("active_program")
+    if value is not None and (
+        not isinstance(value, str)
+        or Path(value).name != value
+        or not value.endswith((".yaml", ".yml"))
+    ):
+        raise ValueError(f"{configured}: users[{index}].active_program is invalid")
+    return value
 
 
 __all__ = [

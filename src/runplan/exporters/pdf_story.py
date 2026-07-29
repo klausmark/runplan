@@ -41,7 +41,10 @@ def _stat(value: str, label: str, styles: PdfStyles) -> list[Paragraph]:
 
 
 def _cover(program: ProgramExport, width: float, styles: PdfStyles) -> list[Any]:
-    """Assemble the single cover-page layout and its summary card."""
+    """Assemble the single cover-page layout and its summary card.
+
+    Structural rationale: the flowables jointly define one indivisible cover component.
+    """
     stats = Table(
         [
             [
@@ -102,7 +105,10 @@ def _cover_details(program: ProgramExport, styles: PdfStyles) -> Paragraph:
 
 
 def _week_header(week: Any, width: float, styles: PdfStyles) -> Table:
-    """Assemble the single week-header table and its summary cells."""
+    """Assemble the single week-header table and its summary cells.
+
+    Structural rationale: the nested tables jointly define one week-header component.
+    """
     left: list[Paragraph] = [
         Paragraph("TRAINING WEEK", styles.eyebrow),
         Paragraph(f"Week {week.number}", styles.week_number),

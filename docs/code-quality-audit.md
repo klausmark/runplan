@@ -36,11 +36,35 @@ previously fused workflows now have named collaborators.
 | `normalize_workout` and `load_program` | Split | Tracking fields, program metadata, week validation, workout identity, scheduling dates, and model construction are focused helpers below the review threshold |
 | `exporters/pdf.py` (459 lines) and `export_pdf` (354 lines) | Split | The facade now validates output and builds the document; brand/page decoration, theme, styles, cover, week, and workout flowables have dedicated modules and functions |
 | PDF style/cover/week review signals | Retain as cohesive constructors | Each function constructs one named visual component or style family; their focused responsibility is documented in code |
+| `scheduled_items_for_dates` (109 lines) | Split | Month fetching, de-duplication, workout normalization, activity association, and legacy enrichment are focused helpers; Garmin call order is preserved |
+| `build_program_export` (81 lines) | Split | Selection orchestration delegates week, workout, summary, and effective-total transformations |
+| `YamlStateRepository.save` (60 lines) | Split | Record application, orphan handling, atomic YAML writing, and status summarization are focused helpers |
+| `load_user_registry` (59 lines) | Split | Registry loading delegates entry identity, pace, active-plan, and path validation |
+| HTML renderer (75 lines) | Split | Document, program-header, week, and workout serializers are separate functions |
 
-The remaining Garmin-query, renderer, export-view-model, and YAML
-repository findings below are still open. A size signal is not considered resolved merely by
-documenting it; an exception is accepted only where the code has one cohesive reason to
-change.
+All baseline production findings have now been reviewed. The assessment tables below are
+retained as the historical baseline; current decisions and measurements are recorded above.
+A size signal is not considered resolved merely by documenting it: an exception is accepted
+only where the code has one cohesive reason to change.
+
+## Final working-tree review
+
+The final measurement has 66 production modules, **zero module-size signals**, **zero strong
+function signals**, 18 review-sized functions/methods, and eight class review candidates.
+Every remaining signal was retained only after the mixed responsibilities had been extracted.
+
+| Remaining review signals | Decision and single responsibility |
+| --- | --- |
+| `reconcile_selected_program`, `_remove_terminal_record`, `WeekSynchronizer._synchronize_workout`, `delete_managed_workouts`, `ensure_schedule`, `_prune_unselected` | Retain as ordered reconciliation, cleanup, synchronization, deletion, scheduling, or pruning transactions. Splitting their sequencing would hide checkpoints and failure safety; policy calculations are already delegated. |
+| `format_program_markdown`, `format_program_text` | Retain as deterministic serializers over an already prepared export model. They contain presentation sections, not business decisions. |
+| PDF `_week_styles`, `_workout_styles`, `_cover`, `_week_header` | Retain as constructors for one named visual component or component-specific style family. |
+| `build_preview`, `ProgramStore.upload`, `ProgramProjector.get` | Retain as one preview projection, one atomic upload integrity boundary, and one read-model projection respectively; parsing, persistence formatting, editing, lifecycle comparison, and export are delegated. |
+| `parse_duration`, `program_model`, `estimate_steps` | Retain as one value parser with supported legacy representations, one normalized-to-domain mapping, and one recursive estimate calculation. |
+| `RunplanHandler`, `WeekSynchronizer`, `ProgramStore`, `ProgramEditor`, `UserRegistry`, `LoggingGarminClient`, `WebSyncService`, `ProgramProjector` | Retain as HTTP adapter, week transaction, document store, edit transaction, user transaction boundary, logging decorator, sync facade, and read-model projector. Each class docstring records its structural rationale. |
+
+The 40-line and class thresholds remain review triggers rather than gates. These exceptions do
+not waive the single-responsibility rules: a future independent reason to change any retained
+unit requires extraction rather than extending the exception.
 
 ## Baseline summary
 

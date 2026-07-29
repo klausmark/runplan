@@ -22,7 +22,11 @@ def ensure_schedule(
     *,
     reused: bool,
 ) -> Any:
-    """Reuse the desired schedule when present, otherwise create it."""
+    """Reuse the desired schedule when present, otherwise create it.
+
+    Structural rationale: lookup, creation, result recording, and ID validation are one
+    schedule-ensuring operation.
+    """
     schedule = next(
         (
             item

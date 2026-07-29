@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 from pathlib import Path
+from typing import Any
 
 from ..application.export import ProgramExport
 from ..presentation.text import (
@@ -17,80 +18,86 @@ from .writer import write_export
 
 
 def format_program_html(program: ProgramExport) -> str:
-    esc = html.escape
-    parts = [
+    """Render one complete export model as HTML from section serializers."""
+    parts = _document_start(program) + _program_header(program)
+    parts.extend(line for week in program.weeks for line in _week_html(week))
+    parts.extend(("</body>", "</html>"))
+    return "\n".join(parts) + "\n"
+
+
+def _document_start(program: ProgramExport) -> list[str]:
+    return [
         "<!doctype html>",
         '<html lang="en">',
         "<head>",
         '  <meta charset="utf-8">',
-        f"  <title>{esc(program.name)}</title>",
+        f"  <title>{html.escape(program.name)}</title>",
         "  <style>body{font:16px/1.5 system-ui,sans-serif;max-width:54rem;margin:2rem auto;padding:0 1rem;color:#102a43}header,section{margin-bottom:3rem}section{break-before:page}h1,h2,h3{color:#183153}.summary{list-style:none;padding:0}.steps{background:#f0f4f8;padding:1rem;white-space:pre-wrap}article{margin:2rem 0}</style>",
         "</head>",
         "<body>",
-        "<header>",
-        f"  <h1>{esc(program.name)}</h1>",
     ]
+
+
+def _program_header(program: ProgramExport) -> list[str]:
+    result = ["<header>", f"  <h1>{html.escape(program.name)}</h1>"]
     if program.description:
-        parts.append(f"  <p>{esc(program.description)}</p>")
-    parts.extend(
-        (
+        result.append(f"  <p>{html.escape(program.description)}</p>")
+    result.extend(
+        [
             '  <ul class="summary">',
             f"    <li>Start week: {program.start_week}</li>",
             f"    <li>Program weeks: {program.total_weeks}</li>",
             f"    <li>Selected weeks: {program.selected_week_count}</li>",
             f"    <li>Total workouts: {program.summary.workout_count}</li>",
-            "    <li>Estimated total duration: "
-            f"{format_seconds_compact(program.summary.estimated_duration_seconds)}</li>",
-            "    <li>Estimated total distance: "
-            f"{format_estimated_distance(program.summary.estimated_distance_meters)}</li>",
+            f"    <li>Estimated total duration: {format_seconds_compact(program.summary.estimated_duration_seconds)}</li>",
+            f"    <li>Estimated total distance: {format_estimated_distance(program.summary.estimated_distance_meters)}</li>",
             "  </ul>",
             "</header>",
-        )
+        ]
     )
-    for week in program.weeks:
-        parts.extend(
-            (
-                f'<section id="week-{week.number}">',
-                f"  <h2>Week {week.number} · {week.start_date} to {week.end_date}</h2>",
-            )
-        )
-        if week.focus:
-            parts.append(f"  <p>Focus: {esc(week.focus)}</p>")
-        parts.extend(
-            (
-                '  <ul class="summary">',
-                f"    <li>Workouts this week: {week.summary.workout_count}</li>",
-                "    <li>Estimated duration this week: "
-                f"{format_seconds_compact(week.summary.estimated_duration_seconds)}</li>",
-                "    <li>Estimated distance this week: "
-                f"{format_estimated_distance(week.summary.estimated_distance_meters)}</li>",
-                "  </ul>",
-            )
-        )
-        for workout in week.workouts:
-            parts.extend(
-                (
-                    "  <article>",
-                    f"    <h3>{format_weekday(workout.date)} · {esc(workout.name)} · "
-                    + (
-                        f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}"
-                        if workout.totals_are_actual
-                        else format_model_totals(workout.steps)
-                    )
-                    + "</h3>",
-                )
-            )
-            if workout.description:
-                parts.append(f"    <p>{esc(workout.description)}</p>")
-            parts.extend(
-                (
-                    f'    <pre class="steps">{esc(format_model_steps(workout.steps, indent=""))}</pre>',
-                    "  </article>",
-                )
-            )
-        parts.append("</section>")
-    parts.extend(("</body>", "</html>"))
-    return "\n".join(parts) + "\n"
+    return result
+
+
+def _week_html(week: Any) -> list[str]:
+    result = [
+        f'<section id="week-{week.number}">',
+        f"  <h2>Week {week.number} · {week.start_date} to {week.end_date}</h2>",
+    ]
+    if week.focus:
+        result.append(f"  <p>Focus: {html.escape(week.focus)}</p>")
+    result.extend(
+        [
+            '  <ul class="summary">',
+            f"    <li>Workouts this week: {week.summary.workout_count}</li>",
+            f"    <li>Estimated duration this week: {format_seconds_compact(week.summary.estimated_duration_seconds)}</li>",
+            f"    <li>Estimated distance this week: {format_estimated_distance(week.summary.estimated_distance_meters)}</li>",
+            "  </ul>",
+        ]
+    )
+    result.extend(line for workout in week.workouts for line in _workout_html(workout))
+    result.append("</section>")
+    return result
+
+
+def _workout_html(workout: Any) -> list[str]:
+    totals = (
+        f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}"
+        if workout.totals_are_actual
+        else format_model_totals(workout.steps)
+    )
+    result = [
+        "  <article>",
+        f"    <h3>{format_weekday(workout.date)} · {html.escape(workout.name)} · {totals}</h3>",
+    ]
+    if workout.description:
+        result.append(f"    <p>{html.escape(workout.description)}</p>")
+    result.extend(
+        [
+            f'    <pre class="steps">{html.escape(format_model_steps(workout.steps, indent=""))}</pre>',
+            "  </article>",
+        ]
+    )
+    return result
 
 
 def export_html(program: ProgramExport, output_path: Path, force: bool) -> None:

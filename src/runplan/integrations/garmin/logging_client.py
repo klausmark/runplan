@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 
 
 class LoggingGarminClient:
-    """Log Garmin calls without exposing credentials or response payloads."""
+    """Log Garmin calls without exposing credentials or response payloads.
+
+    Structural rationale: each method implements the same logging-decorator policy for
+    one method of the Garmin port; the class has one cross-cutting concern.
+    """
 
     def __init__(self, client: GarminClient, *, user_id: str) -> None:
         self.client = client

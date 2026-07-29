@@ -45,7 +45,11 @@ def _prune_unselected(
     result: SyncResult,
     reference_date: date,
 ) -> None:
-    """Remove future active records outside the selected desired set."""
+    """Remove future active records outside the selected desired set.
+
+    Structural rationale: candidate selection and ordered remote/state cleanup are one
+    batch-pruning transaction.
+    """
     desired_keys = {
         f"week-{program['week']:02d}/{definition['id']}"
         for program, compiled in selections

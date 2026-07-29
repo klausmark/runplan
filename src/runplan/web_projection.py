@@ -134,6 +134,11 @@ class ProgramProjector:
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
     ) -> dict[str, Any]:
+        """Build one complete web read model.
+
+        Structural rationale: loading, lifecycle lookup, and week projection are the
+        inputs of one read-model operation and perform no mutation.
+        """
         path = self.path(name)
         raw, text = self._read(path)
         try:

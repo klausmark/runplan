@@ -37,7 +37,11 @@ def _step_model(raw: Any, location: str) -> Step:
 
 
 def program_model(normalized: dict[str, Any]) -> Program:
-    """Build a typed domain program from validated normalized data."""
+    """Build a typed domain program from validated normalized data.
+
+    Structural rationale: this is one boundary mapping from normalized dictionaries to
+    the immutable domain object graph.
+    """
     weeks = tuple(
         Week(
             number=week["number"],

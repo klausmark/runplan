@@ -78,7 +78,10 @@ def _document_styles(regular: str, bold: str, base: Any) -> dict[str, ParagraphS
 
 
 def _week_styles(regular: str, bold: str, base: Any) -> dict[str, ParagraphStyle]:
-    """Create the cohesive style family used by week summary headers."""
+    """Create the cohesive style family used by week summary headers.
+
+    Structural rationale: all returned styles change together with that component.
+    """
     normal = base["Normal"]
     return {
         "week_number": _style(
@@ -124,7 +127,10 @@ def _week_styles(regular: str, bold: str, base: Any) -> dict[str, ParagraphStyle
 
 
 def _workout_styles(regular: str, bold: str, base: Any) -> dict[str, ParagraphStyle]:
-    """Create the cohesive style family used by workout rows."""
+    """Create the cohesive style family used by workout rows.
+
+    Structural rationale: all returned styles change together with that component.
+    """
     normal = base["Normal"]
     body = _style(
         "RunplanBody",

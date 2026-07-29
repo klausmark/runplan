@@ -120,7 +120,11 @@ def reconcile_selected_program(
     *,
     today: date | None = None,
 ) -> ReconcileResult:
-    """Reconcile Garmin evidence for every selected plan occurrence."""
+    """Reconcile Garmin evidence for every selected plan occurrence.
+
+    Structural rationale: discovery, matching, and checkpointing form one guarded
+    reconciliation transaction and preserve remote-call order.
+    """
     validate_selections(selections)
     reference_date = today or date.today()
     program_id = selections[0][0]["program_id"]

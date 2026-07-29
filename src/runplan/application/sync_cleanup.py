@@ -35,7 +35,11 @@ def _remove_terminal_record(
     scheduled: list[dict[str, Any]],
     remote_by_id: dict[Any, dict[str, Any]],
 ) -> list[SyncAction]:
-    """Remove remote objects and checkpoint one terminal record."""
+    """Remove remote objects and checkpoint one terminal record.
+
+    Structural rationale: ordered unschedule/delete/state writes are one recoverable
+    cleanup transaction and must remain visibly sequential.
+    """
     actions: list[SyncAction] = []
     name = record.get("name", key)
     workout_id = record.get("workout_id")
@@ -138,7 +142,11 @@ def delete_managed_workouts(
     program: dict[str, Any],
     compiled: list[tuple[dict[str, Any], Any]],
 ) -> tuple[int, list[SyncAction]]:
-    """Delete all verified active workouts owned by one program."""
+    """Delete all verified active workouts owned by one program.
+
+    Structural rationale: ownership verification and ordered deletion are one guarded
+    destructive workflow.
+    """
     del compiled  # Retained for compatibility with the existing public signature.
     program_id = program["program_id"]
     actions = cleanup_terminal_workouts(client, repository, program_id)

@@ -79,8 +79,68 @@ def tracking_from_record(record: dict[str, Any]) -> dict[str, Any]:
     return tracking
 
 
+def _apply_records(document: dict[str, Any], records: dict[str, Any]) -> None:
+    written: set[str] = set()
+    for week in document.get("weeks", []):
+        if not isinstance(week, dict) or not isinstance(week.get("week"), int):
+            continue
+        for workout in week.get("workouts", []):
+            if not isinstance(workout, dict) or not isinstance(workout.get("id"), str):
+                continue
+            key = f"week-{week['week']:02d}/{workout['id']}"
+            record = records.get(key)
+            if isinstance(record, dict):
+                workout["tracking"] = tracking_from_record(record)
+                written.add(key)
+            else:
+                workout.pop("tracking", None)
+    _apply_orphans(document, records, written)
+
+
+def _apply_orphans(document: dict[str, Any], records: dict[str, Any], written: set[str]) -> None:
+    orphaned = {
+        key: record
+        for key, record in records.items()
+        if key not in written and isinstance(record, dict)
+    }
+    program = document.setdefault("program", {})
+    tracking = program.setdefault("tracking", {})
+    if orphaned:
+        tracking["orphaned_workouts"] = orphaned
+    else:
+        tracking.pop("orphaned_workouts", None)
+        if not tracking:
+            program.pop("tracking", None)
+
+
+def _write_document(path: Path, document: dict[str, Any]) -> None:
+    stream = StringIO()
+    _yaml().dump(document, stream)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+            output.write(stream.getvalue())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _status_counts(records: dict[str, Any]) -> str:
+    counts: dict[str, int] = {}
+    for record in records.values():
+        if isinstance(record, dict):
+            status = str(record.get("status", "unknown"))
+            counts[status] = counts.get(status, 0) + 1
+    return ",".join(f"{key}:{value}" for key, value in sorted(counts.items()))
+
+
 class YamlStateRepository:
-    """Expose embedded workout tracking through the synchronization state port."""
+    """Expose embedded workout tracking through the synchronization state port.
+
+    Structural rationale: the class owns one persistence format and delegates document
+    mutation, serialization, and summaries to module-level helpers.
+    """
 
     def __init__(
         self,
@@ -135,56 +195,14 @@ class YamlStateRepository:
         records = state.get("workouts")
         if not isinstance(records, dict):
             raise ValueError("state workouts must be an object")
-        written: set[str] = set()
-        for week in document.get("weeks", []):
-            if not isinstance(week, dict) or not isinstance(week.get("week"), int):
-                continue
-            for workout in week.get("workouts", []):
-                if not isinstance(workout, dict) or not isinstance(workout.get("id"), str):
-                    continue
-                key = f"week-{week['week']:02d}/{workout['id']}"
-                record = records.get(key)
-                if isinstance(record, dict):
-                    workout["tracking"] = tracking_from_record(record)
-                    written.add(key)
-                else:
-                    workout.pop("tracking", None)
-        orphaned = {
-            key: record
-            for key, record in records.items()
-            if key not in written and isinstance(record, dict)
-        }
-        program = document.setdefault("program", {})
-        program_tracking = program.setdefault("tracking", {})
-        if orphaned:
-            program_tracking["orphaned_workouts"] = orphaned
-        else:
-            program_tracking.pop("orphaned_workouts", None)
-            if not program_tracking:
-                program.pop("tracking", None)
-        stream = StringIO()
-        _yaml().dump(document, stream)
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{self.program_path.name}.", dir=self.program_path.parent
-        )
-        temporary = Path(temporary_name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as output:
-                output.write(stream.getvalue())
-            temporary.replace(self.program_path)
-        finally:
-            temporary.unlink(missing_ok=True)
-        status_counts: dict[str, int] = {}
-        for record in records.values():
-            if isinstance(record, dict):
-                status = str(record.get("status", "unknown"))
-                status_counts[status] = status_counts.get(status, 0) + 1
+        _apply_records(document, records)
+        _write_document(self.program_path, document)
         logger.info(
             "YAML tracking saved file=%s program_id=%s records=%d statuses=%s",
             self.program_path,
             program_id,
             len(records),
-            ",".join(f"{key}:{value}" for key, value in sorted(status_counts.items())),
+            _status_counts(records),
         )
         if self.legacy is not None:
             self.legacy.delete(program_id)

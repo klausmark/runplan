@@ -67,6 +67,11 @@ class WeekSynchronizer:
         return self.result
 
     def _synchronize_workout(self, definition: dict[str, Any], workout: Any) -> None:
+        """Synchronize and checkpoint one desired workout occurrence.
+
+        Structural rationale: matching and scheduling are delegated; this method keeps
+        their required transaction order and final checkpoint explicit.
+        """
         key = f"week-{self.week:02d}/{definition['id']}"
         previous = self.records.get(key)
         if previous is None and definition["schedule_date"] < self.reference_date.isoformat():

@@ -15,7 +15,10 @@ SECTION_DIVIDER = "-" * 72
 
 
 def format_program_text(program: ProgramExport) -> str:
-    """Render a selected program as deterministic terminal-friendly text."""
+    """Render a selected program as deterministic terminal-friendly text.
+
+    Structural rationale: this is one serialization pass over a stable export model.
+    """
     cover = [program.name]
     if program.description:
         cover.extend(("", program.description))

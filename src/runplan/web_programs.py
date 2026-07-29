@@ -76,7 +76,11 @@ class ProgramStore:
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
     ) -> dict[str, Any]:
-        """Validate and atomically store a new YAML program."""
+        """Validate and atomically store a new YAML program.
+
+        Structural rationale: validation, uniqueness, and atomic persistence are the
+        integrity boundary of one upload transaction.
+        """
         if not isinstance(name, str):
             raise WebError(HTTPStatus.BAD_REQUEST, "Program filename is required")
         path = self.path(name)
