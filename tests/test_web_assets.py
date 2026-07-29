@@ -9,9 +9,25 @@ from runplan.web import (
     ProgramStore,
     make_handler,
 )
+from tests.web_helpers import fake_authenticator
 
 
 class TestWebAsset:
+    def test_password_gate_is_packaged_and_precedes_studio_initialization(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+
+        assert 'id="auth-form"' in html
+        assert 'id="auth-password" type="password"' in html
+        assert 'autocomplete="current-password"' in html
+        assert 'class="auth-pending"' in html
+        assert 'request("/api/auth/status")' in script
+        assert 'request("/api/auth/challenge")' in script
+        assert 'request("/api/auth/login"' in script
+        assert "window.crypto.subtle.deriveKey" in script
+        assert script.rstrip().endswith("initializeAuthentication();")
+        assert 'localStorage.setItem("runplan_auth"' not in script
+
     def test_runplan_favicon_is_packaged_and_linked(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         favicon = (ASSET_DIR / "favicon.svg").read_text(encoding="utf-8")
@@ -26,8 +42,10 @@ class TestWebAsset:
 
     def test_favicon_is_served_as_svg(self, tmp_path: Path) -> None:
         store = ProgramStore(tmp_path)
-        handler = object.__new__(make_handler(store))
+        handler = object.__new__(make_handler(store, authenticator=fake_authenticator()))
         handler.path = "/favicon.svg"
+        handler.client_address = ("127.0.0.1", 1234)
+        handler.headers = {}
         handler.wfile = BytesIO()
         handler.send_response = Mock()
         handler.send_header = Mock()

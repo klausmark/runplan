@@ -64,15 +64,15 @@ added separately before sync. The browser remembers the selected user locally,
 while each user's active program is persisted in the server-side user registry
 and shared by the web frontend and CLI. Opening a valid program updates that
 setting; `runplan user set-plan USER FILE` provides the equivalent CLI action.
-This selection is convenience state, not authentication or program ownership.
+This selection is convenience state, not a separate login identity or program ownership.
 
 Garmin sync is a separate confirmed action, never an implicit consequence of
 saving the plan. It uses the CLI's selection and synchronization use cases,
 shows a structured diff before confirmation, and reports progress, results,
 and actionable errors. Credentials remain on the server.
 
-The trusted-network web application exposes multiple server-configured Runplan
-users without an application login. Each user has a stable non-secret ID,
+The web application is protected by one shared Runplan Studio password and
+exposes multiple server-configured Runplan users after that login. Each user has a stable non-secret ID,
 display name, Garmin credentials-file path, Garmin token-store directory, and
 isolated sync state. The settings UI may submit Garmin credentials to the
 server, but saved passwords and Garmin tokens are never returned to the browser.
@@ -80,11 +80,19 @@ Each user also owns configurable estimation defaults, initially fallback pace,
 which must be applied consistently to web summaries, exports, Garmin titles,
 and sync previews. All
 Garmin operations resolve the supplied user ID against server configuration and
-partition clients, state, and future concurrency locks by user. This is user
-selection, not authentication or authorization: anyone who can reach the
-application can operate every configured user. Consequently this mode must
-remain limited to a trusted private network or sit behind an external
-authentication and TLS proxy.
+partition clients, state, and future concurrency locks by user. This remains
+user selection rather than per-profile authorization: anyone who knows the
+shared Studio password can operate every configured user. Remote access
+requires TLS, while a stateless HttpOnly cookie remembers successful browser
+authentication.
+
+Web authentication is independent of Runplan user profiles. The browser derives
+a PBKDF2 proof key and answers a short-lived, single-use server challenge; the
+human password is not sent to the server. A successful proof produces a
+stateless HttpOnly cookie derived from the configured verifier. Changing the
+configured password invalidates every existing browser cookie. Login failures
+are rate-limited in process memory, so no session or attempt state survives a
+server restart.
 
 The server uses hierarchical `runplan.*` loggers with one stdout handler.
 Operational mutations are `INFO`, recoverable remote inconsistencies and client

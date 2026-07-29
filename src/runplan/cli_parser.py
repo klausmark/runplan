@@ -83,9 +83,7 @@ def _add_export_command(commands: Any) -> None:
 
 
 def _add_serve_command(commands: Any, program_directory: Path) -> None:
-    serve_parser = commands.add_parser(
-        "serve", help="Run the local web frontend (no authentication)"
-    )
+    serve_parser = commands.add_parser("serve", help="Run the password-protected web frontend")
     serve_parser.add_argument(
         "--host", default="127.0.0.1", help="Listen address (use 0.0.0.0 for remote access)"
     )

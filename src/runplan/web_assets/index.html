@@ -17,7 +17,20 @@
     </script>
     <link rel="stylesheet" href="/styles.css">
   </head>
-  <body>
+  <body class="auth-pending">
+    <main id="auth-view" class="auth-view">
+      <section class="auth-card" aria-labelledby="auth-title">
+        <img class="auth-mark" src="/favicon.svg" width="52" height="52" alt="">
+        <p class="eyebrow">Runplan Studio</p>
+        <h1 id="auth-title">Enter password</h1>
+        <p class="description">This browser will remain authorized after a successful login.</p>
+        <form id="auth-form">
+          <label>Password<input id="auth-password" type="password" autocomplete="current-password" required autofocus></label>
+          <button id="auth-submit" class="button primary" type="submit">Continue</button>
+          <p id="auth-error" class="auth-error hidden" role="alert"></p>
+        </form>
+      </section>
+    </main>
     <header class="topbar">
       <div class="topbar-primary">
         <a class="brand" href="/" aria-label="Runplan Studio home">

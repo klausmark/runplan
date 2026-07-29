@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .users import UserRegistry, WebError
+from .web_auth import WebAuthenticator
+from .web_auth_http import AuthResponse, WebAuthHttpAdapter
 
 if TYPE_CHECKING:
     from .web import ProgramStore, WebSyncService
@@ -26,6 +28,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
 
     sync: WebSyncService
     registry: UserRegistry
+    auth: WebAuthHttpAdapter
 
     server_version = "RunplanWeb/0.1"
 
@@ -62,10 +65,11 @@ class RunplanHandler(BaseHTTPRequestHandler):
 
     def _handle(self, operation: Any) -> None:
         try:
+            self.auth.authorize(self.path, self.client_address[0], self.headers)
             operation()
         except WebError as exc:
             self._log_web_error(exc)
-            self._json(exc.status, {"error": str(exc)})
+            self._json(exc.status, {"error": str(exc)}, headers=exc.headers)
         except Exception as exc:
             logger.exception(
                 "Unhandled HTTP exception client=%s method=%s path=%s exception=%s",
@@ -79,6 +83,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
     def _post(self) -> None:
         payload = self._body()
         path = urlsplit(self.path).path
+        if response := self.auth.post(path, self.client_address[0], self.headers, payload):
+            self._auth_response(response)
+            return
         if path == "/api/users":
             self._json(
                 HTTPStatus.CREATED,
@@ -141,6 +148,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
     def _get(self) -> None:
         parsed = urlsplit(self.path)
         query = parse_qs(parsed.query)
+        if response := self.auth.get(parsed.path, self.client_address[0], self.headers):
+            self._auth_response(response)
+            return
         if parsed.path == "/api/users":
             self._json(HTTPStatus.OK, {"users": self.registry.list()})
             return
@@ -237,20 +247,32 @@ class RunplanHandler(BaseHTTPRequestHandler):
             raise WebError(HTTPStatus.BAD_REQUEST, "JSON body must be an object")
         return payload
 
-    def _json(self, status: HTTPStatus, payload: Any) -> None:
+    def _json(
+        self,
+        status: HTTPStatus,
+        payload: Any,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         content = json.dumps(payload, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
+
+    def _auth_response(self, response: AuthResponse) -> None:
+        self._json(response.status, response.payload, headers=response.headers)
 
 
 def make_handler(
     store: ProgramStore,
     sync_service: WebSyncService | None = None,
     users: UserRegistry | None = None,
+    authenticator: WebAuthenticator | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     """Bind an HTTP adapter subclass to the supplied application services."""
     if sync_service is None:
@@ -258,8 +280,10 @@ def make_handler(
 
         sync_service = WebSyncService(store, users=users)
     registry = users or sync_service.users
+    authenticator = authenticator or WebAuthenticator.from_environment()
+    auth = WebAuthHttpAdapter(authenticator)
     return type(
         "ConfiguredRunplanHandler",
         (RunplanHandler,),
-        {"sync": sync_service, "registry": registry},
+        {"sync": sync_service, "registry": registry, "auth": auth},
     )

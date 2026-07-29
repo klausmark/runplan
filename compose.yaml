@@ -10,6 +10,10 @@ services:
       - ./runplan-data:/data
     environment:
       RUNPLAN_DEFAULT_PACE: "${RUNPLAN_DEFAULT_PACE:-6:00 min/km}"
+      RUNPLAN_WEB_PASSWORD_HASH: "${RUNPLAN_WEB_PASSWORD_HASH:-}"
+      RUNPLAN_WEB_PASSWORD: "${RUNPLAN_WEB_PASSWORD:-}"
+      RUNPLAN_WEB_REQUIRE_HTTPS: "${RUNPLAN_WEB_REQUIRE_HTTPS:-true}"
+      RUNPLAN_WEB_TRUST_PROXY: "${RUNPLAN_WEB_TRUST_PROXY:-false}"
     init: true
 
 volumes:

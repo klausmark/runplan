@@ -3,6 +3,7 @@ const $ = (selector) => document.querySelector(selector);
 const TOUCH_DRAG_DELAY = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
 const USER_STORAGE_KEY = "runplan-user";
+let studioInitialized = false;
 
 function storedValue(key) {
   try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -23,9 +24,79 @@ async function request(url, options = {}) {
   if (!response.ok) {
     const error = new Error(body?.error || `Request failed (${response.status})`);
     error.status = response.status;
+    if (response.status === 401 && !url.startsWith("/api/auth/")) showLogin();
     throw error;
   }
   return body;
+}
+
+function showLogin(message = "") {
+  document.body.classList.remove("authenticated");
+  document.body.classList.add("auth-pending");
+  const error = $("#auth-error");
+  error.textContent = message;
+  error.classList.toggle("hidden", !message);
+  $("#auth-password").focus();
+}
+
+function showStudio() {
+  document.body.classList.add("authenticated");
+  document.body.classList.remove("auth-pending");
+}
+
+function decodeBase64Url(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  return Uint8Array.from(atob(padded), character => character.charCodeAt(0));
+}
+
+function encodeBase64Url(value) {
+  const binary = Array.from(new Uint8Array(value), byte => String.fromCharCode(byte)).join("");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function passwordProof(password, challenge) {
+  if (!window.isSecureContext || !window.crypto?.subtle) {
+    throw new Error("Runplan login requires HTTPS or localhost.");
+  }
+  const material = await window.crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
+  const key = await window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: decodeBase64Url(challenge.salt),
+      iterations: challenge.iterations,
+      hash: "SHA-256",
+    },
+    material,
+    { name: "HMAC", hash: "SHA-256", length: 256 },
+    false,
+    ["sign"],
+  );
+  return encodeBase64Url(
+    await window.crypto.subtle.sign("HMAC", key, decodeBase64Url(challenge.nonce)),
+  );
+}
+
+async function initializeAuthentication() {
+  try {
+    const status = await request("/api/auth/status");
+    if (!status.authenticated) {
+      showLogin();
+      return;
+    }
+    showStudio();
+    if (!studioInitialized) {
+      studioInitialized = true;
+      await initialize();
+    }
+  } catch (error) {
+    showLogin(error.message);
+  }
 }
 
 function setAppStatus(kind, label, detail = null) {
@@ -805,4 +876,28 @@ document.querySelectorAll("[data-export]").forEach(link => link.addEventListener
   setMobileMenu(false, false);
 }));
 
-initialize();
+$("#auth-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const password = $("#auth-password");
+  const submit = $("#auth-submit");
+  submit.disabled = true;
+  try {
+    const enteredPassword = password.value;
+    password.value = "";
+    const challenge = await request("/api/auth/challenge");
+    const proof = await passwordProof(enteredPassword, challenge);
+    await request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ challengeId: challenge.challengeId, proof }),
+    });
+    await initializeAuthentication();
+  } catch (error) {
+    password.value = "";
+    showLogin(error.message);
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+initializeAuthentication();

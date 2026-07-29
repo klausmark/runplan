@@ -9,11 +9,20 @@ The bundled beginner plan starts with workouts such as:
 
 ## Run the web frontend
 
-Start the unauthenticated web MVP for access from the same machine:
+Runplan Studio requires one shared web password. Generate the recommended
+salted verifier, copy the output, and set it before starting the server:
 
 ```bash
+uv run runplan hash-password
+export RUNPLAN_WEB_PASSWORD_HASH='pbkdf2_sha256:600000:...:...'
 uv run runplan serve
 ```
+
+For a small temporary setup, `RUNPLAN_WEB_PASSWORD` may contain the raw
+password instead. Set exactly one password variable; missing, empty, invalid,
+or double configuration stops server startup. The verifier is
+password-equivalent and must still be kept secret. There is no minimum password
+length, but a strong passphrase is recommended.
 
 To make it reachable from other machines on a trusted private network, listen
 on all interfaces:
@@ -22,7 +31,10 @@ on all interfaces:
 uv run runplan serve --host 0.0.0.0 --port 8000
 ```
 
-Open `http://SERVER-IP:8000`. Each Runplan user has an isolated directory under
+Open `http://localhost:8000`. The first visit shows a password field. A
+successful login sets a 10-year HttpOnly, SameSite cookie, so the same browser
+does not ask again unless site data is removed or the configured password
+changes. Each Runplan user has an isolated directory under
 `~/.local/share/runplan/programs` by default. A new user starts without programs
 and can upload a valid `.yaml` or `.yml` plan in the web frontend. Set
 `RUNPLAN_PROGRAM_DIR` or pass `--program-dir` to use a different server-side
@@ -52,16 +64,19 @@ Markdown and PDF downloads are generated from the YAML source and are not
 written into the source checkout. CLI exports should likewise use an output
 path in the server data or download directory.
 
-The initial server has no authentication. Do not expose it directly to the
-public internet. Use it only on a trusted network or behind a reverse proxy that
-provides authentication and TLS. Authentication and per-user ownership are
-tracked as required follow-up work in `PLAN.md`.
+Remote login requires HTTPS by default. A reverse proxy must overwrite
+`X-Forwarded-Proto`, be the only external ingress, and be enabled with
+`RUNPLAN_WEB_TRUST_PROXY=true`. Direct localhost HTTP remains available for
+development. `RUNPLAN_WEB_REQUIRE_HTTPS=false` exists for explicit test setups,
+but the browser challenge uses Web Crypto, which browsers normally expose only
+on HTTPS and localhost. Challenge-response avoids sending the password itself,
+but HTTP still cannot protect against an active attacker replacing JavaScript.
 
 ### Run with Docker Compose
 
-Create the local configuration and set `RUNPLAN_HOST_IP` to an address assigned
-to the Docker host, such as its Tailscale IPv4 address. Set the desired host
-port in `RUNPLAN_HOST_PORT`:
+Create the local configuration and set `RUNPLAN_HOST_IP` to the Docker host
+interface. Use `127.0.0.1` when a reverse proxy on the same host is the public
+entrypoint. Set the desired host port and web password verifier in `.env`:
 
 ```bash
 cp .env.example .env
@@ -74,7 +89,7 @@ Then build and start Runplan in the background:
 docker compose up -d --build
 ```
 
-Open `http://RUNPLAN_HOST_IP:RUNPLAN_HOST_PORT` using the values from `.env`.
+Open the HTTPS URL exposed by the reverse proxy, or the configured local URL.
 Programs, users, Garmin credentials and tokens, and sync state are persisted in
 the `runplan-data` Docker volume. Stop the container without deleting that data
 with:
@@ -85,10 +100,10 @@ docker compose down
 
 Compose requires both binding values and fails instead of listening on an
 unintended interface when either is missing. With, for example,
-`RUNPLAN_HOST_IP=100.64.0.1` and `RUNPLAN_HOST_PORT=8080`, Runplan is available
-at `http://100.64.0.1:8080` only through that host interface. Use an
-authenticated TLS reverse proxy for public exposure, since Runplan itself has
-no authentication.
+`RUNPLAN_HOST_IP=127.0.0.1` and `RUNPLAN_HOST_PORT=8080`, Runplan is available
+to a reverse proxy on `http://127.0.0.1:8080`. Set
+`RUNPLAN_WEB_TRUST_PROXY=true` only when that proxy replaces
+`X-Forwarded-Proto` and prevents direct external access to the Runplan port.
 
 On the first visit, the browser asks which configured Runplan user to use. If
 the server has no users yet, the same dialog creates the first one from a
@@ -97,7 +112,8 @@ storage and persists each user's active program in the server-side user
 registry, shared with the CLI. Use the user selector in the header to switch
 later.
 
-The web server supports separate Garmin accounts without adding a Runplan login.
+The web server supports separate Garmin accounts behind the one shared Runplan
+Studio password. These profiles are selectors, not separate login identities.
 Set `RUNPLAN_USERS_FILE` to a TOML file outside the project:
 
 ```toml
@@ -121,9 +137,8 @@ same `email` and `password` fields described below. Token stores and sync state
 are isolated by user. Credential and storage paths stay on the server. A user's
 settings dialog can save Garmin email and password; the server never returns a
 saved password to the browser, and leaving the password blank preserves it.
-With no Runplan authentication, anyone who can access the web app can view or
-change every configured user's settings and sync their Garmin account, so the
-trusted network restriction remains essential. If `RUNPLAN_USERS_FILE` is unset,
+Anyone who knows the shared password can view or change every configured user's
+settings and sync their Garmin account. If `RUNPLAN_USERS_FILE` is unset,
 Runplan uses `~/.config/runplan/users.toml`. When that file does not exist, the
 web UI can create it and the first user. A user created in the UI receives these
 server-side paths automatically:

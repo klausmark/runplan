@@ -26,6 +26,7 @@ from .logging_config import configure_server_logging
 from .state.json_repository import JsonStateRepository
 from .state.yaml_repository import YamlStateRepository
 from .users import RunplanUser, UserRegistry, WebError, load_user_registry
+from .web_auth import WebAuthenticator
 from .web_http import make_handler
 from .web_programs import ProgramStore
 
@@ -174,7 +175,10 @@ def serve(host: str, port: int, program_dir: Path, *, log_level: str = "INFO") -
         program_dir = program_dir.expanduser()
         program_dir.mkdir(parents=True, exist_ok=True)
         store = ProgramStore(program_dir, user_scoped=True)
-        server = ThreadingHTTPServer((host, port), make_handler(store, users=users))
+        authenticator = WebAuthenticator.from_environment()
+        server = ThreadingHTTPServer(
+            (host, port), make_handler(store, users=users, authenticator=authenticator)
+        )
     except BaseException:
         logger.critical(
             "Runplan server startup failed host=%s port=%s program_dir=%s",
@@ -184,9 +188,8 @@ def serve(host: str, port: int, program_dir: Path, *, log_level: str = "INFO") -
             exc_info=True,
         )
         raise
-    logger.warning("Runplan web has no authentication; use only on a trusted network")
     logger.info(
-        "Runplan server started root=%s users=%d url=http://%s:%s log_level=%s",
+        "Runplan server started root=%s users=%d url=http://%s:%s log_level=%s auth=enabled",
         store.root,
         len(users.list()),
         host,
