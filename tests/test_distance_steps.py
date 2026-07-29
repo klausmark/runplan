@@ -1,4 +1,4 @@
-import unittest
+import pytest
 
 from runplan import (
     WorkoutDefinitionError,
@@ -12,112 +12,94 @@ from runplan import (
 )
 
 
-class DistanceStepTests(unittest.TestCase):
-    def test_parses_meter_and_kilometer_distances(self) -> None:
-        self.assertEqual(400, parse_distance("400m", "trin[1].distance"))
-        self.assertEqual(1500, parse_distance("1.5km", "trin[1].distance"))
-
-    def test_short_m_form_remains_minutes(self) -> None:
-        self.assertEqual(("time", 120), parse_step_end("2m", "trin[1]"))
-        self.assertEqual(
-            ("distance", 2),
-            parse_step_end({"distance": "2m"}, "trin[1]"),
-        )
-
-    def test_rejects_missing_unit_and_non_positive_distance(self) -> None:
-        for value in ("400", "0m", 400):
-            with self.subTest(value=value), self.assertRaises(WorkoutDefinitionError):
-                parse_distance(value, "trin[1].distance")
-
-    def test_compiles_distance_to_garmin_end_condition(self) -> None:
-        for action in ("warmup", "run", "recovery", "cooldown"):
-            with self.subTest(action=action):
-                step = compile_steps([{action: {"distance": "400m"}}])[0]
-                self.assertEqual("distance", step.endCondition["conditionTypeKey"])
-                self.assertEqual(3, step.endCondition["conditionTypeId"])
-                self.assertEqual(400, step.endConditionValue)
-
-    def test_warmup_and_cooldown_do_not_assume_walking(self) -> None:
-        warmup, cooldown = compile_steps([{"warmup": "5m"}, {"cooldown": "5m"}])
-
-        self.assertEqual("Warm up", warmup.description)
-        self.assertEqual("Cool down", cooldown.description)
-
-    def test_danish_step_names_are_rejected(self) -> None:
-        with self.assertRaisesRegex(WorkoutDefinitionError, "unknown step"):
-            compile_steps([{"løb": "5m"}])
-
-    def test_totals_include_nested_time_and_distance(self) -> None:
-        steps = [
-            {"warmup": "5m"},
-            {
-                "repeat": {
-                    "count": 3,
-                    "steps": [
-                        {"run": {"distance": "400m"}},
-                        {"recovery": {"time": "1m"}},
-                    ],
-                }
-            },
-            {"cooldown": {"distance": "1km"}},
-        ]
-
-        self.assertEqual((480, 2200), estimate_totals(steps))
-        self.assertEqual("8 min + 2.2 km", format_totals(steps))
-        self.assertIn("Run 400 m", step_summary(steps))
-
-    def test_parses_and_compiles_pace_range(self) -> None:
-        self.assertEqual(
-            (270, 285),
-            parse_pace("4:30-4:45 min/km", "trin[1].tempo"),
-        )
-        step = compile_steps(
-            [
-                {
-                    "run": {
-                        "distance": "400m",
-                        "pace": "4:30-4:45 min/km",
-                    }
-                }
-            ]
-        )[0]
-
-        self.assertEqual("pace.zone", step.targetType["workoutTargetTypeKey"])
-        self.assertEqual(6, step.targetType["workoutTargetTypeId"])
-        self.assertAlmostEqual(1000 / 285, step.targetValueOne)
-        self.assertAlmostEqual(1000 / 270, step.targetValueTwo)
-
-    def test_formats_pace_in_step_summary(self) -> None:
-        summary = step_summary([{"run": {"time": "5m", "pace": "5:00 min/km"}}])
-        self.assertEqual("Run 5 min @ 5:00 min/km", summary)
-
-    def test_rejects_invalid_pace(self) -> None:
-        for value in (
-            "4.30 min/km",
-            "4:60 min/km",
-            "4:30 min/mile",
-            "0:00 min/km",
-            270,
-        ):
-            with self.subTest(value=value), self.assertRaises(WorkoutDefinitionError):
-                parse_pace(value, "trin[1].tempo")
-
-        with self.assertRaises(WorkoutDefinitionError):
-            compile_steps([{"run": {"distance": "1km", "pace": None}}])
-
-        with self.assertRaises(WorkoutDefinitionError):
-            compile_steps(
-                [
-                    {
-                        "run": {
-                            "distance": "1km",
-                            "tempo": "5:00 min/km",
-                            "pace": "5:00 min/km",
-                        }
-                    }
-                ]
-            )
+@pytest.mark.parametrize(("value", "expected"), [("400m", 400), ("1.5km", 1500)])
+def test_distance_with_unit_is_parsed(value: str, expected: float) -> None:
+    assert parse_distance(value, "steps[1].distance") == expected
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_short_m_form_means_minutes_unless_distance_is_explicit() -> None:
+    assert parse_step_end("2m", "steps[1]") == ("time", 120)
+    assert parse_step_end({"distance": "2m"}, "steps[1]") == ("distance", 2)
+
+
+@pytest.mark.parametrize("value", ["400", "0m", 400])
+def test_distance_without_valid_positive_unit_is_rejected(value: object) -> None:
+    with pytest.raises(WorkoutDefinitionError):
+        parse_distance(value, "steps[1].distance")
+
+
+@pytest.mark.parametrize("action", ["warmup", "run", "recovery", "cooldown"])
+def test_distance_step_compiles_to_garmin_distance_condition(action: str) -> None:
+    step = compile_steps([{action: {"distance": "400m"}}])[0]
+
+    assert step.endCondition["conditionTypeKey"] == "distance"
+    assert step.endCondition["conditionTypeId"] == 3
+    assert step.endConditionValue == 400
+
+
+def test_warmup_and_cooldown_do_not_assume_walking() -> None:
+    warmup, cooldown = compile_steps([{"warmup": "5m"}, {"cooldown": "5m"}])
+
+    assert warmup.description == "Warm up"
+    assert cooldown.description == "Cool down"
+
+
+def test_unknown_translated_step_name_is_rejected() -> None:
+    with pytest.raises(WorkoutDefinitionError, match="unknown step"):
+        compile_steps([{"løb": "5m"}])
+
+
+def test_totals_include_nested_time_and_distance() -> None:
+    steps = [
+        {"warmup": "5m"},
+        {
+            "repeat": {
+                "count": 3,
+                "steps": [
+                    {"run": {"distance": "400m"}},
+                    {"recovery": {"time": "1m"}},
+                ],
+            }
+        },
+        {"cooldown": {"distance": "1km"}},
+    ]
+
+    assert estimate_totals(steps) == (480, 2200)
+    assert format_totals(steps) == "8 min + 2.2 km"
+    assert "Run 400 m" in step_summary(steps)
+
+
+def test_pace_range_parses_and_compiles_to_garmin_target() -> None:
+    step = compile_steps([{"run": {"distance": "400m", "pace": "4:30-4:45 min/km"}}])[0]
+
+    assert parse_pace("4:30-4:45 min/km", "steps[1].pace") == (270, 285)
+    assert step.targetType["workoutTargetTypeKey"] == "pace.zone"
+    assert step.targetType["workoutTargetTypeId"] == 6
+    assert step.targetValueOne == pytest.approx(1000 / 285)
+    assert step.targetValueTwo == pytest.approx(1000 / 270)
+
+
+def test_step_summary_formats_pace() -> None:
+    summary = step_summary([{"run": {"time": "5m", "pace": "5:00 min/km"}}])
+
+    assert summary == "Run 5 min @ 5:00 min/km"
+
+
+@pytest.mark.parametrize(
+    "value", ["4.30 min/km", "4:60 min/km", "4:30 min/mile", "0:00 min/km", 270]
+)
+def test_invalid_pace_is_rejected(value: object) -> None:
+    with pytest.raises(WorkoutDefinitionError):
+        parse_pace(value, "steps[1].pace")
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        {"run": {"distance": "1km", "pace": None}},
+        {"run": {"distance": "1km", "tempo": "5:00 min/km", "pace": "5:00 min/km"}},
+    ],
+)
+def test_invalid_compiled_pace_is_rejected(step: dict) -> None:
+    with pytest.raises(WorkoutDefinitionError):
+        compile_steps([step])
