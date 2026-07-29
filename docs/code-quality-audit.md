@@ -11,6 +11,27 @@ The script reports source spans, not logical statements. A signal requires revie
 proof of poor design and never fails the quality check. Re-run it after structural changes.
 Use `--all` to print the complete production inventory.
 
+## Refactoring status
+
+The synchronization and user-configuration findings were reviewed first. The current
+working-tree measurement after those changes is 51 production modules, four module-size
+signals, 31 function/method signals, and seven class review candidates. The increase in total
+symbols is intentional: previously fused workflows now have named collaborators.
+
+| Original finding | Decision | Result |
+| --- | --- | --- |
+| `application/sync.py` (899 lines) | Split | Compatibility facade plus reconciliation, planning, matching, scheduling, execution, batch, and cleanup modules; no module exceeds 300 lines |
+| `synchronize_program_week` (241 lines) | Split | Thin facade around `WeekSynchronizer`; matching and scheduling are independent functions |
+| Sync planning/batch/cleanup functions | Split where responsibilities differed | Strong signals removed; remaining review-sized functions each describe one workflow |
+| `users.py` (308 lines) | Split persistence concerns | Credential I/O and registry TOML serialization moved to dedicated modules |
+| `UserRegistry` | Retain as transaction boundary | The class coordinates validation, locking, and atomic user updates while delegating persistence formats; rationale is documented in its docstring |
+| `WeekSynchronizer` | Retain as transaction boundary | Its state exists for one week transaction and preserves checkpoint/call ordering; matching and scheduling policy are delegated; rationale is documented in its docstring |
+
+The remaining web, PDF, CLI, YAML-parser, Garmin-query, renderer, export-view-model, and YAML
+repository findings below are still open. A size signal is not considered resolved merely by
+documenting it; an exception is accepted only where the code has one cohesive reason to
+change.
+
 ## Baseline summary
 
 | Area | Total | Signals |

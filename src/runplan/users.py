@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -15,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from .parsing.values import parse_pace
+from .user_config import write_user_config
+from .user_credentials import CredentialStore
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,11 @@ class RunplanUser:
 
 
 class UserRegistry:
-    """Resolve and persist configured users without exposing secret paths."""
+    """Coordinate user lookup and updates without exposing secret paths.
+
+    Structural rationale: this remains the public, thread-safe transaction boundary for
+    registry changes; credential I/O and registry serialization are delegated.
+    """
 
     def __init__(self, users: Iterable[RunplanUser], *, config_path: Path | None = None) -> None:
         user_list = list(users)
@@ -57,6 +62,7 @@ class UserRegistry:
             raise ValueError("Runplan user IDs must be unique")
         self.config_path = config_path.expanduser().resolve() if config_path else None
         self._lock = threading.Lock()
+        self._credentials = CredentialStore()
 
     @property
     def default_id(self) -> str:
@@ -127,7 +133,7 @@ class UserRegistry:
 
     def settings(self, user_id: str | None) -> dict[str, Any]:
         user = self.get(user_id)
-        credentials = self._read_credentials(user.credentials_file)
+        credentials = self._credentials.read(user.credentials_file)
         return {
             "id": user.id,
             "fullName": user.name,
@@ -154,14 +160,14 @@ class UserRegistry:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin email is required")
         if not isinstance(password, str):
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin password is invalid")
-        existing = self._read_credentials(user.credentials_file)
+        existing = self._credentials.read(user.credentials_file)
         effective_password = password or existing.get("password")
         if not isinstance(effective_password, str) or not effective_password:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin password is required")
         with self._lock:
             updated_user = replace(user, name=full_name.strip(), default_pace=default_pace.strip())
             updated = {**self._users, user.id: updated_user}
-            self._write_credentials(user.credentials_file, email.strip(), effective_password)
+            self._credentials.write(user.credentials_file, email.strip(), effective_password)
             self._write(updated.values())
             self._users = updated
         logger.info(
@@ -171,57 +177,9 @@ class UserRegistry:
         )
         return {"user": updated_user.public(), "settings": self.settings(user.id)}
 
-    @staticmethod
-    def _read_credentials(path: Path) -> dict[str, str]:
-        try:
-            value = tomllib.loads(path.read_text(encoding="utf-8-sig"))
-        except FileNotFoundError as exc:
-            logger.debug(
-                "Garmin credentials file not found exception=%s",
-                type(exc).__name__,
-            )
-            return {}
-        except (OSError, tomllib.TOMLDecodeError) as exc:
-            raise WebError(
-                HTTPStatus.UNPROCESSABLE_ENTITY,
-                f"Could not read Garmin credentials: {exc}",
-            ) from exc
-        return {
-            key: item for key in ("email", "password") if isinstance((item := value.get(key)), str)
-        }
-
-    @staticmethod
-    def _write_credentials(path: Path, email: str, password: str) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(
-            f"email = {json.dumps(email)}\npassword = {json.dumps(password)}\n",
-            encoding="utf-8",
-        )
-        temporary.replace(path)
-
     def _write(self, users: Iterable[RunplanUser]) -> None:
         assert self.config_path is not None
-        lines: list[str] = []
-        for user in users:
-            lines.extend(
-                [
-                    "[[users]]",
-                    f"id = {json.dumps(user.id)}",
-                    f"name = {json.dumps(user.name, ensure_ascii=False)}",
-                    f"credentials_file = {json.dumps(str(user.credentials_file))}",
-                    f"token_store = {json.dumps(str(user.token_store))}",
-                    f"state_dir = {json.dumps(str(user.state_directory))}",
-                    f"default_pace = {json.dumps(user.default_pace)}",
-                ]
-            )
-            if user.active_program is not None:
-                lines.append(f"active_program = {json.dumps(user.active_program)}")
-            lines.append("")
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.config_path.with_suffix(".tmp")
-        temporary.write_text("\n".join(lines), encoding="utf-8")
-        temporary.replace(self.config_path)
+        write_user_config(self.config_path, users)
 
 
 def _configured_user_path(
