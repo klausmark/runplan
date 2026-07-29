@@ -23,9 +23,16 @@ logger = logging.getLogger(__name__)
 class WebError(Exception):
     """An expected adapter error with an HTTP-compatible status."""
 
-    def __init__(self, status: HTTPStatus, message: str):
+    def __init__(
+        self,
+        status: HTTPStatus,
+        message: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ):
         super().__init__(message)
         self.status = status
+        self.headers = headers or {}
 
 
 @dataclass(frozen=True)

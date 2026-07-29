@@ -35,6 +35,10 @@ def build_parser(program_directory: Path) -> argparse.ArgumentParser:
     _add_sync_command(commands)
     _add_user_command(commands)
     _add_export_command(commands)
+    commands.add_parser(
+        "hash-password",
+        help="Generate a password verifier for RUNPLAN_WEB_PASSWORD_HASH",
+    )
     _add_serve_command(commands, program_directory)
     _add_reconcile_command(commands)
     return parser

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import os
 import sys
 from argparse import Namespace
@@ -156,6 +157,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_user_command(arguments)
     if arguments.command == "export":
         return run_export(arguments)
+    if arguments.command == "hash-password":
+        return run_hash_password()
     if arguments.command == "serve":
         from .web import serve
 
@@ -168,6 +171,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "reconcile":
         return run_reconcile(arguments)
     return 2
+
+
+def run_hash_password() -> int:
+    """Prompt for and print a web password verifier without echoing the password."""
+    from .web_auth import format_password_hash
+
+    password = getpass.getpass("Web password: ")
+    confirmation = getpass.getpass("Confirm web password: ")
+    if not password:
+        print("Web password must not be empty.", file=sys.stderr)
+        return 2
+    if password != confirmation:
+        print("Passwords do not match.", file=sys.stderr)
+        return 2
+    print(format_password_hash(password))
+    return 0
 
 
 def _program_path(user_id: str, filename: str) -> Path:
@@ -285,6 +304,7 @@ __all__ = [
     "parse_arguments",
     "prepare_sync_selections",
     "run_export",
+    "run_hash_password",
     "run_multi_week_sync",
     "run_preview",
     "run_reconcile",
