@@ -34,8 +34,10 @@ previously fused workflows now have named collaborators.
 | CLI parser and selection review signals | Split | Command-specific parser builders and selection/compilation helpers are independently named and below the review threshold |
 | `parsing/yaml_loader.py` (372 lines) | Split | Tracking normalization and typed-model construction now have dedicated modules; the loader facade is below 300 lines |
 | `normalize_workout` and `load_program` | Split | Tracking fields, program metadata, week validation, workout identity, scheduling dates, and model construction are focused helpers below the review threshold |
+| `exporters/pdf.py` (459 lines) and `export_pdf` (354 lines) | Split | The facade now validates output and builds the document; brand/page decoration, theme, styles, cover, week, and workout flowables have dedicated modules and functions |
+| PDF style/cover/week review signals | Retain as cohesive constructors | Each function constructs one named visual component or style family; their focused responsibility is documented in code |
 
-The remaining PDF, Garmin-query, renderer, export-view-model, and YAML
+The remaining Garmin-query, renderer, export-view-model, and YAML
 repository findings below are still open. A size signal is not considered resolved merely by
 documenting it; an exception is accepted only where the code has one cohesive reason to
 change.
