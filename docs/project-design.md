@@ -44,6 +44,14 @@ alternatives required before the workflow is complete. Moves retain stable
 workout IDs and content. Save, validation, and Garmin sync state must be
 distinct and unambiguous, and reversible local edits should offer undo.
 
+An empty day can create a workout from a valid YAML template, with the supported
+syntax documented in the creation dialog. Workout additions, edits, moves, and
+deletions are optimistic-revision transactions that validate the complete
+program before one atomic write. Every week retains at least one workout.
+Deleting tracked content stores only the synchronization record as a pending
+orphan; the next preview exposes the Garmin cleanup and the confirmed sync
+performs it.
+
 The complete planning workflow must work on mobile as well as desktop and
 tablet. On narrow screens, weeks and days may change layout or use deliberate
 horizontal navigation, but workout information, movement, dialogs, sync, and

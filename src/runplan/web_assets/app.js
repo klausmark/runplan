@@ -3,6 +3,7 @@ const $ = (selector) => document.querySelector(selector);
 const TOUCH_DRAG_DELAY = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
 const USER_STORAGE_KEY = "runplan-user";
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let studioInitialized = false;
 
 function storedValue(key) {
@@ -320,7 +321,6 @@ function render(program) {
   $("#program-description").textContent = program.program.description || "No program description";
   setAppStatus("saved", "Saved");
   updateUndoControl();
-  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const calendar = $("#calendar");
   calendar.replaceChildren(...program.weeks.map((week) => {
     const section = document.createElement("details");
@@ -351,12 +351,22 @@ function render(program) {
       const label = document.createElement("div");
       label.className = "day-label";
       const dayName = document.createElement("span");
-      dayName.textContent = weekdays[day - 1];
+      dayName.textContent = WEEKDAYS[day - 1];
       const date = document.createElement("span");
       date.textContent = dateLabel(addDays(week.start_date, day - 1));
       label.append(dayName, date);
       cell.append(label);
-      if (workout) cell.append(workoutCard(week.week, workout));
+      if (workout) {
+        cell.append(workoutCard(week.week, workout));
+      } else {
+        const add = document.createElement("button");
+        add.className = "add-workout";
+        add.type = "button";
+        add.textContent = "+ Add workout";
+        add.setAttribute("aria-label", `Add workout to week ${week.week}, ${WEEKDAYS[day - 1]}`);
+        add.addEventListener("click", () => openAddWorkout(week.week, day));
+        cell.append(add);
+      }
       cell.addEventListener("dragover", (event) => { event.preventDefault(); cell.classList.add("drag-over"); });
       cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
       cell.addEventListener("drop", () => moveWorkout(week.week, day, cell));
@@ -613,15 +623,56 @@ async function moveWorkout(toWeek, toDay, cell) {
 }
 
 function openWorkout(week, workout) {
-  state.workout = { week, workoutId: workout.id };
+  state.workout = { mode: "edit", week, workoutId: workout.id, name: workout.name };
   $("#workout-title").textContent = workout.name;
+  $("#workout-yaml-reference").classList.add("hidden");
+  const weekWorkouts = state.program.weeks.find((item) => item.week === week).workouts;
+  const onlyWorkout = weekWorkouts.length === 1;
+  $("#workout-editor-help").textContent = `The workout ID is stable and cannot be changed. Tracking is editable and affects Garmin sync and actual totals. The complete program is validated before saving.${onlyWorkout ? " This is the week's only workout and cannot be deleted." : ""}`;
+  const deleteButton = $("#delete-workout-button");
+  deleteButton.classList.remove("hidden");
+  deleteButton.disabled = onlyWorkout;
+  deleteButton.title = deleteButton.disabled ? "A week must contain at least one workout." : "";
+  $("#save-workout-button").textContent = "Validate & save";
   $("#workout-yaml").value = workout.yaml;
+  $("#workout-dialog").showModal();
+}
+
+function nextWorkoutId(week) {
+  const ids = new Set(week.workouts.map((workout) => workout.id));
+  let number = 1;
+  while (ids.has(`workout-${number}`)) number += 1;
+  return `workout-${number}`;
+}
+
+function workoutTemplate(week, day) {
+  return `id: ${nextWorkoutId(week)}
+day: ${day}
+name: New workout
+description: Describe the purpose and intensity.
+steps:
+  - warmup: 10m
+  - run: 20m
+  - cooldown: 5m
+`;
+}
+
+function openAddWorkout(weekNumber, day) {
+  const week = state.program.weeks.find((item) => item.week === weekNumber);
+  state.workout = { mode: "add", week: weekNumber };
+  $("#workout-title").textContent = `Add workout · Week ${weekNumber}, ${WEEKDAYS[day - 1]}`;
+  $("#workout-editor-help").textContent = "Start with the valid template below. You may change every field, including the day, before validation.";
+  $("#workout-yaml-reference").classList.remove("hidden");
+  $("#delete-workout-button").classList.add("hidden");
+  $("#save-workout-button").textContent = "Validate & add";
+  $("#workout-yaml").value = workoutTemplate(week, day);
   $("#workout-dialog").showModal();
 }
 
 async function saveEdit(payload) {
   clearUndoMove();
-  setAppStatus(payload.workout ? "validation" : "saving", payload.workout ? "Validating…" : "Saving…");
+  const validatesWorkout = payload.workout || payload.add_workout;
+  setAppStatus(validatesWorkout ? "validation" : "saving", validatesWorkout ? "Validating…" : "Saving…");
   const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId: state.user.id, revision: state.program.revision, ...payload })
@@ -848,8 +899,28 @@ $("#user-settings-form").addEventListener("submit", async (event) => {
 });
 $("#workout-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  try { await saveEdit({ workout: { week: state.workout.week, workout_id: state.workout.workoutId, yaml: $("#workout-yaml").value } }); $("#workout-dialog").close(); }
+  const change = state.workout.mode === "add"
+    ? { add_workout: { week: state.workout.week, yaml: $("#workout-yaml").value } }
+    : { workout: { week: state.workout.week, workout_id: state.workout.workoutId, yaml: $("#workout-yaml").value } };
+  try { await saveEdit(change); $("#workout-dialog").close(); }
   catch (error) { setSaveFailure(error); showError(error.message); }
+});
+
+$("#delete-workout-button").addEventListener("click", () => {
+  $("#delete-workout-title").textContent = `Delete ${state.workout.name}?`;
+  $("#delete-workout-message").textContent = "This removes the workout from the plan. If it was synchronized, its Garmin schedule and workout will be removed during the next reviewed and confirmed sync.";
+  $("#delete-workout-dialog").showModal();
+});
+
+$("#delete-workout-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await saveEdit({
+      delete_workout: { week: state.workout.week, workout_id: state.workout.workoutId },
+    });
+    $("#delete-workout-dialog").close();
+    $("#workout-dialog").close();
+  } catch (error) { setSaveFailure(error); showError(error.message); }
 });
 $("#move-form").addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -124,6 +124,8 @@ main { width: min(1500px, 94vw); margin: 0 auto; padding: 46px 0 80px; }
 .workout p { font-size: 11px; line-height: 1.4; color: var(--muted); margin: 0 0 10px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .workout-summary { color: var(--green-dark); font-size: 11px; font-weight: 800; margin: -1px 0 7px; }
 .workout-actions { display: flex; align-items: center; justify-content: end; gap: 10px; }
+.add-workout { width: 100%; min-height: 72px; border: 1px dashed var(--field-line); border-radius: 10px; color: var(--green); background: transparent; font-size: 11px; font-weight: 800; cursor: pointer; }
+.add-workout:hover, .add-workout:focus-visible { border-color: var(--green); background: var(--day-start); }
 .edit-workout, .move-workout { color: var(--green); background: transparent; border: 0; padding: 3px 0; font-size: 11px; font-weight: 800; cursor: pointer; }
 .move-workout { display: none; color: var(--muted); }
 .touch-drag-source { opacity: .3; }
@@ -149,6 +151,12 @@ dialog label small { color: var(--muted); font-size: 11px; font-weight: 400; lin
 dialog footer { display: flex; justify-content: end; gap: 10px; margin-top: 4px; }
 .move-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .workout-dialog { width: min(760px, 94vw); }
+.workout-dialog footer .danger { margin-right: auto; }
+.yaml-reference { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--day-start); font-size: 12px; line-height: 1.45; }
+.yaml-reference h3, .yaml-reference p { margin: 0; }
+.yaml-reference pre { margin: 2px 0 0; padding: 10px; overflow-x: auto; border-radius: 8px; background: var(--field); color: var(--ink); }
+.button.danger { border-color: #a43b32; background: #a43b32; color: #fff; }
+.button.danger:hover { background: #873028; }
 .editor-help { color: var(--muted); font-size: 13px; margin: -8px 0 0; }
 .code-editor { width: 100%; min-height: 420px; resize: vertical; overflow-x: auto; white-space: pre; background: #17231e; color: #e9f3ec; border-color: #17231e; font: 14px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 2; }
 .sync-dialog { width: min(680px, 94vw); }

@@ -39,8 +39,13 @@ changes. Each Runplan user has an isolated directory under
 and can upload a valid `.yaml` or `.yml` plan in the web frontend. Set
 `RUNPLAN_PROGRAM_DIR` or pass `--program-dir` to use a different server-side
 root directory. It supports plan name,
-description, and start-week editing, drag-and-drop workout scheduling, focused
-workout YAML editing, and YAML, Markdown, and PDF downloads.
+description, and start-week editing, drag-and-drop workout scheduling, workout
+creation and editing through validated YAML, deletion with confirmation, and
+YAML, Markdown, and PDF downloads. Empty calendar days provide a valid starter
+workout and an inline reference for the supported step, duration, distance,
+pace, and repeat syntax. A week must retain at least one workout. Deleting a
+previously synchronized workout queues its Garmin cleanup for the next reviewed
+and confirmed sync rather than contacting Garmin immediately.
 
 `runplan serve` writes operational logs to stdout for container and service
 log collectors. `INFO` is the default and includes YAML changes, user and plan

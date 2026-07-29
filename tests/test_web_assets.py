@@ -145,10 +145,33 @@ class TestWebAsset:
         assert "async function undoLastMove()" in script
         assert "state.undoMove = { fromWeek: toWeek" in script
         assert script.count("userId: state.user.id") >= 4
-        assert 'payload.workout ? "validation" : "saving"' in script
+        assert "payload.workout || payload.add_workout" in script
         assert 'setAppStatus("garmin", "Syncing Garmin…")' in script
         assert '[data-status="failed"]' in styles
         assert 'showError("Saved' not in script
+
+    def test_calendar_can_add_workouts_from_empty_days_with_yaml_help(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="workout-yaml-reference"' in html
+        assert "Workout YAML syntax" in html
+        assert "warmup" in html and "repeat" in html and "pace" in html
+        assert 'add.className = "add-workout"' in script
+        assert "function workoutTemplate(week, day)" in script
+        assert "id: ${nextWorkoutId(week)}" in script
+        assert "add_workout: { week: state.workout.week" in script
+        assert ".add-workout" in styles
+
+    def test_workout_deletion_uses_a_named_confirmation_dialog(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert 'id="delete-workout-dialog"' in html
+        assert 'id="delete-workout-title"' in html
+        assert "during the next reviewed and confirmed sync" in script
+        assert "delete_workout: { week: state.workout.week" in script
+        assert "deleteButton.disabled = onlyWorkout" in script
+        assert "only workout and cannot be deleted" in script
 
     def test_mobile_header_uses_a_compact_menu_and_bottom_sheet(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
