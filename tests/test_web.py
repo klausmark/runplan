@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import unittest
+from datetime import date
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
-from datetime import date
 from unittest.mock import Mock, patch
 
 import yaml
-
 from helpers import program_data
+
 from runplan.application.results import SyncResult
 from runplan.application.sync import workout_content_hash
 from runplan.state.json_repository import new_state
@@ -55,7 +55,7 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn('<g transform="rotate(-4 32 32)">', favicon)
         self.assertIn('fill="#fff" fill-rule="evenodd"', favicon)
         self.assertIn("l9 7-6 6-9-7-4-3", favicon)
-        self.assertNotIn('stroke=', favicon)
+        self.assertNotIn("stroke=", favicon)
 
     def test_favicon_is_served_as_svg(self) -> None:
         with TemporaryDirectory() as directory:
@@ -70,9 +70,7 @@ class WebAssetTests(unittest.TestCase):
             handler._get()
 
             handler.send_response.assert_called_once_with(200)
-            handler.send_header.assert_any_call(
-                "Content-Type", "image/svg+xml; charset=utf-8"
-            )
+            handler.send_header.assert_any_call("Content-Type", "image/svg+xml; charset=utf-8")
             self.assertTrue(handler.wfile.getvalue().startswith(b"<svg"))
 
     def test_theme_control_and_dark_palette_are_packaged(self) -> None:
@@ -97,7 +95,7 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn('id="user-cancel"', html)
         self.assertIn('$("#add-user-button").addEventListener', script)
         self.assertIn('const USER_STORAGE_KEY = "runplan-user"', script)
-        self.assertIn('`runplan-program:${userId}`', script)
+        self.assertIn("`runplan-program:${userId}`", script)
         self.assertIn("state.user.activeProgram", script)
         self.assertIn("/active-program", script)
         self.assertIn('request("/api/users")', script)
@@ -188,8 +186,8 @@ class WebAssetTests(unittest.TestCase):
         self.assertIn("function setMobileMenu(open", script)
         self.assertIn('event.key === "Escape"', script)
         self.assertNotIn("updateHeaderForScroll", script)
-        self.assertIn('.topbar.menu-open .topbar-actions-shell', styles)
-        self.assertIn('body.mobile-menu-open .mobile-menu-backdrop', styles)
+        self.assertIn(".topbar.menu-open .topbar-actions-shell", styles)
+        self.assertIn("body.mobile-menu-open .mobile-menu-backdrop", styles)
         self.assertIn("prefers-reduced-motion: reduce", styles)
 
 
@@ -234,18 +232,24 @@ class UserRegistryTests(unittest.TestCase):
             registry = load_user_registry(config)
             registry.create("runner", "Runner One")
 
-            result = registry.update_settings("runner", {
-                "fullName": "Runner Updated",
-                "defaultPace": "5:45 min/km",
-                "garminEmail": "runner@example.com",
-                "garminPassword": "secret-value",
-            })
-            preserved = registry.update_settings("runner", {
-                "fullName": "Runner Updated",
-                "defaultPace": "5:30 min/km",
-                "garminEmail": "new@example.com",
-                "garminPassword": "",
-            })
+            result = registry.update_settings(
+                "runner",
+                {
+                    "fullName": "Runner Updated",
+                    "defaultPace": "5:45 min/km",
+                    "garminEmail": "runner@example.com",
+                    "garminPassword": "secret-value",
+                },
+            )
+            preserved = registry.update_settings(
+                "runner",
+                {
+                    "fullName": "Runner Updated",
+                    "defaultPace": "5:30 min/km",
+                    "garminEmail": "new@example.com",
+                    "garminPassword": "",
+                },
+            )
 
             self.assertNotIn("garminPassword", result["settings"])
             self.assertTrue(result["settings"]["hasGarminPassword"])
@@ -299,9 +303,9 @@ state_dir = "state/sample-runner"
             self.assertEqual(root / "state/sample-runner", user.state_directory)
 
     def test_rejects_unknown_user(self) -> None:
-        registry = UserRegistry([RunplanUser(
-            "known", "Known", Path("credentials"), Path("tokens"), Path("state")
-        )])
+        registry = UserRegistry(
+            [RunplanUser("known", "Known", Path("credentials"), Path("tokens"), Path("state"))]
+        )
         with self.assertRaises(WebError) as context:
             registry.get("unknown")
         self.assertEqual(400, context.exception.status)
@@ -398,7 +402,8 @@ class ProgramStoreTests(unittest.TestCase):
     def test_editor_can_remove_tracking_to_reset_a_workout_to_planned(self) -> None:
         raw = yaml.safe_load(self.path.read_text(encoding="utf-8"))
         raw["weeks"][0]["workouts"][0]["tracking"] = {
-            "status": "missed", "scheduled_date": "2026-12-28"
+            "status": "missed",
+            "scheduled_date": "2026-12-28",
         }
         self.path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
         repository = YamlStateRepository(self.path)
@@ -452,7 +457,14 @@ class ProgramStoreTests(unittest.TestCase):
             {"status": "scheduled", "synced_content_hash": "short"},
             {"status": "scheduled", "garmin": {"workout_id": -1}},
             {"status": "completed", "actual": {"distance_meters": 10, "duration_seconds": 0}},
-            {"status": "completed", "actual": {"distance_meters": 10, "duration_seconds": 20, "completed_at": "not-a-time"}},
+            {
+                "status": "completed",
+                "actual": {
+                    "distance_meters": 10,
+                    "duration_seconds": 20,
+                    "completed_at": "not-a-time",
+                },
+            },
         )
 
         for tracking in invalid_values:
@@ -590,9 +602,7 @@ class ProgramStoreTests(unittest.TestCase):
         )
 
         self.assertEqual(5000, moved["weeks"][0]["estimated_distance_meters"])
-        self.assertAlmostEqual(
-            12633.33, moved["weeks"][1]["estimated_distance_meters"], places=1
-        )
+        self.assertAlmostEqual(12633.33, moved["weeks"][1]["estimated_distance_meters"], places=1)
 
     def test_replaces_workout_yaml_but_not_stable_id(self) -> None:
         loaded = self.store.get("plan.yaml")
@@ -658,9 +668,7 @@ weeks:
                 "workout": {
                     "week": 1,
                     "workout_id": "mixed",
-                    "yaml": editor_yaml.replace(
-                        "name: Week 1 - Mixed", "name: Week 1 - Updated"
-                    ),
+                    "yaml": editor_yaml.replace("name: Week 1 - Mixed", "name: Week 1 - Updated"),
                 },
             },
         )
@@ -802,11 +810,17 @@ class WebSyncServiceTests(unittest.TestCase):
 
     def test_user_profiles_have_isolated_state_and_confirmation_tokens(self) -> None:
         alice = RunplanUser(
-            "alice", "Alice", self.root / "alice.toml", self.root / "alice-tokens",
+            "alice",
+            "Alice",
+            self.root / "alice.toml",
+            self.root / "alice-tokens",
             self.root / "alice-state",
         )
         bob = RunplanUser(
-            "bob", "Bob", self.root / "bob.toml", self.root / "bob-tokens",
+            "bob",
+            "Bob",
+            self.root / "bob.toml",
+            self.root / "bob-tokens",
             self.root / "bob-state",
         )
         service = WebSyncService(
@@ -817,22 +831,23 @@ class WebSyncServiceTests(unittest.TestCase):
         )
         alice_state = service.repository_for("alice").load("characterization-plan")
         alice_state["workouts"]["week-01/mixed"] = {
-            "status": "scheduled", "date": "2026-12-28", "schedule_id": 42
+            "status": "scheduled",
+            "date": "2026-12-28",
+            "schedule_id": 42,
         }
         service.repository_for("alice").save("characterization-plan", alice_state)
 
         alice_preview = service.preview("plan.yaml", "alice")
         bob_preview = service.preview("plan.yaml", "bob")
 
-        self.assertNotEqual(
-            alice_preview["confirmationToken"], bob_preview["confirmationToken"]
-        )
+        self.assertNotEqual(alice_preview["confirmationToken"], bob_preview["confirmationToken"])
         self.assertEqual("alice", alice_preview["userId"])
         self.assertEqual("bob", bob_preview["userId"])
         self.assertNotEqual(
             [action["kind"] for action in alice_preview["plan"]["actions"]],
             [action["kind"] for action in bob_preview["plan"]["actions"]],
         )
+
 
 if __name__ == "__main__":
     unittest.main()

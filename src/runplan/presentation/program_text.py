@@ -11,7 +11,6 @@ from .text import (
     format_weekday,
 )
 
-
 SECTION_DIVIDER = "-" * 72
 
 
@@ -51,7 +50,11 @@ def format_program_text(program: ProgramExport) -> str:
         for workout in week.workouts:
             lines.append(
                 f"\n{format_weekday(workout.date)} · {workout.name} · "
-                + (f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}" if workout.totals_are_actual else format_model_totals(workout.steps))
+                + (
+                    f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}"
+                    if workout.totals_are_actual
+                    else format_model_totals(workout.steps)
+                )
             )
             if workout.description:
                 lines.append(workout.description)

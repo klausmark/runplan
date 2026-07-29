@@ -84,9 +84,7 @@ class WeekSelection:
         if self.kind == "explicit":
             unknown = tuple(week for week in self.weeks if week not in available)
             if unknown:
-                raise WeekSelectionError(
-                    f"weeks {unknown} are not in the program"
-                )
+                raise WeekSelectionError(f"weeks {unknown} are not in the program")
             return self.weeks
         if start_date is None:
             raise WeekSelectionError("relative selection requires a program start date")
@@ -94,17 +92,13 @@ class WeekSelection:
         current = (reference_date - start_date).days // 7 + 1
         if self.kind == "ahead":
             if current not in available:
-                raise WeekSelectionError(
-                    f"current plan week {current} is outside the program"
-                )
+                raise WeekSelectionError(f"current plan week {current} is outside the program")
             last = current + self.weeks[0]
             return tuple(week for week in available if current <= week <= last)
         offset = 1 if self.kind == "next" else 0
         number = current + offset
         if number not in available:
-            raise WeekSelectionError(
-                f"resolved week {number} is outside the program"
-            )
+            raise WeekSelectionError(f"resolved week {number} is outside the program")
         return (number,)
 
 

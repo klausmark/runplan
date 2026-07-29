@@ -7,7 +7,6 @@ import re
 import sys
 from typing import TextIO
 
-
 LOGGER_NAME = "runplan"
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 

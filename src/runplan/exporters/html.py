@@ -72,7 +72,12 @@ def format_program_html(program: ProgramExport) -> str:
                 (
                     "  <article>",
                     f"    <h3>{format_weekday(workout.date)} · {esc(workout.name)} · "
-                    + (f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}" if workout.totals_are_actual else format_model_totals(workout.steps)) + "</h3>",
+                    + (
+                        f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}"
+                        if workout.totals_are_actual
+                        else format_model_totals(workout.steps)
+                    )
+                    + "</h3>",
                 )
             )
             if workout.description:

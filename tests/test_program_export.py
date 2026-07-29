@@ -1,8 +1,8 @@
+import tempfile
+import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
-import tempfile
-import unittest
 from unittest.mock import patch
 
 import yaml
@@ -20,9 +20,7 @@ class ProgramExportTests(unittest.TestCase):
         self.program = load_program_model(program_data())
 
     def test_common_model_selects_requested_weeks(self) -> None:
-        export = build_program_export(
-            self.program, WeekSelection.explicit("2")
-        )
+        export = build_program_export(self.program, WeekSelection.explicit("2"))
 
         self.assertEqual("Characterization Plan", export.name)
         self.assertEqual(2, export.total_weeks)
@@ -78,11 +76,18 @@ class ProgramExportTests(unittest.TestCase):
             source = Path(directory, "plan.yaml")
             source.write_text(yaml.safe_dump(program_data()), encoding="utf-8")
             stdout = StringIO()
-            with patch.dict("os.environ", {"RUNPLAN_DEFAULT_PACE": "5:00 min/km"}), redirect_stdout(stdout):
+            with (
+                patch.dict("os.environ", {"RUNPLAN_DEFAULT_PACE": "5:00 min/km"}),
+                redirect_stdout(stdout),
+            ):
                 result = main(
                     [
-                        "export", str(source), "--format", "text",
-                        "--select-weeks", "2",
+                        "export",
+                        str(source),
+                        "--format",
+                        "text",
+                        "--select-weeks",
+                        "2",
                     ]
                 )
 
@@ -94,7 +99,10 @@ class ProgramExportTests(unittest.TestCase):
             source = Path(directory, "plan.yaml")
             source.write_text(yaml.safe_dump(program_data()), encoding="utf-8")
             stderr = StringIO()
-            with patch.dict("os.environ", {"RUNPLAN_DEFAULT_PACE": "fast"}), redirect_stderr(stderr):
+            with (
+                patch.dict("os.environ", {"RUNPLAN_DEFAULT_PACE": "fast"}),
+                redirect_stderr(stderr),
+            ):
                 result = main(["export", str(source), "--format", "text"])
 
         self.assertEqual(2, result)
@@ -108,8 +116,12 @@ class ProgramExportTests(unittest.TestCase):
             with redirect_stdout(stdout):
                 result = main(
                     [
-                        "export", str(source), "--format", "text",
-                        "--select-weeks", "2",
+                        "export",
+                        str(source),
+                        "--format",
+                        "text",
+                        "--select-weeks",
+                        "2",
                     ]
                 )
 

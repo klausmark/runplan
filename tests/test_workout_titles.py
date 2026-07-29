@@ -33,9 +33,7 @@ class WorkoutTitleTests(unittest.TestCase):
 
     def test_timed_step_with_explicit_pace_is_not_marked_approximate(self) -> None:
         raw = program_data()
-        raw["weeks"][0]["workouts"][0]["steps"] = [
-            {"run": {"time": "10m", "pace": "5:00 min/km"}}
-        ]
+        raw["weeks"][0]["workouts"][0]["steps"] = [{"run": {"time": "10m", "pace": "5:00 min/km"}}]
         workout = load_program_model(raw).week(1).workouts[0]
 
         estimate = estimate_steps(workout.steps)

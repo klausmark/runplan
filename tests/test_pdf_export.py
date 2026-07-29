@@ -2,8 +2,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import Mock
 from pathlib import Path
+from unittest.mock import Mock
 
 from pypdf import PdfReader
 
@@ -13,13 +13,12 @@ from runplan import (
     export_pdf,
     load_definition_model,
 )
-from runplan.parsing.yaml_loader import load_program_model
 from runplan.exporters.html import format_program_html
 from runplan.exporters.markdown import format_program_markdown
 from runplan.exporters.pdf import _draw_runplan_mark
+from runplan.parsing.yaml_loader import load_program_model
 from runplan.presentation.program_text import format_program_text
 from tests.helpers import program_data
-
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 PROGRAM_FIXTURES = PROJECT_DIR / "tests" / "fixtures" / "programs"
@@ -34,15 +33,11 @@ class PdfExportTests(unittest.TestCase):
 
         canvas.rotate.assert_called_once_with(4)
         canvas.roundRect.assert_called_once_with(7, 7, 50, 50, 15, fill=1, stroke=0)
-        canvas.drawPath.assert_called_once_with(
-            glyph, fill=1, stroke=0, fillMode=0
-        )
+        canvas.drawPath.assert_called_once_with(glyph, fill=1, stroke=0, fillMode=0)
         canvas.drawCentredString.assert_not_called()
 
     def test_pdf_and_text_have_matching_sections_and_one_week_per_page(self) -> None:
-        program = build_program_export(
-            load_program_model(program_data()), WeekSelection.all()
-        )
+        program = build_program_export(load_program_model(program_data()), WeekSelection.all())
         text = format_program_text(program)
         html = format_program_html(program)
         markdown = format_program_markdown(program)
@@ -121,9 +116,7 @@ class PdfExportTests(unittest.TestCase):
             self.assertGreater(output.stat().st_size, 0)
 
     def test_export_is_deterministic(self) -> None:
-        program = build_program_export(
-            load_program_model(program_data()), WeekSelection.all()
-        )
+        program = build_program_export(load_program_model(program_data()), WeekSelection.all())
 
         with tempfile.TemporaryDirectory() as temporary_dir:
             first = Path(temporary_dir) / "first.pdf"
@@ -135,9 +128,7 @@ class PdfExportTests(unittest.TestCase):
 
     def test_exports_pace_target_in_minutes_per_kilometer(self) -> None:
         program = build_program_export(
-            load_definition_model(
-                PROJECT_DIR / "docs" / "examples" / "distance-workout.yaml"
-            ),
+            load_definition_model(PROJECT_DIR / "docs" / "examples" / "distance-workout.yaml"),
             WeekSelection.all(),
         )
 
@@ -156,9 +147,7 @@ class PdfExportTests(unittest.TestCase):
         except ImportError:
             self.skipTest("Pillow is not installed")
 
-        program = build_program_export(
-            load_program_model(program_data()), WeekSelection.all()
-        )
+        program = build_program_export(load_program_model(program_data()), WeekSelection.all())
 
         with tempfile.TemporaryDirectory() as temporary_dir:
             directory = Path(temporary_dir)
@@ -181,10 +170,7 @@ class PdfExportTests(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            pages = [
-                Image.open(directory / f"page-{page}.png").convert("RGB")
-                for page in (1, 2)
-            ]
+            pages = [Image.open(directory / f"page-{page}.png").convert("RGB") for page in (1, 2)]
 
             self.assertEqual([(596, 842), (596, 842)], [page.size for page in pages])
             for page in pages:

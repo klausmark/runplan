@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from .models import Step
 
-
 DEFAULT_PACE_SECONDS_PER_KM = 6 * 60
 
 
@@ -53,11 +52,7 @@ def estimate_steps(
         elif step.end_kind == "distance":
             meters = step.end_value or 0
             distance += meters
-            pace = (
-                sum(step.pace) / len(step.pace)
-                if step.pace
-                else fallback_pace_seconds_per_km
-            )
+            pace = sum(step.pace) / len(step.pace) if step.pace else fallback_pace_seconds_per_km
             if not step.pace:
                 duration_is_approximate = True
             duration += meters / 1000 * pace

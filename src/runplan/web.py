@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
 import os
 import re
 import tempfile
-import copy
 from argparse import Namespace
+from collections.abc import Callable
 from datetime import date, timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import StringIO
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from ruamel.yaml import YAML
@@ -42,7 +43,6 @@ from .parsing.yaml_loader import load_program_model
 from .state.json_repository import JsonStateRepository
 from .state.yaml_repository import YamlStateRepository, tracking_from_record
 from .users import RunplanUser, UserRegistry, WebError, load_user_registry
-
 
 ASSET_DIR = Path(__file__).with_name("web_assets")
 logger = logging.getLogger(__name__)
@@ -213,8 +213,7 @@ class ProgramStore:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
         try:
             pace = parse_pace(
-                fallback_pace_value
-                or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
+                fallback_pace_value or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
                 "RUNPLAN_DEFAULT_PACE",
             )
         except ValueError as exc:
@@ -236,7 +235,11 @@ class ProgramStore:
                 status = record.get("display_status", record.get("status", "planned"))
                 actual_distance = record.get("actual_distance_meters")
                 actual_duration = record.get("actual_duration_seconds")
-                if status == "completed" and actual_distance is not None and actual_duration is not None:
+                if (
+                    status == "completed"
+                    and actual_distance is not None
+                    and actual_duration is not None
+                ):
                     effective_distance = actual_distance
                     effective_duration = actual_duration
                     actual = True
@@ -273,9 +276,7 @@ class ProgramStore:
             weeks.append(
                 {
                     "week": week.number,
-                    "start_date": (
-                        model.start_date + timedelta(weeks=week.number - 1)
-                    ).isoformat(),
+                    "start_date": (model.start_date + timedelta(weeks=week.number - 1)).isoformat(),
                     "focus": week.focus,
                     "effective_distance_meters": sum(
                         workout["effective_distance_meters"] for workout in workouts
@@ -346,9 +347,8 @@ class ProgramStore:
                 elif record.get("date") != definition["schedule_date"]:
                     view_record["display_status"] = "changed"
                     statuses[(week, definition["id"])] = view_record
-                elif (
-                    record.get("content_hash")
-                    and record["content_hash"] != workout_content_hash(workout)
+                elif record.get("content_hash") and record["content_hash"] != workout_content_hash(
+                    workout
                 ):
                     view_record["display_status"] = "changed"
                     statuses[(week, definition["id"])] = view_record
@@ -394,9 +394,11 @@ class ProgramStore:
         self._atomic_write(path, rendered)
         changes: list[str] = []
         if isinstance(metadata, dict):
-            changes.extend(f"program.{field}" for field in metadata if field in {
-                "name", "short_name", "description", "start_week"
-            })
+            changes.extend(
+                f"program.{field}"
+                for field in metadata
+                if field in {"name", "short_name", "description", "start_week"}
+            )
         if isinstance(move, dict):
             changes.append(
                 "move:"
@@ -404,9 +406,7 @@ class ProgramStore:
                 f"{move.get('to_week')}/day-{move.get('to_day')}"
             )
         if isinstance(workout_edit, dict):
-            changes.append(
-                f"workout:{workout_edit.get('week')}/{workout_edit.get('workout_id')}"
-            )
+            changes.append(f"workout:{workout_edit.get('week')}/{workout_edit.get('workout_id')}")
         logger.info(
             "YAML program saved file=%s changes=%s bytes=%d",
             path,
@@ -443,7 +443,9 @@ class ProgramStore:
         workout = next((item for item in source["workouts"] if item.get("id") == workout_id), None)
         if workout is None:
             raise WebError(HTTPStatus.BAD_REQUEST, "Workout not found in source week")
-        occupied = next((item for item in target["workouts"] if item.get("day") == target_day), None)
+        occupied = next(
+            (item for item in target["workouts"] if item.get("day") == target_day), None
+        )
         old_day = workout["day"]
         if occupied is not None and occupied is not workout:
             occupied["day"] = old_day
@@ -496,8 +498,7 @@ class ProgramStore:
         try:
             model = load_program_model(raw)
             pace = parse_pace(
-                fallback_pace_value
-                or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
+                fallback_pace_value or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
                 "defaultPace",
             )
             export = build_program_export(
@@ -508,7 +509,11 @@ class ProgramStore:
         stem = path.stem
         if format_name == "markdown":
             logger.info("Program exported file=%s format=markdown", path)
-            return format_program_markdown(export).encode(), "text/markdown; charset=utf-8", f"{stem}.md"
+            return (
+                format_program_markdown(export).encode(),
+                "text/markdown; charset=utf-8",
+                f"{stem}.md",
+            )
         if format_name == "yaml":
             logger.info("Program exported file=%s format=yaml", path)
             return path.read_bytes(), "application/yaml; charset=utf-8", path.name
@@ -523,10 +528,9 @@ class ProgramStore:
 
 def _login_for_web(user: RunplanUser) -> GarminClient:
     """Log in without allowing an MFA prompt to block the HTTP server."""
+
     def reject_mfa() -> str:
-        raise RuntimeError(
-            "Garmin requested MFA; authenticate once with the CLI before web sync"
-        )
+        raise RuntimeError("Garmin requested MFA; authenticate once with the CLI before web sync")
 
     logger.info("Garmin login started user=%s", user.id)
     try:
@@ -538,7 +542,7 @@ def _login_for_web(user: RunplanUser) -> GarminClient:
     except BaseException as exc:
         logger.exception("Garmin login failed user=%s", user.id)
         try:
-            setattr(exc, "_runplan_logged", True)
+            exc._runplan_logged = True
         except Exception:
             pass
         raise
@@ -559,17 +563,23 @@ class WebSyncService:
         today: Callable[[], date] = date.today,
     ) -> None:
         self.store = store
-        self.users = users or UserRegistry([RunplanUser(
-            id="local-default",
-            name="Local user",
-            credentials_file=Path(os.getenv(
-                "GARMIN_CREDENTIALS_FILE", "~/.config/runplan/credentials.toml"
-            )).expanduser(),
-            token_store=Path(os.getenv("GARMIN_TOKENSTORE", "~/.garminconnect")).expanduser(),
-            state_directory=Path(os.getenv(
-                "GARMIN_STATE_DIR", "~/.local/state/runplan"
-            )).expanduser(),
-        )])
+        self.users = users or UserRegistry(
+            [
+                RunplanUser(
+                    id="local-default",
+                    name="Local user",
+                    credentials_file=Path(
+                        os.getenv("GARMIN_CREDENTIALS_FILE", "~/.config/runplan/credentials.toml")
+                    ).expanduser(),
+                    token_store=Path(
+                        os.getenv("GARMIN_TOKENSTORE", "~/.garminconnect")
+                    ).expanduser(),
+                    state_directory=Path(
+                        os.getenv("GARMIN_STATE_DIR", "~/.local/state/runplan")
+                    ).expanduser(),
+                )
+            ]
+        )
         self.repository = repository
         self.client_factory = client_factory
         self.today = today
@@ -642,9 +652,7 @@ class WebSyncService:
     def execute(self, name: str, request: dict[str, Any]) -> dict[str, Any]:
         user = self.users.get(request.get("userId") or self.users.default_id)
         if not isinstance(request.get("confirmationToken"), str):
-            raise WebError(
-                HTTPStatus.BAD_REQUEST, "Sync requires a preview confirmation token"
-            )
+            raise WebError(HTTPStatus.BAD_REQUEST, "Sync requires a preview confirmation token")
         preview = self.preview(name, user.id)
         if request["confirmationToken"] != preview["confirmationToken"]:
             raise WebError(
@@ -680,9 +688,7 @@ class WebSyncService:
             raise WebError(HTTPStatus.BAD_GATEWAY, str(exc)) from exc
         except Exception as exc:
             log_method = (
-                logger.error
-                if getattr(exc, "_runplan_logged", False)
-                else logger.exception
+                logger.error if getattr(exc, "_runplan_logged", False) else logger.exception
             )
             log_method(
                 "Garmin sync failed user=%s file=%s exception=%s message=%s duration_ms=%d",
@@ -716,6 +722,7 @@ class WebSyncService:
             "results": [result.to_dict() for result in results],
         }
 
+
 def make_handler(
     store: ProgramStore,
     sync_service: WebSyncService | None = None,
@@ -739,7 +746,9 @@ def make_handler(
 
         def _log_web_error(self, exc: WebError) -> None:
             cause = exc.__cause__
-            level = logging.ERROR if exc.status >= HTTPStatus.INTERNAL_SERVER_ERROR else logging.WARNING
+            level = (
+                logging.ERROR if exc.status >= HTTPStatus.INTERNAL_SERVER_ERROR else logging.WARNING
+            )
             logger.log(
                 level,
                 "HTTP request failed client=%s method=%s path=%s status=%d exception=%s cause=%s message=%s",
@@ -774,9 +783,7 @@ def make_handler(
                 if urlsplit(self.path).path == "/api/users":
                     self._json(
                         HTTPStatus.CREATED,
-                        {"user": registry.create(
-                            payload.get("username"), payload.get("fullName")
-                        )},
+                        {"user": registry.create(payload.get("username"), payload.get("fullName"))},
                     )
                     return
                 if urlsplit(self.path).path == "/api/programs":
@@ -800,9 +807,7 @@ def make_handler(
                     user = registry.get(user_parts[0])
                     filename = payload.get("filename")
                     if not isinstance(filename, str):
-                        raise WebError(
-                            HTTPStatus.BAD_REQUEST, "Program filename is required"
-                        )
+                        raise WebError(HTTPStatus.BAD_REQUEST, "Program filename is required")
                     path = sync.store_for(user.id).path(filename)
                     if not path.is_file():
                         raise WebError(HTTPStatus.NOT_FOUND, "Program not found")
@@ -910,7 +915,7 @@ def make_handler(
             prefix = "/api/programs/"
             if not path.startswith(prefix):
                 raise WebError(HTTPStatus.NOT_FOUND, "Not found")
-            return [unquote(part) for part in path[len(prefix):].split("/") if part]
+            return [unquote(part) for part in path[len(prefix) :].split("/") if part]
 
         def _api_user_parts(self, *, required: bool = True) -> list[str]:
             path = urlsplit(self.path).path
@@ -919,7 +924,7 @@ def make_handler(
                 if required:
                     raise WebError(HTTPStatus.NOT_FOUND, "Not found")
                 return []
-            return [unquote(part) for part in path[len(prefix):].split("/") if part]
+            return [unquote(part) for part in path[len(prefix) :].split("/") if part]
 
         def _body(self) -> dict[str, Any]:
             try:

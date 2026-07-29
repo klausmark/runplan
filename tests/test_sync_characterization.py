@@ -26,11 +26,11 @@ from runplan.application.sync import (
     synchronize_program_week,
     synchronize_program_weeks,
 )
-from runplan.state.json_repository import CURRENT_STATE_VERSION, JsonStateRepository
 from runplan.integrations.garmin.client import (
     get_all_workouts,
     scheduled_items_for_dates,
 )
+from runplan.state.json_repository import CURRENT_STATE_VERSION, JsonStateRepository
 from tests.helpers import compiled_week
 
 
@@ -107,15 +107,12 @@ class FakeGarmin:
         self.schedules = [
             item
             for item in self.schedules
-            if item.get("id") != schedule_id
-            and item.get("workoutScheduleId") != schedule_id
+            if item.get("id") != schedule_id and item.get("workoutScheduleId") != schedule_id
         ]
 
     def delete_workout(self, workout_id: int) -> None:
         self.events.append(("delete", workout_id))
-        self.workouts = [
-            item for item in self.workouts if item.get("workoutId") != workout_id
-        ]
+        self.workouts = [item for item in self.workouts if item.get("workoutId") != workout_id]
 
 
 class SyncCharacterizationTests(unittest.TestCase):
@@ -153,9 +150,7 @@ class SyncCharacterizationTests(unittest.TestCase):
         self.assertEqual(2, len([event for event in client.events if event[0] == "schedule"]))
         state = load_state(program["program_id"])
         self.assertEqual(1, state["active_week"])
-        self.assertEqual(
-            {"week-01/mixed", "week-01/easy"}, set(state["workouts"])
-        )
+        self.assertEqual({"week-01/mixed", "week-01/easy"}, set(state["workouts"]))
         self.assertEqual(1000, state["workouts"]["week-01/mixed"]["workout_id"])
         self.assertTrue(state_path(program["program_id"]).exists())
 
@@ -175,9 +170,9 @@ class SyncCharacterizationTests(unittest.TestCase):
         client = FakeGarmin()
         program, compiled = self._sync(client)
         old_date = compiled[0][0]["schedule_date"]
-        old_schedule_id = load_state(program["program_id"])["workouts"][
-            "week-01/mixed"
-        ]["schedule_id"]
+        old_schedule_id = load_state(program["program_id"])["workouts"]["week-01/mixed"][
+            "schedule_id"
+        ]
         client.events.clear()
 
         moved_program, moved_compiled = compiled_week(1)
@@ -214,9 +209,7 @@ class SyncCharacterizationTests(unittest.TestCase):
         moved_program, moved_compiled = compiled_week(1)
         moved_compiled[0][0]["schedule_date"] = "2026-12-29"
 
-        plan = plan_program_weeks(
-            JsonStateRepository(), [(moved_program, moved_compiled)]
-        )
+        plan = plan_program_weeks(JsonStateRepository(), [(moved_program, moved_compiled)])
 
         self.assertEqual(
             ["reuse", "schedule", "unschedule", "reuse"],
@@ -323,21 +316,19 @@ class SyncCharacterizationTests(unittest.TestCase):
         client = FakeGarmin()
         selection = compiled_week(1)
         synchronize_program_weeks(client, JsonStateRepository(), [selection])
-        missing_id = load_state("characterization-plan")["workouts"][
-            "week-01/mixed"
-        ]["workout_id"]
-        client.workouts = [
-            item for item in client.workouts if item["workoutId"] != missing_id
-        ]
+        missing_id = load_state("characterization-plan")["workouts"]["week-01/mixed"]["workout_id"]
+        client.workouts = [item for item in client.workouts if item["workoutId"] != missing_id]
 
         with self.assertLogs("runplan.application.sync", "WARNING") as logs:
             synchronize_program_weeks(client, JsonStateRepository(), [selection])
 
-        self.assertTrue(any(
-            f"workout_id={missing_id}" in item
-            and "Tracked Garmin workout not found; recreating" in item
-            for item in logs.output
-        ))
+        self.assertTrue(
+            any(
+                f"workout_id={missing_id}" in item
+                and "Tracked Garmin workout not found; recreating" in item
+                for item in logs.output
+            )
+        )
 
     def test_prune_only_removes_future_active_workouts(self) -> None:
         records = {
@@ -420,22 +411,24 @@ class SyncCharacterizationTests(unittest.TestCase):
             {"program_id": "characterization-plan", "workouts": {"week-01/completed": record}},
         )
         client = FakeGarmin(
-            workouts=[{
-                "workoutId": 10,
-                "workoutName": record["name"],
-                "description": record["description"],
-            }],
-            schedules=[{
-                "itemType": "workout",
-                "workoutId": 10,
-                "workoutScheduleId": 20,
-                "date": "2026-07-20",
-            }],
+            workouts=[
+                {
+                    "workoutId": 10,
+                    "workoutName": record["name"],
+                    "description": record["description"],
+                }
+            ],
+            schedules=[
+                {
+                    "itemType": "workout",
+                    "workoutId": 10,
+                    "workoutScheduleId": 20,
+                    "date": "2026-07-20",
+                }
+            ],
         )
 
-        actions = cleanup_terminal_workouts(
-            client, JsonStateRepository(), "characterization-plan"
-        )
+        actions = cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
 
         self.assertEqual(["unschedule", "delete"], [action.kind for action in actions])
         cleaned = load_state("characterization-plan")["workouts"]["week-01/completed"]
@@ -451,21 +444,21 @@ class SyncCharacterizationTests(unittest.TestCase):
             "characterization-plan",
             {
                 "program_id": "characterization-plan",
-                "workouts": {"week-01/missed": {
-                    "week": 1,
-                    "workout_id": 10,
-                    "schedule_id": 20,
-                    "date": "2026-07-20",
-                    "name": "Missed workout",
-                    "status": "missed",
-                }},
+                "workouts": {
+                    "week-01/missed": {
+                        "week": 1,
+                        "workout_id": 10,
+                        "schedule_id": 20,
+                        "date": "2026-07-20",
+                        "name": "Missed workout",
+                        "status": "missed",
+                    }
+                },
             },
         )
         client = FakeGarmin()
 
-        actions = cleanup_terminal_workouts(
-            client, JsonStateRepository(), "characterization-plan"
-        )
+        actions = cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
 
         self.assertEqual([], actions)
         cleaned = load_state("characterization-plan")["workouts"]["week-01/missed"]
@@ -487,7 +480,14 @@ class SyncCharacterizationTests(unittest.TestCase):
         )
         client = FakeGarmin(
             workouts=[{"workoutId": 10, "workoutName": "Someone else's workout"}],
-            schedules=[{"itemType": "workout", "workoutId": 10, "workoutScheduleId": 20, "date": "2026-07-20"}],
+            schedules=[
+                {
+                    "itemType": "workout",
+                    "workoutId": 10,
+                    "workoutScheduleId": 20,
+                    "date": "2026-07-20",
+                }
+            ],
         )
 
         cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
@@ -515,12 +515,21 @@ class SyncCharacterizationTests(unittest.TestCase):
                 raise RuntimeError("simulated delete failure")
 
         client = DeleteFailure(
-            workouts=[{
-                "workoutId": 10,
-                "workoutName": record["name"],
-                "description": record["description"],
-            }],
-            schedules=[{"itemType": "workout", "workoutId": 10, "workoutScheduleId": 20, "date": "2026-07-20"}],
+            workouts=[
+                {
+                    "workoutId": 10,
+                    "workoutName": record["name"],
+                    "description": record["description"],
+                }
+            ],
+            schedules=[
+                {
+                    "itemType": "workout",
+                    "workoutId": 10,
+                    "workoutScheduleId": 20,
+                    "date": "2026-07-20",
+                }
+            ],
         )
 
         with self.assertRaisesRegex(RuntimeError, "simulated delete failure"):
@@ -551,14 +560,10 @@ class SyncCharacterizationTests(unittest.TestCase):
         )
 
         program, compiled = compiled_week(1)
-        synchronize_program_weeks(
-            client, JsonStateRepository(), [(program, compiled)], prune=True
-        )
+        synchronize_program_weeks(client, JsonStateRepository(), [(program, compiled)], prune=True)
 
         event_names = [event[0] for event in client.events]
-        last_schedule = max(
-            index for index, name in enumerate(event_names) if name == "schedule"
-        )
+        last_schedule = max(index for index, name in enumerate(event_names) if name == "schedule")
         self.assertGreater(event_names.index("unschedule"), last_schedule)
         self.assertGreater(event_names.index("delete"), last_schedule)
         state = load_state("characterization-plan")
@@ -586,8 +591,9 @@ class SyncCharacterizationTests(unittest.TestCase):
         )
         program, compiled = compiled_week(1)
 
-        with self.assertRaisesRegex(RuntimeError, "simulated upload failure"), redirect_stdout(
-            StringIO()
+        with (
+            self.assertRaisesRegex(RuntimeError, "simulated upload failure"),
+            redirect_stdout(StringIO()),
         ):
             sync_program_week(client, program, compiled)
 
@@ -656,7 +662,9 @@ class SyncCharacterizationTests(unittest.TestCase):
             deleted = delete_all_managed(client, program, compiled)
 
         self.assertEqual(1, deleted)
-        self.assertLess(client.events.index(("unschedule", 199)), client.events.index(("delete", 99)))
+        self.assertLess(
+            client.events.index(("unschedule", 199)), client.events.index(("delete", 99))
+        )
         self.assertIn(77, [item["workoutId"] for item in client.workouts])
         self.assertFalse(state_path("characterization-plan").exists())
 
@@ -689,9 +697,7 @@ class SyncCharacterizationTests(unittest.TestCase):
 
         output = StringIO()
         with redirect_stdout(output):
-            result = synchronize_program_week(
-                client, JsonStateRepository(), program, compiled
-            )
+            result = synchronize_program_week(client, JsonStateRepository(), program, compiled)
 
         self.assertEqual("", output.getvalue())
         self.assertEqual(program["program_id"], result.program_id)
@@ -726,13 +732,9 @@ class SyncCharacterizationTests(unittest.TestCase):
     def test_skipping_then_syncing_a_later_week_preserves_existing_state(self) -> None:
         client = FakeGarmin()
 
-        synchronize_program_weeks(
-            client, JsonStateRepository(), [compiled_week(1)]
-        )
+        synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
         client.events.clear()
-        synchronize_program_weeks(
-            client, JsonStateRepository(), [compiled_week(2)]
-        )
+        synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(2)])
 
         self.assertFalse(any(event[0] in ("delete", "unschedule") for event in client.events))
         self.assertEqual(
@@ -782,9 +784,13 @@ class SyncCharacterizationTests(unittest.TestCase):
         self.assertIn(("delete", old_id), client.events)
         record = load_state("characterization-plan")["workouts"]["week-01/mixed"]
         self.assertNotEqual(old_id, record["workout_id"])
-        replacement = next(item for item in client.workouts if item["workoutId"] == record["workout_id"])
+        replacement = next(
+            item for item in client.workouts if item["workoutId"] == record["workout_id"]
+        )
         self.assertNotIn("[runplan:", replacement.get("description") or "")
-        self.assertTrue(any("Tracked Garmin workout changed; replacing" in item for item in logs.output))
+        self.assertTrue(
+            any("Tracked Garmin workout changed; replacing" in item for item in logs.output)
+        )
 
     def test_missing_ids_in_garmin_responses_are_logged_as_errors(self) -> None:
         class MissingWorkoutId(FakeGarmin):
@@ -796,9 +802,7 @@ class SyncCharacterizationTests(unittest.TestCase):
             self.assertLogs("runplan.application.sync", "ERROR") as logs,
             self.assertRaisesRegex(RuntimeError, "did not return workoutId"),
         ):
-            synchronize_program_weeks(
-                MissingWorkoutId(), JsonStateRepository(), [compiled_week(1)]
-            )
+            synchronize_program_weeks(MissingWorkoutId(), JsonStateRepository(), [compiled_week(1)])
 
         self.assertTrue(any("create response missing workout ID" in item for item in logs.output))
 
@@ -816,12 +820,12 @@ class SyncCharacterizationTests(unittest.TestCase):
         client.fail_upload_number = None
         client.events.clear()
 
-        results = synchronize_program_weeks(
-            client, JsonStateRepository(), [compiled_week(1)]
-        )
+        results = synchronize_program_weeks(client, JsonStateRepository(), [compiled_week(1)])
 
-        self.assertEqual(["reuse", "already_scheduled", "create", "schedule"],
-                         [action.kind for action in results[0].actions])
+        self.assertEqual(
+            ["reuse", "already_scheduled", "create", "schedule"],
+            [action.kind for action in results[0].actions],
+        )
         self.assertEqual(
             [("upload", "Week 1 - Easy")],
             [event for event in client.events if event[0] == "upload"],
@@ -903,15 +907,11 @@ class SyncCharacterizationTests(unittest.TestCase):
             for action in plan.actions
             if action.name == "Old completed workout"
         ]
-        self.assertEqual(
-            [("unschedule", 90, 190), ("delete", 90, None)], cleanup
-        )
+        self.assertEqual([("unschedule", 90, 190), ("delete", 90, None)], cleanup)
 
     def test_untracked_past_workouts_become_missed_instead_of_being_scheduled(self) -> None:
         selection = compiled_week(1)
-        plan = plan_program_weeks(
-            JsonStateRepository(), [selection], today=date(2027, 1, 1)
-        )
+        plan = plan_program_weeks(JsonStateRepository(), [selection], today=date(2027, 1, 1))
         client = FakeGarmin()
 
         results = synchronize_program_weeks(
@@ -922,9 +922,7 @@ class SyncCharacterizationTests(unittest.TestCase):
         )
 
         self.assertEqual(["missed", "missed"], [a.kind for a in plan.actions])
-        self.assertEqual(
-            ["missed", "missed"], [a.kind for a in results[0].actions]
-        )
+        self.assertEqual(["missed", "missed"], [a.kind for a in results[0].actions])
         self.assertFalse(any(event[0] == "upload" for event in client.events))
         self.assertFalse(any(event[0] == "schedule" for event in client.events))
         state = load_state("characterization-plan")["workouts"]
@@ -956,8 +954,9 @@ class SyncCharacterizationTests(unittest.TestCase):
 
 class StateCharacterizationTests(unittest.TestCase):
     def test_state_round_trip_is_utf8_and_atomic_temp_file_is_removed(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, patch.dict(
-            os.environ, {"GARMIN_STATE_DIR": directory}
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"GARMIN_STATE_DIR": directory}),
         ):
             state = {
                 "program_id": "unicode-plan",
@@ -974,8 +973,9 @@ class StateCharacterizationTests(unittest.TestCase):
             self.assertFalse(Path(directory, "unicode-plan.tmp").exists())
 
     def test_invalid_state_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, patch.dict(
-            os.environ, {"GARMIN_STATE_DIR": directory}
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"GARMIN_STATE_DIR": directory}),
         ):
             path = Path(directory, "expected.json")
             path.write_text(
@@ -986,8 +986,9 @@ class StateCharacterizationTests(unittest.TestCase):
                 load_state("expected")
 
     def test_legacy_state_without_version_is_migrated_in_memory(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, patch.dict(
-            os.environ, {"GARMIN_STATE_DIR": directory}
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"GARMIN_STATE_DIR": directory}),
         ):
             path = Path(directory, "legacy.json")
             path.write_text(
@@ -1001,8 +1002,9 @@ class StateCharacterizationTests(unittest.TestCase):
             self.assertNotIn("schema_version", json.loads(path.read_text()))
 
     def test_version_one_state_gains_lifecycle_status(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, patch.dict(
-            os.environ, {"GARMIN_STATE_DIR": directory}
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"GARMIN_STATE_DIR": directory}),
         ):
             path = Path(directory, "legacy.json")
             path.write_text(
@@ -1026,8 +1028,9 @@ class StateCharacterizationTests(unittest.TestCase):
         self.assertEqual("planned", state["workouts"]["planned"]["status"])
 
     def test_state_from_newer_schema_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, patch.dict(
-            os.environ, {"GARMIN_STATE_DIR": directory}
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"GARMIN_STATE_DIR": directory}),
         ):
             path = Path(directory, "future.json")
             path.write_text(
@@ -1045,8 +1048,9 @@ class StateCharacterizationTests(unittest.TestCase):
                 load_state("future")
 
     def test_non_object_state_is_rejected_as_invalid_format(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, patch.dict(
-            os.environ, {"GARMIN_STATE_DIR": directory}
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"GARMIN_STATE_DIR": directory}),
         ):
             Path(directory, "list-state.json").write_text("[]", encoding="utf-8")
 
@@ -1056,10 +1060,7 @@ class StateCharacterizationTests(unittest.TestCase):
 
 class GarminBoundaryCharacterizationTests(unittest.TestCase):
     def test_workout_pagination_uses_pages_of_one_hundred(self) -> None:
-        workouts = [
-            {"workoutId": value, "workoutName": f"Workout {value}"}
-            for value in range(205)
-        ]
+        workouts = [{"workoutId": value, "workoutName": f"Workout {value}"} for value in range(205)]
         client = FakeGarmin(workouts=workouts)
 
         result = get_all_workouts(client)
@@ -1098,9 +1099,7 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
             ]
         )
 
-        result = scheduled_items_for_dates(
-            client, {"2026-12-31", "2027-01-01"}
-        )
+        result = scheduled_items_for_dates(client, {"2026-12-31", "2027-01-01"})
 
         self.assertEqual([1, 2], [item["workoutId"] for item in result])
         self.assertEqual(
@@ -1108,11 +1107,7 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
                 ("get_scheduled_workouts", 2026, 12),
                 ("get_scheduled_workouts", 2027, 1),
             ],
-            [
-                event
-                for event in client.events
-                if event[0] == "get_scheduled_workouts"
-            ],
+            [event for event in client.events if event[0] == "get_scheduled_workouts"],
         )
 
     def test_scheduled_lookup_normalizes_garmin_calendar_shape(self) -> None:
@@ -1146,11 +1141,18 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
     def test_calendar_activity_is_joined_to_workout_through_activity_summary(self) -> None:
         class CalendarClient:
             def get_scheduled_workouts(self, year: int, month: int) -> dict:
-                return {"calendarItems": [
-                    {"itemType": "workout", "date": "2026-07-28", "id": 20, "workoutId": 10},
-                    {"itemType": "activity", "date": "2026-07-28", "id": 900, "startTimestampLocal": "2026-07-28T17:35:02.0"},
-                    {"itemType": "activity", "date": "2026-07-28", "id": 901},
-                ]}
+                return {
+                    "calendarItems": [
+                        {"itemType": "workout", "date": "2026-07-28", "id": 20, "workoutId": 10},
+                        {
+                            "itemType": "activity",
+                            "date": "2026-07-28",
+                            "id": 900,
+                            "startTimestampLocal": "2026-07-28T17:35:02.0",
+                        },
+                        {"itemType": "activity", "date": "2026-07-28", "id": 901},
+                    ]
+                }
 
             def get_activity(self, activity_id: str) -> dict:
                 if activity_id == "901":
@@ -1177,10 +1179,12 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
                 self.activity_calls: list[str] = []
 
             def get_scheduled_workouts(self, year: int, month: int) -> dict:
-                return {"calendarItems": [
-                    {"itemType": "workout", "date": "2026-07-27", "id": 20, "workoutId": 10},
-                    {"itemType": "activity", "date": "2026-07-27", "id": 900},
-                ]}
+                return {
+                    "calendarItems": [
+                        {"itemType": "workout", "date": "2026-07-27", "id": 20, "workoutId": 10},
+                        {"itemType": "activity", "date": "2026-07-27", "id": 900},
+                    ]
+                }
 
             def get_activity(self, activity_id: str) -> dict:
                 self.activity_calls.append(activity_id)
@@ -1199,11 +1203,13 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
     def test_distinct_activities_for_the_same_workout_and_date_remain_a_conflict(self) -> None:
         class CalendarClient:
             def get_scheduled_workouts(self, year: int, month: int) -> dict:
-                return {"calendarItems": [
-                    {"itemType": "workout", "date": "2026-07-27", "id": 20, "workoutId": 10},
-                    {"itemType": "activity", "date": "2026-07-27", "id": 900},
-                    {"itemType": "activity", "date": "2026-07-27", "id": 901},
-                ]}
+                return {
+                    "calendarItems": [
+                        {"itemType": "workout", "date": "2026-07-27", "id": 20, "workoutId": 10},
+                        {"itemType": "activity", "date": "2026-07-27", "id": 900},
+                        {"itemType": "activity", "date": "2026-07-27", "id": 901},
+                    ]
+                }
 
             def get_activity(self, activity_id: str) -> dict:
                 return {
@@ -1212,9 +1218,7 @@ class GarminBoundaryCharacterizationTests(unittest.TestCase):
                     "summaryDTO": {"distance": 5000, "duration": 1800},
                 }
 
-        with self.assertRaisesRegex(
-            RuntimeError, "workoutId=10 on 2026-07-27"
-        ):
+        with self.assertRaisesRegex(RuntimeError, "workoutId=10 on 2026-07-27"):
             scheduled_items_for_dates(CalendarClient(), {"2026-07-27"})
 
 

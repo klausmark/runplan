@@ -1,25 +1,26 @@
+import tempfile
+import unittest
 from argparse import Namespace
 from contextlib import redirect_stdout
 from datetime import date
 from io import StringIO
 from pathlib import Path
-import tempfile
-import unittest
 from unittest.mock import patch
+
+import yaml
 
 from runplan.cli import (
     _sync_one_user,
     main,
     parse_arguments,
     prepare_sync_selections,
-    run_preview,
     run_multi_week_sync,
+    run_preview,
     run_user_sync,
     week_selection,
 )
-from tests.helpers import compiled_week, program_data
-import yaml
 from runplan.users import RunplanUser, UserRegistry, load_user_registry
+from tests.helpers import compiled_week, program_data
 
 
 class CliSelectionTests(unittest.TestCase):
@@ -104,6 +105,7 @@ class CliSelectionTests(unittest.TestCase):
         self.assertEqual(user.credentials_file, delegated.credentials_file)
         self.assertEqual(user.token_store, delegated.token_store)
         self.assertEqual(user.state_directory.resolve(), delegated.repository.state_directory)
+
     def test_serve_programs_default_to_external_user_data_directory(self) -> None:
         with patch.dict("os.environ", {"XDG_DATA_HOME": "/srv/runplan-data"}, clear=True):
             arguments = parse_arguments(["serve"])
@@ -122,9 +124,7 @@ class CliSelectionTests(unittest.TestCase):
 
     def test_parser_rejects_multiple_selector_flags(self) -> None:
         with self.assertRaises(SystemExit):
-            parse_arguments(
-                ["sync", "plan.yaml", "--select-weeks", "1", "--weeks-ahead", "1"]
-            )
+            parse_arguments(["sync", "plan.yaml", "--select-weeks", "1", "--weeks-ahead", "1"])
 
     def test_default_and_explicit_selectors(self) -> None:
         self.assertEqual("ahead", week_selection(Namespace()).kind)
@@ -153,9 +153,7 @@ class CliSelectionTests(unittest.TestCase):
             stdout = StringIO()
 
             with patch("runplan.cli.export_pdf") as export, redirect_stdout(stdout):
-                result = main(
-                    ["export", str(source), "--output", str(output)]
-                )
+                result = main(["export", str(source), "--output", str(output)])
 
         self.assertEqual(0, result)
         export.assert_called_once()
@@ -204,12 +202,8 @@ class CliSelectionTests(unittest.TestCase):
             source = Path(directory, "plan.yaml")
             source.write_text(yaml.safe_dump(program_data()), encoding="utf-8")
 
-            first = prepare_sync_selections(
-                Namespace(yaml_file=source, today=date(2026, 12, 28))
-            )
-            second = prepare_sync_selections(
-                Namespace(yaml_file=source, today=date(2027, 1, 4))
-            )
+            first = prepare_sync_selections(Namespace(yaml_file=source, today=date(2026, 12, 28)))
+            second = prepare_sync_selections(Namespace(yaml_file=source, today=date(2027, 1, 4)))
 
         self.assertEqual([1, 2], [program["week"] for program, _ in first])
         self.assertEqual([2], [program["week"] for program, _ in second])

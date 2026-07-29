@@ -13,7 +13,6 @@ from ruamel.yaml import YAML
 
 from .json_repository import JsonStateRepository, new_state
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -114,7 +113,11 @@ class YamlStateRepository:
                 if record is not None:
                     state["workouts"][f"week-{week['week']:02d}/{workout['id']}"] = record
         program_tracking = document.get("program", {}).get("tracking", {})
-        orphaned = program_tracking.get("orphaned_workouts", {}) if isinstance(program_tracking, dict) else {}
+        orphaned = (
+            program_tracking.get("orphaned_workouts", {})
+            if isinstance(program_tracking, dict)
+            else {}
+        )
         if isinstance(orphaned, dict):
             for key, record in orphaned.items():
                 if isinstance(key, str) and isinstance(record, dict):

@@ -8,11 +8,10 @@ import logging
 from datetime import date
 from typing import Any
 
-from .ports import GarminClient, StateRepository
-from .results import ReconcileResult, SyncAction, SyncPlan, SyncResult
 from ..integrations.garmin.client import get_all_workouts, scheduled_items_for_dates
 from ..state.json_repository import JsonStateRepository
-
+from .ports import GarminClient, StateRepository
+from .results import ReconcileResult, SyncAction, SyncPlan, SyncResult
 
 logger = logging.getLogger(__name__)
 
@@ -74,18 +73,11 @@ def reconcile_program(
         and record["date"] < reference_date.isoformat()
         and record.get("status") not in _TERMINAL_STATUSES
     }
-    scheduled = (
-        scheduled_items_for_dates(client, historical_dates)
-        if historical_dates
-        else []
-    )
+    scheduled = scheduled_items_for_dates(client, historical_dates) if historical_dates else []
     result = ReconcileResult(program_id)
     changed = False
     for record in records.values():
-        if (
-            not isinstance(record, dict)
-            or record.get("date") not in historical_dates
-        ):
+        if not isinstance(record, dict) or record.get("date") not in historical_dates:
             continue
         occurrence = _schedule_for_record(scheduled, record)
         activity_id = occurrence.get("associatedActivityId") if occurrence else None
@@ -266,9 +258,7 @@ def workout_content_hash(workout: Any) -> str:
 
 def plan_program_weeks(
     repository: StateRepository,
-    selections: list[
-        tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]
-    ],
+    selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
     *,
     prune: bool = False,
     today: date | None = None,
@@ -310,7 +300,10 @@ def plan_program_weeks(
                 plan.add("schedule", definition["name"], date=definition["schedule_date"])
             else:
                 plan.add("reuse", definition["name"], workout_id=record.get("workout_id"))
-                if not record.get("schedule_id") or record.get("date") != definition["schedule_date"]:
+                if (
+                    not record.get("schedule_id")
+                    or record.get("date") != definition["schedule_date"]
+                ):
                     plan.add("schedule", definition["name"], date=definition["schedule_date"])
                     if (
                         record.get("schedule_id")
@@ -386,16 +379,10 @@ def cleanup_terminal_workouts(
     if not terminal:
         return []
     remote_workouts = get_all_workouts(client)
-    dates = {
-        record["date"]
-        for _, record in terminal
-        if isinstance(record.get("date"), str)
-    }
+    dates = {record["date"] for _, record in terminal if isinstance(record.get("date"), str)}
     scheduled = scheduled_items_for_dates(client, dates) if dates else []
     remote_by_id = {
-        item.get("workoutId"): item
-        for item in remote_workouts
-        if item.get("workoutId") is not None
+        item.get("workoutId"): item for item in remote_workouts if item.get("workoutId") is not None
     }
 
     # Verify every extant template before making the first destructive call.
@@ -403,8 +390,7 @@ def cleanup_terminal_workouts(
         remote = remote_by_id.get(record.get("workout_id"))
         if remote is not None and not _is_owned(remote, record):
             raise RuntimeError(
-                f"Safety stop: workoutId={record.get('workout_id')} "
-                "does not belong to the program"
+                f"Safety stop: workoutId={record.get('workout_id')} does not belong to the program"
             )
 
     actions: list[SyncAction] = []
@@ -476,12 +462,8 @@ def synchronize_program_week(
     result = SyncResult(program_id=program_id, week=week)
     state = repository.load(program_id)
     records: dict[str, Any] = state["workouts"]
-    current_keys = {
-        f"week-{week:02d}/{definition['id']}" for definition, _ in compiled
-    }
-    relevant_dates = {
-        definition["schedule_date"] for definition, _ in compiled
-    } | {
+    current_keys = {f"week-{week:02d}/{definition['id']}" for definition, _ in compiled}
+    relevant_dates = {definition["schedule_date"] for definition, _ in compiled} | {
         record["date"]
         for record in records.values()
         if isinstance(record, dict) and isinstance(record.get("date"), str)
@@ -520,10 +502,14 @@ def synchronize_program_week(
             )
             continue
         tracked_id = previous.get("workout_id") if isinstance(previous, dict) else None
-        matching = next(
-            (item for item in remote_workouts if item.get("workoutId") == tracked_id),
-            None,
-        ) if tracked_id is not None else None
+        matching = (
+            next(
+                (item for item in remote_workouts if item.get("workoutId") == tracked_id),
+                None,
+            )
+            if tracked_id is not None
+            else None
+        )
         reusable = bool(
             matching is not None
             and matching.get("workoutName") == payload.get("workoutName")
@@ -578,9 +564,7 @@ def synchronize_program_week(
                     key,
                     definition["name"],
                 )
-                raise RuntimeError(
-                    f"Upload of {definition['name']!r} did not return workoutId"
-                )
+                raise RuntimeError(f"Upload of {definition['name']!r} did not return workoutId")
             remote = {**payload, **uploaded}
             remote_workouts.append(remote)
             result.add("create", definition["name"], workout_id=workout_id)
@@ -589,9 +573,7 @@ def synchronize_program_week(
         else:
             workout_id = matching.get("workoutId")
             if not workout_id:
-                raise RuntimeError(
-                    f"Existing workout {definition['name']!r} has no workoutId"
-                )
+                raise RuntimeError(f"Existing workout {definition['name']!r} has no workoutId")
             result.add("reuse", definition["name"], workout_id=workout_id)
 
         schedule = next(
@@ -636,9 +618,7 @@ def synchronize_program_week(
                 workout_id,
                 definition["schedule_date"],
             )
-            raise RuntimeError(
-                f"Scheduling {definition['name']!r} did not return a schedule ID"
-            )
+            raise RuntimeError(f"Scheduling {definition['name']!r} did not return a schedule ID")
         if (
             previous
             and previous.get("schedule_id")
@@ -710,9 +690,7 @@ def synchronize_program_week(
 def synchronize_program_weeks(
     client: GarminClient,
     repository: StateRepository,
-    selections: list[
-        tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]
-    ],
+    selections: list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]],
     *,
     prune: bool = False,
     today: date | None = None,
@@ -780,9 +758,7 @@ def synchronize_program_weeks(
             schedule_id = record.get("schedule_id")
             if schedule_id:
                 client.unschedule_workout(schedule_id)
-                results[-1].add(
-                    "unschedule", name, workout_id=workout_id, schedule_id=schedule_id
-                )
+                results[-1].add("unschedule", name, workout_id=workout_id, schedule_id=schedule_id)
             if workout_id and remote is not None:
                 client.delete_workout(workout_id)
                 results[-1].add("delete", name, workout_id=workout_id)
@@ -842,9 +818,7 @@ def delete_managed_workouts(
         name = record.get("name", key)
         if schedule_id:
             client.unschedule_workout(schedule_id)
-            actions.append(
-                SyncAction("unschedule", name, workout_id, schedule_id=schedule_id)
-            )
+            actions.append(SyncAction("unschedule", name, workout_id, schedule_id=schedule_id))
         if workout_id and remote is not None:
             client.delete_workout(workout_id)
             actions.append(SyncAction("delete", name, workout_id))
@@ -891,9 +865,7 @@ def sync_program_week(
     compiled: list[tuple[dict[str, Any], Any]],
 ) -> None:
     """CLI-compatible wrapper around the output-free synchronization use case."""
-    result = synchronize_program_week(
-        client, JsonStateRepository(), program, compiled, prune=False
-    )
+    result = synchronize_program_week(client, JsonStateRepository(), program, compiled, prune=False)
     _print_actions(result.actions)
     print(f"\nWeek {result.week} was synced with Garmin Connect.")
 

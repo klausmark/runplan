@@ -1,5 +1,7 @@
 """Runplan application use cases."""
 
+from .ports import GarminClient, StateRepository
+from .results import SyncAction, SyncPlan, SyncResult
 from .sync import (
     delete_all_managed,
     delete_managed_workouts,
@@ -8,8 +10,6 @@ from .sync import (
     synchronize_program_week,
     synchronize_program_weeks,
 )
-from .ports import GarminClient, StateRepository
-from .results import SyncAction, SyncPlan, SyncResult
 
 __all__ = [
     "GarminClient",

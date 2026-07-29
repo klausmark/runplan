@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .errors import WorkoutDefinitionError
 from ..parsing.values import parse_step_end
-
+from .errors import WorkoutDefinitionError
 
 ACTION_NAMES = {
     "warmup": "warmup",
@@ -32,50 +31,36 @@ def normalize_action(raw_action: Any, location: str) -> str:
     action = ACTION_NAMES.get(raw_action.strip().lower())
     if action is None:
         valid = "warmup, run, recovery, repeat or cooldown"
-        raise WorkoutDefinitionError(
-            f"{location}: unknown step {raw_action!r}; use {valid}"
-        )
+        raise WorkoutDefinitionError(f"{location}: unknown step {raw_action!r}; use {valid}")
     return action
 
 
 def repeat_parts(value: Any, location: str) -> tuple[int, list[Any]]:
     """Validate and return repeat count and child steps."""
     if not isinstance(value, dict):
-        raise WorkoutDefinitionError(
-            f"{location}: 'repeat' must contain 'count' and 'steps'"
-        )
+        raise WorkoutDefinitionError(f"{location}: 'repeat' must contain 'count' and 'steps'")
     count = value.get("count")
     child_steps = value.get("steps")
     if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
-        raise WorkoutDefinitionError(
-            f"{location}.count: must be a positive integer"
-        )
+        raise WorkoutDefinitionError(f"{location}.count: must be a positive integer")
     if not isinstance(child_steps, list) or not child_steps:
-        raise WorkoutDefinitionError(
-            f"{location}.steps: must be a non-empty list"
-        )
+        raise WorkoutDefinitionError(f"{location}.steps: must be a non-empty list")
     return count, child_steps
 
 
-def estimate_totals(
-    step_definitions: list[Any], location: str = "steps"
-) -> tuple[float, float]:
+def estimate_totals(step_definitions: list[Any], location: str = "steps") -> tuple[float, float]:
     """Calculate known seconds and meters, including nested repeats."""
     time_total = 0.0
     distance_total = 0.0
     for order, item in enumerate(step_definitions, start=1):
         item_location = f"{location}[{order}]"
         if not isinstance(item, dict) or len(item) != 1:
-            raise WorkoutDefinitionError(
-                f"{item_location}: each step must have exactly one action"
-            )
+            raise WorkoutDefinitionError(f"{item_location}: each step must have exactly one action")
         raw_action, value = next(iter(item.items()))
         action = normalize_action(raw_action, item_location)
         if action == "repeat":
             count, child_steps = repeat_parts(value, item_location)
-            child_time, child_distance = estimate_totals(
-                child_steps, f"{item_location}.steps"
-            )
+            child_time, child_distance = estimate_totals(child_steps, f"{item_location}.steps")
             time_total += count * child_time
             distance_total += count * child_distance
         else:

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Literal, Mapping
-
+from typing import Any, Literal
 
 StepAction = Literal["warmup", "run", "recovery", "cooldown", "repeat"]
 EndKind = Literal["time", "distance"]
@@ -33,6 +33,7 @@ class Step:
             raise ValueError("regular steps require a positive end condition")
         elif self.count is not None or self.steps:
             raise ValueError("regular steps cannot contain repeat fields")
+
 
 @dataclass(frozen=True, slots=True)
 class Workout:
@@ -64,6 +65,7 @@ class Workout:
             actual_distance_meters=record.get("actual_distance_meters"),
             actual_duration_seconds=record.get("actual_duration_seconds"),
         )
+
 
 @dataclass(frozen=True, slots=True)
 class Week:

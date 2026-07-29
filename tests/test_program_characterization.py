@@ -64,9 +64,21 @@ class ProgramParsingCharacterizationTests(unittest.TestCase):
 
     def test_rejects_duplicate_ids_days_and_unsorted_days(self) -> None:
         mutations = (
-            ("duplicate id", lambda raw: raw["weeks"][0]["workouts"][1].update(id="mixed"), "ID 'mixed'"),
-            ("duplicate day", lambda raw: raw["weeks"][0]["workouts"][1].update(day=1), "day 1 is already"),
-            ("unsorted day", lambda raw: raw["weeks"][0]["workouts"][0].update(day=5), "must be sorted by day"),
+            (
+                "duplicate id",
+                lambda raw: raw["weeks"][0]["workouts"][1].update(id="mixed"),
+                "ID 'mixed'",
+            ),
+            (
+                "duplicate day",
+                lambda raw: raw["weeks"][0]["workouts"][1].update(day=1),
+                "day 1 is already",
+            ),
+            (
+                "unsorted day",
+                lambda raw: raw["weeks"][0]["workouts"][0].update(day=5),
+                "must be sorted by day",
+            ),
         )
         for label, mutate, message in mutations:
             with self.subTest(label=label):
@@ -90,9 +102,7 @@ class ProgramParsingCharacterizationTests(unittest.TestCase):
                     load_program(raw, selected_week=1)
 
     def test_rejects_unknown_selected_week(self) -> None:
-        with self.assertRaisesRegex(
-            WorkoutDefinitionError, "Program does not contain week 9"
-        ):
+        with self.assertRaisesRegex(WorkoutDefinitionError, "Program does not contain week 9"):
             load_program(program_data(), selected_week=9)
 
     def test_duration_formats_remain_backward_compatible(self) -> None:
@@ -274,9 +284,10 @@ class CliPreviewCharacterizationTests(unittest.TestCase):
                 yes=False,
             )
             stdout = StringIO()
-            with patch(
-                "runplan.cli_sync.load_state", return_value=copy.deepcopy(state)
-            ), redirect_stdout(stdout):
+            with (
+                patch("runplan.cli_sync.load_state", return_value=copy.deepcopy(state)),
+                redirect_stdout(stdout),
+            ):
                 result = run_sync(args)
 
         self.assertEqual(0, result)

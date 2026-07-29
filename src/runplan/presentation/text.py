@@ -5,15 +5,14 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from ..domain.models import Step
 from ..domain.steps import (
     estimate_duration,
     estimate_totals,
     normalize_action,
     repeat_parts,
 )
-from ..domain.models import Step
 from ..parsing.values import parse_step_end, step_pace
-
 
 WEEKDAYS = (
     "Monday",
@@ -133,9 +132,7 @@ def format_model_step_summary(steps: tuple[Step, ...]) -> str:
     parts = []
     for step in steps:
         if step.action == "repeat":
-            parts.append(
-                f"Repeat {step.count} times: {format_model_step_summary(step.steps)}"
-            )
+            parts.append(f"Repeat {step.count} times: {format_model_step_summary(step.steps)}")
         else:
             parts.append(f"{labels[step.action]} {format_model_step_value(step)}")
     return " · ".join(parts)
@@ -144,9 +141,7 @@ def format_model_step_summary(steps: tuple[Step, ...]) -> str:
 def format_step_value(value: Any, location: str) -> str:
     kind, end_value = parse_step_end(value, location)
     formatted = (
-        format_seconds_compact(end_value)
-        if kind == "time"
-        else format_distance_compact(end_value)
+        format_seconds_compact(end_value) if kind == "time" else format_distance_compact(end_value)
     )
     pace = step_pace(value, location)
     return f"{formatted} @ {format_pace(pace)}" if pace else formatted

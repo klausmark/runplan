@@ -46,7 +46,10 @@ class YamlStateRepositoryTests(unittest.TestCase):
             repository = YamlStateRepository(path)
             state = repository.load("characterization-plan")
             state["workouts"]["week-09/removed"] = {
-                "week": 9, "date": "2027-02-22", "status": "scheduled", "workout_id": 99
+                "week": 9,
+                "date": "2027-02-22",
+                "status": "scheduled",
+                "workout_id": 99,
             }
 
             repository.save("characterization-plan", state)

@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-
 CURRENT_STATE_VERSION = 2
 
 
@@ -29,8 +28,7 @@ def migrate_state(state: Any) -> dict[str, Any]:
         raise ValueError("schema_version must be a non-negative integer")
     if version > CURRENT_STATE_VERSION:
         raise ValueError(
-            f"schema version {version} is newer than supported version "
-            f"{CURRENT_STATE_VERSION}"
+            f"schema version {version} is newer than supported version {CURRENT_STATE_VERSION}"
         )
     migrated = dict(state)
     if version == 0:
@@ -58,9 +56,7 @@ def _legacy_status(record: dict[str, Any]) -> str:
 
 def state_path(program_id: str) -> Path:
     """Return the configured state path for a program."""
-    state_directory = Path(
-        os.getenv("GARMIN_STATE_DIR", "~/.local/state/runplan")
-    ).expanduser()
+    state_directory = Path(os.getenv("GARMIN_STATE_DIR", "~/.local/state/runplan")).expanduser()
     return state_directory / f"{program_id}.json"
 
 
@@ -77,10 +73,7 @@ def load_state(program_id: str) -> dict[str, Any]:
         state = migrate_state(state)
     except ValueError as exc:
         raise SystemExit(f"State file has an invalid format: {path}\n{exc}") from exc
-    if (
-        state.get("program_id") != program_id
-        or not isinstance(state.get("workouts"), dict)
-    ):
+    if state.get("program_id") != program_id or not isinstance(state.get("workouts"), dict):
         raise SystemExit(f"State file has an invalid format: {path}")
     return state
 
@@ -88,10 +81,7 @@ def load_state(program_id: str) -> dict[str, Any]:
 def save_state(program_id: str, state: dict[str, Any]) -> None:
     """Atomically persist one program state document."""
     document = migrate_state(state)
-    if (
-        document.get("program_id") != program_id
-        or not isinstance(document.get("workouts"), dict)
-    ):
+    if document.get("program_id") != program_id or not isinstance(document.get("workouts"), dict):
         raise ValueError("state does not match the program or schema")
     path = state_path(program_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -133,12 +123,16 @@ class JsonStateRepository:
             save_state(program_id, state)
             return
         document = migrate_state(state)
-        if document.get("program_id") != program_id or not isinstance(document.get("workouts"), dict):
+        if document.get("program_id") != program_id or not isinstance(
+            document.get("workouts"), dict
+        ):
             raise ValueError("state does not match the program or schema")
         path = self._path(program_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         temporary.replace(path)
 
     def delete(self, program_id: str) -> None:

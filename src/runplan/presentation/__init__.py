@@ -1,5 +1,7 @@
 """Human- and machine-readable presentation helpers."""
 
+from .json_output import format_json
+from .overview import format_overview
 from .text import (
     estimate_duration,
     estimate_totals,
@@ -8,8 +10,6 @@ from .text import (
     format_weekday,
     step_summary,
 )
-from .json_output import format_json
-from .overview import format_overview
 
 __all__ = [
     "estimate_duration",

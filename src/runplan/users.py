@@ -8,13 +8,13 @@ import os
 import re
 import threading
 import tomllib
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .parsing.values import parse_pace
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,7 @@ class RunplanUser:
 class UserRegistry:
     """Resolve and persist configured users without exposing secret paths."""
 
-    def __init__(
-        self, users: Iterable[RunplanUser], *, config_path: Path | None = None
-    ) -> None:
+    def __init__(self, users: Iterable[RunplanUser], *, config_path: Path | None = None) -> None:
         user_list = list(users)
         self._users = {user.id: user for user in user_list}
         if len(self._users) != len(user_list):
@@ -98,9 +96,7 @@ class UserRegistry:
 
     def create(self, username: Any, full_name: Any) -> dict[str, str | None]:
         """Persist and return a new server-configured Runplan user."""
-        if not isinstance(username, str) or not re.fullmatch(
-            r"[a-z0-9]+(?:-[a-z0-9]+)*", username
-        ):
+        if not isinstance(username, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", username):
             raise WebError(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 "Username must use lowercase letters, numbers, and hyphens",
@@ -163,9 +159,7 @@ class UserRegistry:
         if not isinstance(effective_password, str) or not effective_password:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin password is required")
         with self._lock:
-            updated_user = replace(
-                user, name=full_name.strip(), default_pace=default_pace.strip()
-            )
+            updated_user = replace(user, name=full_name.strip(), default_pace=default_pace.strip())
             updated = {**self._users, user.id: updated_user}
             self._write_credentials(user.credentials_file, email.strip(), effective_password)
             self._write(updated.values())
@@ -193,9 +187,7 @@ class UserRegistry:
                 f"Could not read Garmin credentials: {exc}",
             ) from exc
         return {
-            key: item
-            for key in ("email", "password")
-            if isinstance((item := value.get(key)), str)
+            key: item for key in ("email", "password") if isinstance((item := value.get(key)), str)
         }
 
     @staticmethod
@@ -232,11 +224,24 @@ class UserRegistry:
         temporary.replace(self.config_path)
 
 
+def _configured_user_path(
+    configured: Path,
+    entry: dict[str, Any],
+    index: int,
+    field: str,
+    fallback: str,
+) -> Path:
+    """Resolve and validate one user path relative to its registry file."""
+    value = entry.get(field, fallback)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{configured}: users[{index}].{field} is invalid")
+    result = Path(value).expanduser()
+    return result if result.is_absolute() else configured.parent / result
+
+
 def load_user_registry(path: Path | None = None) -> UserRegistry:
     """Load users from the configured TOML file, which may not exist yet."""
-    configured = path or Path(
-        os.getenv("RUNPLAN_USERS_FILE", "~/.config/runplan/users.toml")
-    )
+    configured = path or Path(os.getenv("RUNPLAN_USERS_FILE", "~/.config/runplan/users.toml"))
     configured = configured.expanduser().resolve()
     if not configured.exists():
         return UserRegistry([], config_path=configured)
@@ -252,15 +257,11 @@ def load_user_registry(path: Path | None = None) -> UserRegistry:
         if not isinstance(entry, dict):
             raise ValueError(f"{configured}: users[{index}] must be a table")
         user_id, name = entry.get("id"), entry.get("name")
-        if not isinstance(user_id, str) or not re.fullmatch(
-            r"[a-z0-9]+(?:-[a-z0-9]+)*", user_id
-        ):
+        if not isinstance(user_id, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", user_id):
             raise ValueError(f"{configured}: users[{index}].id is invalid")
         if not isinstance(name, str) or not name.strip():
             raise ValueError(f"{configured}: users[{index}].name is required")
-        default_pace = entry.get(
-            "default_pace", os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km")
-        )
+        default_pace = entry.get("default_pace", os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"))
         if not isinstance(default_pace, str):
             raise ValueError(f"{configured}: users[{index}].default_pace is invalid")
         try:
@@ -275,22 +276,23 @@ def load_user_registry(path: Path | None = None) -> UserRegistry:
         ):
             raise ValueError(f"{configured}: users[{index}].active_program is invalid")
 
-        def configured_path(field: str, fallback: str) -> Path:
-            value = entry.get(field, fallback)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{configured}: users[{index}].{field} is invalid")
-            result = Path(value).expanduser()
-            return result if result.is_absolute() else configured.parent / result
-
         users.append(
             RunplanUser(
                 id=user_id,
                 name=name.strip(),
-                credentials_file=configured_path(
-                    "credentials_file", f"credentials-{user_id}.toml"
+                credentials_file=_configured_user_path(
+                    configured,
+                    entry,
+                    index,
+                    "credentials_file",
+                    f"credentials-{user_id}.toml",
                 ),
-                token_store=configured_path("token_store", f"tokens/{user_id}"),
-                state_directory=configured_path("state_dir", f"state/{user_id}"),
+                token_store=_configured_user_path(
+                    configured, entry, index, "token_store", f"tokens/{user_id}"
+                ),
+                state_directory=_configured_user_path(
+                    configured, entry, index, "state_dir", f"state/{user_id}"
+                ),
                 default_pace=default_pace,
                 active_program=active_program,
             )

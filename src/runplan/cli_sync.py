@@ -43,9 +43,10 @@ def run_sync(args: argparse.Namespace) -> int:
             from .cli import run_preview
 
             run_preview(args, compiled_selections)
-            confirmed = args.yes or input(
-                "Apply these prune changes? [y/N] "
-            ).strip().lower() in ("y", "yes")
+            confirmed = args.yes or input("Apply these prune changes? [y/N] ").strip().lower() in (
+                "y",
+                "yes",
+            )
             if not confirmed:
                 print("Sync cancelled; Garmin was not changed.")
                 return 0
@@ -116,8 +117,7 @@ def run_sync(args: argparse.Namespace) -> int:
                     else:
                         print("\nNo workouts are registered in local state.")
                         print(
-                            "A real run also checks exact matches from the "
-                            "selected week in Garmin."
+                            "A real run also checks exact matches from the selected week in Garmin."
                         )
                     print("\nDry run: No data was deleted.")
                 return 0
@@ -135,7 +135,9 @@ def run_sync(args: argparse.Namespace) -> int:
                     token_store=getattr(args, "token_store", None),
                 )
                 deleted = delete_all_managed(
-                    client, definition, compiled,
+                    client,
+                    definition,
+                    compiled,
                     repository=getattr(args, "repository", None),
                 )
                 print(f"\nCleanup complete: {deleted} workouts processed.")
@@ -182,21 +184,18 @@ def run_sync(args: argparse.Namespace) -> int:
 
         if args.dry_run:
             state = load_state(definition["program_id"])
-            current_keys = {
-                f"week-{definition['week']:02d}/{item['id']}"
-                for item, _ in compiled
-            }
+            current_keys = {f"week-{definition['week']:02d}/{item['id']}" for item, _ in compiled}
             obsolete = [
-                record
-                for key, record in state["workouts"].items()
-                if key not in current_keys
+                record for key, record in state["workouts"].items() if key not in current_keys
             ]
             print("\nSync changes:")
             print(f"  Create or reuse: {len(compiled)} workouts")
             if obsolete:
                 print(f"  Remove: {len(obsolete)} previous workouts and schedules")
                 for record in obsolete:
-                    print(f"    - {record.get('name', 'Unknown workout')} ({record.get('date', 'unknown date')})")
+                    print(
+                        f"    - {record.get('name', 'Unknown workout')} ({record.get('date', 'unknown date')})"
+                    )
             else:
                 print("  Remove: no registered workouts")
             print("\nDry run: No data was uploaded or deleted.")

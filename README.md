@@ -158,14 +158,14 @@ versions. A `requirements.txt` file is therefore not needed.
 
 ## Development checks
 
-Pytest is the project's test runner, including during the gradual migration of
-existing `unittest` tests:
+Run formatting, lint, and the complete test suite with one command:
 
 ```bash
-uv run pytest
+uv run python scripts/check.py
 ```
 
-The development principles and the staged Ruff adoption are documented in
+Pytest remains available directly with `uv run pytest`, including during the
+gradual migration of existing `unittest` tests. The development principles are documented in
 [development-standards.md](docs/development-standards.md).
 
 ## Select and preview a user's active program

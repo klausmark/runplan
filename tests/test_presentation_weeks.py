@@ -1,8 +1,8 @@
+import tempfile
+import unittest
 from argparse import Namespace
 from datetime import date
 from pathlib import Path
-import tempfile
-import unittest
 
 import yaml
 
@@ -75,9 +75,7 @@ class PresentationWeekTests(unittest.TestCase):
             ["Monday run"],
             [workout.name for workout in export.weeks[0].workouts],
         )
-        self.assertEqual(
-            [2], [workout.source_week for workout in export.weeks[0].workouts]
-        )
+        self.assertEqual([2], [workout.source_week for workout in export.weeks[0].workouts])
 
     def test_sync_selection_preserves_source_names_weeks_and_dates(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -88,9 +88,7 @@ class DistanceStepTests(unittest.TestCase):
         self.assertAlmostEqual(1000 / 270, step.targetValueTwo)
 
     def test_formats_pace_in_step_summary(self) -> None:
-        summary = step_summary(
-            [{"run": {"time": "5m", "pace": "5:00 min/km"}}]
-        )
+        summary = step_summary([{"run": {"time": "5m", "pace": "5:00 min/km"}}])
         self.assertEqual("Run 5 min @ 5:00 min/km", summary)
 
     def test_rejects_invalid_pace(self) -> None:

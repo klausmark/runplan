@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from garminconnect import Garmin
 
@@ -15,15 +16,16 @@ from ...application.ports import GarminClient
 def load_credentials(credentials_file: Path | None = None) -> tuple[str, str]:
     """Load Garmin credentials from a TOML file outside the project."""
     credentials_path = (
-        credentials_file
-        or Path(os.getenv("GARMIN_CREDENTIALS_FILE", "~/.config/runplan/credentials.toml"))
-    ).expanduser().resolve()
+        (
+            credentials_file
+            or Path(os.getenv("GARMIN_CREDENTIALS_FILE", "~/.config/runplan/credentials.toml"))
+        )
+        .expanduser()
+        .resolve()
+    )
     project_directory = Path(__file__).resolve().parents[3]
 
-    if (
-        credentials_path == project_directory
-        or project_directory in credentials_path.parents
-    ):
+    if credentials_path == project_directory or project_directory in credentials_path.parents:
         raise SystemExit(
             "The credentials file must be outside the project directory.\n"
             f"Current path: {credentials_path}"
@@ -39,13 +41,9 @@ def load_credentials(credentials_file: Path | None = None) -> tuple[str, str]:
             'password = "your-password"'
         ) from exc
     except tomllib.TOMLDecodeError as exc:
-        raise SystemExit(
-            f"Credentials file is not valid TOML: {credentials_path}\n{exc}"
-        ) from exc
+        raise SystemExit(f"Credentials file is not valid TOML: {credentials_path}\n{exc}") from exc
     except OSError as exc:
-        raise SystemExit(
-            f"Could not read credentials file: {credentials_path}\n{exc}"
-        ) from exc
+        raise SystemExit(f"Could not read credentials file: {credentials_path}\n{exc}") from exc
 
     email = credentials.get("email")
     password = credentials.get("password")
@@ -64,8 +62,7 @@ def login_to_garmin(
 ) -> Garmin:
     """Authenticate and reuse Garmin tokens from the configured token store."""
     resolved_token_store = (
-        token_store
-        or Path(os.getenv("GARMIN_TOKENSTORE", "~/.garminconnect"))
+        token_store or Path(os.getenv("GARMIN_TOKENSTORE", "~/.garminconnect"))
     ).expanduser()
     email, password = load_credentials(credentials_file)
     client = Garmin(
@@ -89,9 +86,7 @@ def get_all_workouts(client: GarminClient) -> list[dict[str, Any]]:
         start += len(page)
 
 
-def scheduled_items_for_dates(
-    client: GarminClient, dates: set[str]
-) -> list[dict[str, Any]]:
+def scheduled_items_for_dates(client: GarminClient, dates: set[str]) -> list[dict[str, Any]]:
     """Return workout calendar items from every month represented by dates."""
     items: list[dict[str, Any]] = []
     for month_key in sorted({value[:7] for value in dates}):
@@ -128,9 +123,7 @@ def scheduled_items_for_dates(
                 **item,
                 "date": item.get("date", item.get("calendarDate")),
                 "workoutId": item.get("workoutId", workout.get("workoutId")),
-                "workoutScheduleId": item.get(
-                    "workoutScheduleId", item.get("id")
-                ),
+                "workoutScheduleId": item.get("workoutScheduleId", item.get("id")),
             }
         )
     relevant_workouts = {
@@ -170,9 +163,7 @@ def scheduled_items_for_dates(
             or isinstance(duration, bool)
             or duration <= 0
         ):
-            raise RuntimeError(
-                f"Garmin activity {activity_id} has invalid distance or duration"
-            )
+            raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
         occurrence["associatedActivityId"] = summary.get("activityId", activity_id)
         occurrence["associatedActivityDateTime"] = details.get(
             "startTimeLocal", item.get("startTimestampLocal")
@@ -191,7 +182,12 @@ def scheduled_items_for_dates(
         details = summary.get("summaryDTO")
         details = details if isinstance(details, dict) else {}
         distance, duration = details.get("distance"), details.get("duration")
-        if not isinstance(distance, (int, float)) or distance <= 0 or not isinstance(duration, (int, float)) or duration <= 0:
+        if (
+            not isinstance(distance, (int, float))
+            or distance <= 0
+            or not isinstance(duration, (int, float))
+            or duration <= 0
+        ):
             raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
         occurrence["actualDistanceMeters"] = float(distance)
         occurrence["actualDurationSeconds"] = float(duration)

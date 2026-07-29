@@ -63,7 +63,11 @@ def format_program_markdown(program: ProgramExport) -> str:
                 (
                     "",
                     f"### {format_weekday(workout.date)} · {_escape(workout.name)} · "
-                    + (f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}" if workout.totals_are_actual else format_model_totals(workout.steps)),
+                    + (
+                        f"Actual {format_estimated_distance(workout.effective_distance_meters)} · {format_seconds_compact(workout.effective_duration_seconds)}"
+                        if workout.totals_are_actual
+                        else format_model_totals(workout.steps)
+                    ),
                 )
             )
             if workout.description:

@@ -29,11 +29,9 @@ from ..application.export import ProgramExport
 from ..presentation.text import (
     format_estimated_distance,
     format_model_step_summary,
-    format_model_totals,
     format_seconds_compact,
     format_weekday,
 )
-
 
 PAPER = colors.HexColor("#F6F5EF")
 CARD = colors.HexColor("#FFFEF9")
@@ -285,33 +283,38 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
     selected_dates = ""
     if program.weeks:
         selected_dates = (
-            f"{program.weeks[0].start_date:%d %b %Y} – "
-            f"{program.weeks[-1].end_date:%d %b %Y}"
+            f"{program.weeks[0].start_date:%d %b %Y} – {program.weeks[-1].end_date:%d %b %Y}"
         )
 
     cover_stats = Table(
-        [[
-            stat_card(str(program.selected_week_count), "SELECTED WEEKS"),
-            stat_card(str(program.summary.workout_count), "WORKOUTS"),
-            stat_card(
-                format_seconds_compact(program.summary.estimated_duration_seconds),
-                "DURATION",
-            ),
-            stat_card(
-                format_estimated_distance(program.summary.estimated_distance_meters),
-                "DISTANCE",
-            ),
-        ]],
+        [
+            [
+                stat_card(str(program.selected_week_count), "SELECTED WEEKS"),
+                stat_card(str(program.summary.workout_count), "WORKOUTS"),
+                stat_card(
+                    format_seconds_compact(program.summary.estimated_duration_seconds),
+                    "DURATION",
+                ),
+                stat_card(
+                    format_estimated_distance(program.summary.estimated_distance_meters),
+                    "DISTANCE",
+                ),
+            ]
+        ],
         colWidths=[content_width / 4] * 4,
     )
-    cover_stats.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), CARD),
-        ("BOX", (0, 0), (-1, -1), 0.7, LINE),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE),
-        ("TOPPADDING", (0, 0), (-1, -1), 5 * mm),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
+    cover_stats.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), CARD),
+                ("BOX", (0, 0), (-1, -1), 0.7, LINE),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE),
+                ("TOPPADDING", (0, 0), (-1, -1), 5 * mm),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
 
     story: list[Any] = [
         Spacer(1, 16 * mm),
@@ -324,23 +327,25 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
         story.append(Paragraph(html.escape(program.description), subtitle_style))
     if selected_dates:
         story.append(Paragraph(html.escape(selected_dates), subtitle_style))
-    story.extend([
-        Spacer(1, 12 * mm),
-        cover_stats,
-        Spacer(1, 9 * mm),
-        Paragraph(
-            f"Start week: {program.start_week}<br/>"
-            f"Program weeks: {program.total_weeks}<br/>"
-            f"Selected weeks: {program.selected_week_count}<br/>"
-            f"Total workouts: {program.summary.workout_count}<br/>"
-            "Estimated total duration: "
-            f"{format_seconds_compact(program.summary.estimated_duration_seconds)}<br/>"
-            "Estimated total distance: "
-            f"{format_estimated_distance(program.summary.estimated_distance_meters)}",
-            subtitle_style,
-        ),
-        PageBreak(),
-    ])
+    story.extend(
+        [
+            Spacer(1, 12 * mm),
+            cover_stats,
+            Spacer(1, 9 * mm),
+            Paragraph(
+                f"Start week: {program.start_week}<br/>"
+                f"Program weeks: {program.total_weeks}<br/>"
+                f"Selected weeks: {program.selected_week_count}<br/>"
+                f"Total workouts: {program.summary.workout_count}<br/>"
+                "Estimated total duration: "
+                f"{format_seconds_compact(program.summary.estimated_duration_seconds)}<br/>"
+                "Estimated total distance: "
+                f"{format_estimated_distance(program.summary.estimated_distance_meters)}",
+                subtitle_style,
+            ),
+            PageBreak(),
+        ]
+    )
 
     for week_index, week in enumerate(program.weeks):
         header_left: list[Paragraph] = [
@@ -352,43 +357,51 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
             ),
         ]
         if week.focus:
-            header_left.append(
-                Paragraph(f"<b>Focus</b> · {html.escape(week.focus)}", focus_style)
-            )
+            header_left.append(Paragraph(f"<b>Focus</b> · {html.escape(week.focus)}", focus_style))
         week_stats = Table(
-            [[
-                stat_card(str(week.summary.workout_count), "WORKOUTS"),
-                stat_card(
-                    format_seconds_compact(week.summary.estimated_duration_seconds),
-                    "DURATION",
-                ),
-                stat_card(
-                    format_estimated_distance(week.summary.estimated_distance_meters),
-                    "DISTANCE",
-                ),
-            ]],
+            [
+                [
+                    stat_card(str(week.summary.workout_count), "WORKOUTS"),
+                    stat_card(
+                        format_seconds_compact(week.summary.estimated_duration_seconds),
+                        "DURATION",
+                    ),
+                    stat_card(
+                        format_estimated_distance(week.summary.estimated_distance_meters),
+                        "DISTANCE",
+                    ),
+                ]
+            ],
             colWidths=[29 * mm] * 3,
         )
-        week_stats.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 2 * mm),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
-            ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE),
-        ]))
+        week_stats.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 2 * mm),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE),
+                ]
+            )
+        )
         week_header = Table(
             [[header_left, week_stats]],
             colWidths=[content_width - 91 * mm, 91 * mm],
         )
-        week_header.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), CARD),
-            ("BOX", (0, 0), (-1, -1), 0.7, LINE),
-            ("LINEBEFORE", (0, 0), (0, -1), 3, GREEN),
-            ("LEFTPADDING", (0, 0), (0, 0), 6 * mm),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm),
-            ("TOPPADDING", (0, 0), (-1, -1), 5 * mm),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
+        week_header.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), CARD),
+                    ("BOX", (0, 0), (-1, -1), 0.7, LINE),
+                    ("LINEBEFORE", (0, 0), (0, -1), 3, GREEN),
+                    ("LEFTPADDING", (0, 0), (0, 0), 6 * mm),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5 * mm),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
         story.extend([week_header, Spacer(1, 3 * mm)])
 
         for workout in week.workouts:
@@ -400,37 +413,41 @@ def export_pdf(program: ProgramExport, output_path: Path, force: bool) -> None:
                 Paragraph(html.escape(workout.name), workout_style),
             ]
             if workout.description:
-                workout_content.append(
-                    Paragraph(html.escape(workout.description), body_style)
-                )
+                workout_content.append(Paragraph(html.escape(workout.description), body_style))
             workout_content.append(
                 Paragraph(html.escape(format_model_step_summary(workout.steps)), steps_style)
             )
             workout_row = Table(
-                [[
-                    day_content,
-                    workout_content,
-                    Paragraph(
-                        html.escape(
-                            f"{'Actual' if workout.totals_are_actual else 'Planned'} "
-                            f"{format_estimated_distance(workout.effective_distance_meters)} · "
-                            f"{format_seconds_compact(workout.effective_duration_seconds)}"
+                [
+                    [
+                        day_content,
+                        workout_content,
+                        Paragraph(
+                            html.escape(
+                                f"{'Actual' if workout.totals_are_actual else 'Planned'} "
+                                f"{format_estimated_distance(workout.effective_distance_meters)} · "
+                                f"{format_seconds_compact(workout.effective_duration_seconds)}"
+                            ),
+                            workout_total_style,
                         ),
-                        workout_total_style,
-                    ),
-                ]],
+                    ]
+                ],
                 colWidths=[25 * mm, content_width - 58 * mm, 33 * mm],
             )
-            workout_row.setStyle(TableStyle([
-                ("LINEBELOW", (0, 0), (-1, -1), 0.6, LINE),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (0, 0), 4 * mm),
-                ("RIGHTPADDING", (1, 0), (1, 0), 4 * mm),
-                ("RIGHTPADDING", (2, 0), (2, 0), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 3.5 * mm),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5 * mm),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]))
+            workout_row.setStyle(
+                TableStyle(
+                    [
+                        ("LINEBELOW", (0, 0), (-1, -1), 0.6, LINE),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                        ("RIGHTPADDING", (0, 0), (0, 0), 4 * mm),
+                        ("RIGHTPADDING", (1, 0), (1, 0), 4 * mm),
+                        ("RIGHTPADDING", (2, 0), (2, 0), 0),
+                        ("TOPPADDING", (0, 0), (-1, -1), 3.5 * mm),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5 * mm),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ]
+                )
+            )
             story.append(KeepTogether(workout_row))
 
         if week_index < len(program.weeks) - 1:

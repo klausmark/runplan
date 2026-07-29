@@ -1,14 +1,14 @@
 # Runplan agent guide
 
-Run the complete test suite before finishing a code change:
+Run the complete local quality check before finishing a code change:
 
 ```bash
-uv run pytest
+uv run python scripts/check.py
 ```
 
-Ruff is configured but is not yet a required gate. Do not run Ruff with `--fix` or format the
-whole repository as part of an unrelated change. A dedicated baseline change will activate
-the combined formatting, lint, and test check.
+This checks Ruff formatting, Ruff lint, and the complete pytest suite. Run `uv run pytest`
+directly when only the tests are needed during development. Do not apply repository-wide
+formatting as part of an unrelated change.
 
 ## Engineering rules
 
@@ -42,6 +42,6 @@ the combined formatting, lint, and test check.
 ## Definition of done
 
 - Changed functions, classes, and modules remain cohesive and single-purpose.
-- The complete pytest suite passes.
+- The complete local quality check passes.
 - Behavior changes have readable tests, and affected documentation is updated.
 - User-visible changes are recorded under `Unreleased` in `CHANGELOG.md`.

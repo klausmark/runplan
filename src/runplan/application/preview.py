@@ -69,11 +69,15 @@ def build_preview(
                 number=number,
                 start_date=(
                     date.fromisoformat(min(item.date for item in workouts))
-                    - timedelta(days=date.fromisoformat(min(item.date for item in workouts)).weekday())
+                    - timedelta(
+                        days=date.fromisoformat(min(item.date for item in workouts)).weekday()
+                    )
                 ).isoformat(),
                 end_date=(
                     date.fromisoformat(min(item.date for item in workouts))
-                    - timedelta(days=date.fromisoformat(min(item.date for item in workouts)).weekday())
+                    - timedelta(
+                        days=date.fromisoformat(min(item.date for item in workouts)).weekday()
+                    )
                     + timedelta(days=6)
                 ).isoformat(),
                 workouts=tuple(sorted(workouts, key=lambda item: item.date)),

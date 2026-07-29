@@ -6,33 +6,33 @@ import argparse
 import os
 import sys
 from argparse import Namespace
+from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
-from typing import Sequence
 from typing import Any
 
-from .domain.selectors import WeekSelection
-from .domain.errors import WorkoutDefinitionError
-from .domain.estimates import estimate_steps
-from .domain.workout_titles import garmin_workout_title
 from .application.export import build_program_export
-from .application.presentation_weeks import build_presentation_weeks, presentation_start
-from .exporters.pdf import export_pdf
-from .exporters.html import export_html
-from .exporters.markdown import export_markdown
-from .cli_sync import run_sync
-from .integrations.garmin.mapper import build_workout
-from .parsing.yaml_loader import load_definition, load_definition_model
-from .parsing.values import parse_pace
-from .application.preview import build_preview
 from .application.ports import StateRepository
+from .application.presentation_weeks import build_presentation_weeks, presentation_start
+from .application.preview import build_preview
 from .application.sync import (
     plan_program_weeks,
     reconcile_program,
     synchronize_program_weeks,
 )
+from .cli_sync import run_sync
+from .domain.errors import WorkoutDefinitionError
+from .domain.estimates import estimate_steps
+from .domain.selectors import WeekSelection
+from .domain.workout_titles import garmin_workout_title
+from .exporters.html import export_html
+from .exporters.markdown import export_markdown
+from .exporters.pdf import export_pdf
 from .integrations.garmin.client import login_to_garmin
+from .integrations.garmin.mapper import build_workout
 from .logging_config import LOG_LEVELS
+from .parsing.values import parse_pace
+from .parsing.yaml_loader import load_definition, load_definition_model
 from .presentation.json_output import format_json
 from .presentation.overview import format_overview
 from .presentation.program_text import format_program_text
@@ -61,9 +61,7 @@ def week_selection(arguments: Namespace, *, default_all: bool = False) -> WeekSe
     return WeekSelection.all() if default_all else WeekSelection.ahead(1)
 
 
-def add_week_selectors(
-    parser: argparse.ArgumentParser, *, allow_weeks_ahead: bool = False
-) -> None:
+def add_week_selectors(parser: argparse.ArgumentParser, *, allow_weeks_ahead: bool = False) -> None:
     """Add the shared calendar-week selector options."""
     selectors = parser.add_mutually_exclusive_group()
     selectors.add_argument(
@@ -130,9 +128,7 @@ def prepare_sync_selections(
             estimate = estimate_steps(item.workout.steps, fallback_pace_seconds_per_km)
             workout["estimated_duration_seconds"] = estimate.duration_seconds
             workout["estimated_distance_meters"] = estimate.distance_meters
-            workout["estimated_distance_is_approximate"] = (
-                estimate.distance_is_approximate
-            )
+            workout["estimated_distance_is_approximate"] = estimate.distance_is_approximate
             workout["name"] = garmin_workout_title(
                 model.short_name,
                 presentation_week,
@@ -173,11 +169,13 @@ def run_multi_week_sync(
 ) -> int:
     """Execute additive Garmin synchronization for prepared weeks."""
     try:
-        client = login_to_garmin(
-            credentials_file=credentials_file, token_store=token_store
-        )
+        client = login_to_garmin(credentials_file=credentials_file, token_store=token_store)
         results = synchronize_program_weeks(
-            client, repository or JsonStateRepository(), selections, prune=prune, today=today,
+            client,
+            repository or JsonStateRepository(),
+            selections,
+            prune=prune,
+            today=today,
         )
         for result in results:
             for action in result.actions:
@@ -197,18 +195,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Validate, export, and sync YAML running programs.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    sync_parser = commands.add_parser(
-        "sync", help="Sync program weeks with Garmin Connect"
-    )
+    sync_parser = commands.add_parser("sync", help="Sync program weeks with Garmin Connect")
     sync_target = sync_parser.add_mutually_exclusive_group(required=True)
     sync_target.add_argument("user_id", nargs="?", help="Configured Runplan user ID")
     sync_target.add_argument(
         "--all", dest="all_users", action="store_true", help="Sync every configured user"
     )
     sync_parser.add_argument("--dry-run", action="store_true")
-    sync_parser.add_argument(
-        "--output", choices=("overview", "json"), default="overview"
-    )
+    sync_parser.add_argument("--output", choices=("overview", "json"), default="overview")
     sync_parser.add_argument("--delete-all", action="store_true")
     sync_parser.add_argument("--prune", action="store_true")
     sync_parser.add_argument("--yes", action="store_true")
@@ -216,15 +210,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     user_parser = commands.add_parser("user", help="Manage configured Runplan users")
     user_commands = user_parser.add_subparsers(dest="user_command", required=True)
-    set_plan_parser = user_commands.add_parser(
-        "set-plan", help="Set a user's active program"
-    )
+    set_plan_parser = user_commands.add_parser("set-plan", help="Set a user's active program")
     set_plan_parser.add_argument("user_id")
     set_plan_parser.add_argument("filename")
 
-    export_parser = commands.add_parser(
-        "export", help="Render selected program weeks"
-    )
+    export_parser = commands.add_parser("export", help="Render selected program weeks")
     export_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
     export_parser.add_argument(
         "--format", choices=("pdf", "text", "html", "markdown"), default="pdf"
@@ -260,22 +250,15 @@ def build_parser() -> argparse.ArgumentParser:
     reconcile_parser = commands.add_parser(
         "reconcile", help="Refresh completed and missed workouts from Garmin"
     )
-    reconcile_parser.add_argument(
-        "yaml_file", type=Path, help="Path to the program YAML file"
-    )
+    reconcile_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
     return parser
 
 
 def parse_arguments(argv: Sequence[str] | None = None) -> Namespace:
     parser = build_parser()
     arguments = parser.parse_args(argv)
-    if (
-        arguments.command == "serve"
-        and arguments.log_level not in LOG_LEVELS
-    ):
-        parser.error(
-            "RUNPLAN_LOG_LEVEL must be one of: " + ", ".join(LOG_LEVELS)
-        )
+    if arguments.command == "serve" and arguments.log_level not in LOG_LEVELS:
+        parser.error("RUNPLAN_LOG_LEVEL must be one of: " + ", ".join(LOG_LEVELS))
     return arguments
 
 

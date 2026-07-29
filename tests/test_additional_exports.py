@@ -1,8 +1,8 @@
+import tempfile
+import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
-import tempfile
-import unittest
 
 import yaml
 
@@ -17,9 +17,7 @@ from tests.helpers import program_data
 
 class AdditionalExportTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.program = build_program_export(
-            load_program_model(program_data()), WeekSelection.all()
-        )
+        self.program = build_program_export(load_program_model(program_data()), WeekSelection.all())
 
     def test_html_is_standalone_and_escapes_user_content(self) -> None:
         raw = program_data()
@@ -73,8 +71,14 @@ class AdditionalExportTests(unittest.TestCase):
                     with redirect_stdout(stdout):
                         result = main(
                             [
-                                "export", str(source), "--format", export_format,
-                                "--output", str(output), "--select-weeks", "2",
+                                "export",
+                                str(source),
+                                "--format",
+                                export_format,
+                                "--output",
+                                str(output),
+                                "--select-weeks",
+                                "2",
                             ]
                         )
                     document = output.read_text(encoding="utf-8")

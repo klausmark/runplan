@@ -20,9 +20,7 @@ def parse_duration(value: Any, location: str) -> float:
         return seconds
 
     if not isinstance(value, str):
-        raise WorkoutDefinitionError(
-            f"{location}: the duration must be like 30s, 2m, or 00:30"
-        )
+        raise WorkoutDefinitionError(f"{location}: the duration must be like 30s, 2m, or 00:30")
 
     text = value.strip().lower()
     if not text:
@@ -48,19 +46,14 @@ def parse_duration(value: Any, location: str) -> float:
     token_pattern = re.compile(r"(\d+(?:\.\d+)?)\s*([hms])", re.IGNORECASE)
     matches = list(token_pattern.finditer(text))
     compact_input = re.sub(r"\s+", "", text)
-    compact_matches = "".join(
-        match.group(0).replace(" ", "") for match in matches
-    )
+    compact_matches = "".join(match.group(0).replace(" ", "") for match in matches)
     if not matches or compact_matches != compact_input:
         raise WorkoutDefinitionError(
             f"{location}: invalid duration {value!r}; use for example 30s, 2m, or 1m30s"
         )
 
     factors = {"h": 3600.0, "m": 60.0, "s": 1.0}
-    total = sum(
-        float(match.group(1)) * factors[match.group(2).lower()]
-        for match in matches
-    )
+    total = sum(float(match.group(1)) * factors[match.group(2).lower()] for match in matches)
     if total <= 0:
         raise WorkoutDefinitionError(f"{location}: the duration must be greater than 0")
     return total
@@ -69,9 +62,7 @@ def parse_duration(value: Any, location: str) -> float:
 def parse_distance(value: Any, location: str) -> float:
     """Convert a distance with an explicit unit to meters."""
     if not isinstance(value, str):
-        raise WorkoutDefinitionError(
-            f"{location}: the distance must be like 400m or 1.5km"
-        )
+        raise WorkoutDefinitionError(f"{location}: the distance must be like 400m or 1.5km")
     match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(m|km)\s*", value, re.IGNORECASE)
     if match is None:
         raise WorkoutDefinitionError(
@@ -89,11 +80,7 @@ def parse_step_end(value: Any, location: str) -> tuple[str, float]:
     if not isinstance(value, dict):
         return "time", parse_duration(value, location)
     end_keys = [key for key in value if key in ("time", "distance")]
-    unknown_keys = [
-        key
-        for key in value
-        if key not in ("time", "distance", "pace")
-    ]
+    unknown_keys = [key for key in value if key not in ("time", "distance", "pace")]
     if unknown_keys:
         raise WorkoutDefinitionError(
             f"{location}: unknown field {unknown_keys[0]!r}; use 'time', "
@@ -101,8 +88,7 @@ def parse_step_end(value: Any, location: str) -> tuple[str, float]:
         )
     if len(end_keys) != 1:
         raise WorkoutDefinitionError(
-            f"{location}: the end condition must have exactly one field: 'time' or "
-            "'distance'"
+            f"{location}: the end condition must have exactly one field: 'time' or 'distance'"
         )
     raw_kind = end_keys[0]
     raw_value = value[raw_kind]
@@ -115,9 +101,7 @@ def parse_step_end(value: Any, location: str) -> tuple[str, float]:
 def parse_pace(value: Any, location: str) -> tuple[float, float]:
     """Parse min/km pace and return fast/slow seconds per kilometer."""
     if not isinstance(value, str):
-        raise WorkoutDefinitionError(
-            f"{location}: the pace must be like '4:30-4:45 min/km'"
-        )
+        raise WorkoutDefinitionError(f"{location}: the pace must be like '4:30-4:45 min/km'")
     match = re.fullmatch(
         r"\s*(\d+):([0-5]\d)\s*(?:-\s*(\d+):([0-5]\d)\s*)?min/km\s*",
         value,
@@ -129,11 +113,7 @@ def parse_pace(value: Any, location: str) -> tuple[float, float]:
             "or '4:30-4:45 min/km'"
         )
     first = int(match.group(1)) * 60 + int(match.group(2))
-    second = (
-        int(match.group(3)) * 60 + int(match.group(4))
-        if match.group(3) is not None
-        else first
-    )
+    second = int(match.group(3)) * 60 + int(match.group(4)) if match.group(3) is not None else first
     if first <= 0 or second <= 0:
         raise WorkoutDefinitionError(f"{location}: the pace must be greater than 0")
     return min(first, second), max(first, second)
@@ -147,9 +127,7 @@ def step_pace(value: Any, location: str) -> tuple[float, float] | None:
     if not pace_keys:
         return None
     if len(pace_keys) > 1:
-        raise WorkoutDefinitionError(
-            f"{location}: use only one pace field"
-        )
+        raise WorkoutDefinitionError(f"{location}: use only one pace field")
     return parse_pace(value[pace_keys[0]], f"{location}.{pace_keys[0]}")
 
 

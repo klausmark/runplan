@@ -8,7 +8,6 @@ from typing import Any
 
 from ...application.ports import GarminClient
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +40,7 @@ class LoggingGarminClient:
                 round((perf_counter() - started) * 1000),
             )
             try:
-                setattr(exc, "_runplan_logged", True)
+                exc._runplan_logged = True
             except Exception:
                 pass
             raise

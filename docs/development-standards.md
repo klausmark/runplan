@@ -60,17 +60,17 @@ boundaries and never contact a real Garmin account.
 
 ## Formatting and local checks
 
-Ruff is configured for Python 3.13 with a 100-character target line length. Its formatter and
-lint rules will become required in a dedicated baseline change. Until that baseline exists,
-do not apply repository-wide formatting during unrelated work and use this required check:
+Ruff formats and lints Python code with Python 3.13 as the language target and a 100-character
+target line length. Run all required checks with:
 
 ```bash
-uv run pytest
+uv run python scripts/check.py
 ```
 
-After the baseline, the project will provide one command that checks formatting, lint, and the
-complete pytest suite. Coverage thresholds, static type-checking, and hosted CI can be added
-when they solve a demonstrated problem.
+The command checks formatting, lint, and the complete pytest suite. Use `uv run pytest` for a
+test-only development loop. Do not apply repository-wide formatting during unrelated work.
+Coverage thresholds, static type-checking, and hosted CI can be added when they solve a
+demonstrated problem.
 
 ## Versioning and change history
 

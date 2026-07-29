@@ -19,7 +19,6 @@ from ...domain.models import Step, Workout
 from ...domain.steps import estimate_duration, normalize_action, repeat_parts
 from ...parsing.values import parse_step_end, step_pace
 
-
 RUNNING_SPORT = {
     "sportTypeId": 1,
     "sportTypeKey": "running",
@@ -82,9 +81,7 @@ def compile_steps(step_definitions: list[Any], location: str = "steps") -> list[
     for order, item in enumerate(step_definitions, start=1):
         item_location = f"{location}[{order}]"
         if not isinstance(item, dict) or len(item) != 1:
-            raise WorkoutDefinitionError(
-                f"{item_location}: each step must have exactly one action"
-            )
+            raise WorkoutDefinitionError(f"{item_location}: each step must have exactly one action")
         raw_action, value = next(iter(item.items()))
         action = normalize_action(raw_action, item_location)
         if action == "repeat":
@@ -92,9 +89,7 @@ def compile_steps(step_definitions: list[Any], location: str = "steps") -> list[
             compiled.append(
                 create_repeat_group(
                     iterations=count,
-                    workout_steps=compile_steps(
-                        child_steps, location=f"{item_location}.steps"
-                    ),
+                    workout_steps=compile_steps(child_steps, location=f"{item_location}.steps"),
                     step_order=order,
                 )
             )
@@ -124,11 +119,7 @@ def _step_definition(step: Step) -> dict[str, Any]:
         }
     assert step.end_kind is not None and step.end_value is not None
     value: dict[str, Any] = {
-        step.end_kind: (
-            step.end_value
-            if step.end_kind == "time"
-            else f"{step.end_value:g}m"
-        )
+        step.end_kind: (step.end_value if step.end_kind == "time" else f"{step.end_value:g}m")
     }
     if step.pace is not None:
         fast, slow = step.pace

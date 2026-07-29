@@ -43,9 +43,7 @@ def normalize_workout(raw: Any, location: str) -> dict[str, Any]:
         normalized_tracking = dict(tracking)
         synced_week = tracking.get("synced_week")
         if synced_week is not None and (
-            not isinstance(synced_week, int)
-            or isinstance(synced_week, bool)
-            or synced_week <= 0
+            not isinstance(synced_week, int) or isinstance(synced_week, bool) or synced_week <= 0
         ):
             raise WorkoutDefinitionError(
                 f"{location}.tracking.synced_week: must be a positive integer"
@@ -76,9 +74,7 @@ def normalize_workout(raw: Any, location: str) -> dict[str, Any]:
         garmin = tracking.get("garmin")
         if garmin is not None:
             if not isinstance(garmin, dict):
-                raise WorkoutDefinitionError(
-                    f"{location}.tracking.garmin: must be an object"
-                )
+                raise WorkoutDefinitionError(f"{location}.tracking.garmin: must be an object")
             for field in ("workout_id", "schedule_id", "activity_id"):
                 value = garmin.get(field)
                 if value is not None and (
@@ -96,14 +92,14 @@ def normalize_workout(raw: Any, location: str) -> dict[str, Any]:
             for field in ("distance_meters", "duration_seconds"):
                 value = actual.get(field)
                 if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
-                    raise WorkoutDefinitionError(f"{location}.tracking.actual.{field}: must be positive")
+                    raise WorkoutDefinitionError(
+                        f"{location}.tracking.actual.{field}: must be positive"
+                    )
         elif isinstance(actual, dict):
             for field in ("distance_meters", "duration_seconds"):
                 value = actual.get(field)
                 if value is not None and (
-                    not isinstance(value, (int, float))
-                    or isinstance(value, bool)
-                    or value <= 0
+                    not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0
                 ):
                     raise WorkoutDefinitionError(
                         f"{location}.tracking.actual.{field}: must be positive"
@@ -151,21 +147,15 @@ def load_program(raw: dict[str, Any], selected_week: int) -> dict[str, Any]:
         raise WorkoutDefinitionError("Field 'weeks' must be a non-empty list")
 
     program_id = program.get("id")
-    if not isinstance(program_id, str) or not re.fullmatch(
-        r"[a-z0-9]+(?:-[a-z0-9]+)*", program_id
-    ):
-        raise WorkoutDefinitionError(
-            "program.id: use lowercase ASCII letters, numbers and hyphens"
-        )
+    if not isinstance(program_id, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", program_id):
+        raise WorkoutDefinitionError("program.id: use lowercase ASCII letters, numbers and hyphens")
     program_name = program.get("name")
     if not isinstance(program_name, str) or not program_name.strip():
         raise WorkoutDefinitionError("program.name: must contain the program name")
     program_short_name = program.get("short_name")
     if (
         not isinstance(program_short_name, str)
-        or not re.fullmatch(
-            r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", program_short_name.strip()
-        )
+        or not re.fullmatch(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", program_short_name.strip())
         or not 2 <= len(program_short_name.strip()) <= 10
     ):
         raise WorkoutDefinitionError(
@@ -191,9 +181,7 @@ def load_program(raw: dict[str, Any], selected_week: int) -> dict[str, Any]:
 
         workouts = week.get("workouts")
         if not isinstance(workouts, list) or not workouts:
-            raise WorkoutDefinitionError(
-                f"{week_location}.workouts: must be a non-empty list"
-            )
+            raise WorkoutDefinitionError(f"{week_location}.workouts: must be a non-empty list")
 
         ids: set[str] = set()
         days: set[int] = set()
@@ -225,9 +213,7 @@ def load_program(raw: dict[str, Any], selected_week: int) -> dict[str, Any]:
                     f"{workout_location}.day: day {day} is already used in the week"
                 )
             if day <= previous_day:
-                raise WorkoutDefinitionError(
-                    f"{week_location}.workouts: must be sorted by day"
-                )
+                raise WorkoutDefinitionError(f"{week_location}.workouts: must be sorted by day")
             days.add(day)
             previous_day = day
 
@@ -261,9 +247,7 @@ def load_program(raw: dict[str, Any], selected_week: int) -> dict[str, Any]:
         "program_name": program_name.strip(),
         "program_short_name": program_short_name.strip(),
         "program_description": (
-            program_description.strip()
-            if isinstance(program_description, str)
-            else None
+            program_description.strip() if isinstance(program_description, str) else None
         ),
         "start_date": start_date.isoformat(),
         "start_week": start_week,
@@ -295,9 +279,7 @@ def load_definition(path: Path, selected_week: int = 1) -> dict[str, Any]:
 
 def _step_model(raw: Any, location: str) -> Step:
     if not isinstance(raw, dict) or len(raw) != 1:
-        raise WorkoutDefinitionError(
-            f"{location}: each step must have exactly one action"
-        )
+        raise WorkoutDefinitionError(f"{location}: each step must have exactly one action")
     raw_action, value = next(iter(raw.items()))
     action = normalize_action(raw_action, location)
     if action == "repeat":
@@ -338,12 +320,20 @@ def program_model(normalized: dict[str, Any]) -> Program:
                     ),
                     schedule_date=date.fromisoformat(workout["schedule_date"]),
                     status=workout.get("tracking", {}).get("status", "planned"),
-                    garmin_workout_id=workout.get("tracking", {}).get("garmin", {}).get("workout_id"),
-                    garmin_schedule_id=workout.get("tracking", {}).get("garmin", {}).get("schedule_id"),
+                    garmin_workout_id=workout.get("tracking", {})
+                    .get("garmin", {})
+                    .get("workout_id"),
+                    garmin_schedule_id=workout.get("tracking", {})
+                    .get("garmin", {})
+                    .get("schedule_id"),
                     activity_id=workout.get("tracking", {}).get("garmin", {}).get("activity_id"),
                     completed_at=workout.get("tracking", {}).get("actual", {}).get("completed_at"),
-                    actual_distance_meters=workout.get("tracking", {}).get("actual", {}).get("distance_meters"),
-                    actual_duration_seconds=workout.get("tracking", {}).get("actual", {}).get("duration_seconds"),
+                    actual_distance_meters=workout.get("tracking", {})
+                    .get("actual", {})
+                    .get("distance_meters"),
+                    actual_duration_seconds=workout.get("tracking", {})
+                    .get("actual", {})
+                    .get("duration_seconds"),
                 )
                 for workout in week["workouts"]
             ),

@@ -102,7 +102,9 @@ class ServerLoggingTests(unittest.TestCase):
         client.delete_workout(42)
 
         rendered = output.getvalue()
-        self.assertIn("Garmin workout created user=klaus workout_name='Easy run' workout_id=42", rendered)
+        self.assertIn(
+            "Garmin workout created user=klaus workout_name='Easy run' workout_id=42", rendered
+        )
         self.assertIn("schedule_id=84 date=2026-07-30", rendered)
         self.assertIn("Garmin unschedule_workout succeeded user=klaus schedule_id=84", rendered)
         self.assertIn("Garmin delete_workout succeeded user=klaus workout_id=42", rendered)
