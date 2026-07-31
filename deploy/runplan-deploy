@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+remote="${RUNPLAN_DEPLOY_REMOTE:-origin}"
+branch="${RUNPLAN_DEPLOY_BRANCH:-main}"
+health_url="${RUNPLAN_DEPLOY_HEALTH_URL:-}"
+retry_failed=false
+
+case "${1:-}" in
+  "") ;;
+  --retry) retry_failed=true ;;
+  *)
+    printf 'Usage: %s [--retry]\n' "$0" >&2
+    exit 2
+    ;;
+esac
+
+if (( $# > 1 )); then
+  printf 'Usage: %s [--retry]\n' "$0" >&2
+  exit 2
+fi
+
+for command in git docker flock; do
+  command -v "$command" >/dev/null || {
+    printf 'Required command is not installed: %s\n' "$command" >&2
+    exit 1
+  }
+done
+
+state_dir="${RUNPLAN_DEPLOY_STATE_DIR:-${STATE_DIRECTORY:-}}"
+if [[ -z "$state_dir" ]]; then
+  state_dir="${HOME:?HOME must be set}/.local/state/runplan-deploy"
+fi
+
+mkdir -p "$state_dir"
+exec 9>"$state_dir/deploy.lock"
+flock -n 9 || {
+  printf 'Another Runplan deployment is already running.\n' >&2
+  exit 0
+}
+
+log() {
+  printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
+}
+
+write_state() {
+  local name="$1"
+  local value="$2"
+  local temporary="$state_dir/$name.tmp"
+
+  printf '%s\n' "$value" >"$temporary"
+  mv "$temporary" "$state_dir/$name"
+}
+
+check_external_health() {
+  local attempt
+
+  [[ -z "$health_url" ]] && return 0
+  command -v curl >/dev/null || {
+    log "curl is required when RUNPLAN_DEPLOY_HEALTH_URL is set"
+    return 1
+  }
+
+  for attempt in {1..6}; do
+    if curl --fail --silent --show-error --max-time 5 "$health_url" >/dev/null; then
+      return 0
+    fi
+    if (( attempt < 6 )); then
+      sleep 5
+    fi
+  done
+  return 1
+}
+
+compose_local() {
+  RUNPLAN_IMAGE=runplan:local docker compose "$@"
+}
+
+compose_up() {
+  compose_local up -d --no-build --force-recreate --wait --wait-timeout 90
+}
+
+old_commit=""
+old_image=""
+target_commit=""
+cutover_started=false
+record_failed_commit=false
+
+handle_failure() {
+  local status=$?
+  local rollback_ok=true
+
+  trap - ERR
+  set +e
+
+  if [[ "$record_failed_commit" == true ]]; then
+    write_state failed-commit "$target_commit"
+  fi
+
+  if [[ -n "$old_commit" ]]; then
+    log "Restoring deployment checkout to $old_commit"
+    git reset --hard "$old_commit" || rollback_ok=false
+  fi
+
+  if [[ "$cutover_started" == true ]]; then
+    if [[ -n "$old_image" ]]; then
+      log "Restoring previous image $old_image"
+      docker image tag "$old_image" runplan:local || rollback_ok=false
+      compose_up || rollback_ok=false
+      check_external_health || rollback_ok=false
+    else
+      log "No previous image exists; stopping the failed first deployment"
+      compose_local down || rollback_ok=false
+    fi
+  fi
+
+  if [[ "$rollback_ok" == true ]]; then
+    log "Deployment failed; the previous deployment is active"
+  else
+    log "ERROR: deployment and automatic rollback failed; operator action is required"
+  fi
+  exit "$status"
+}
+
+trap handle_failure ERR
+
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  log "Refusing to deploy from a checkout with modified tracked files"
+  exit 1
+fi
+
+current_branch="$(git symbolic-ref --quiet --short HEAD || true)"
+if [[ "$current_branch" != "$branch" ]]; then
+  log "Expected branch $branch, found ${current_branch:-detached HEAD}"
+  exit 1
+fi
+
+old_commit="$(git rev-parse HEAD)"
+log "Fetching $remote/$branch"
+git fetch --prune "$remote" "$branch"
+target_commit="$(git rev-parse FETCH_HEAD)"
+
+if [[ -f "$state_dir/failed-commit" ]] \
+  && [[ "$(<"$state_dir/failed-commit")" == "$target_commit" ]] \
+  && [[ "$retry_failed" == false ]]; then
+  log "Skipping previously failed commit $target_commit; use --retry to try it again"
+  exit 0
+fi
+
+if ! git merge-base --is-ancestor "$old_commit" "$target_commit"; then
+  log "Refusing non-fast-forward update from $old_commit to $target_commit"
+  exit 1
+fi
+
+if [[ -f "$state_dir/successful-commit" ]] \
+  && [[ "$(<"$state_dir/successful-commit")" == "$target_commit" ]] \
+  && [[ "$old_commit" == "$target_commit" ]]; then
+  log "Commit $target_commit is already deployed"
+  exit 0
+fi
+
+container_id="$(compose_local ps -q runplan)"
+if [[ -n "$container_id" ]]; then
+  old_image="$(docker inspect --format '{{.Image}}' "$container_id")"
+elif docker image inspect runplan:local >/dev/null 2>&1; then
+  old_image="$(docker image inspect --format '{{.Id}}' runplan:local)"
+fi
+
+if [[ -n "$old_image" ]]; then
+  docker image tag "$old_image" "runplan:rollback-${old_commit:0:12}"
+  docker image tag "$old_image" runplan:rollback
+fi
+
+log "Advancing deployment checkout to $target_commit"
+git merge --ff-only "$target_commit"
+
+candidate_image="runplan:$target_commit"
+log "Building $candidate_image while the current container remains active"
+record_failed_commit=true
+RUNPLAN_IMAGE="$candidate_image" docker compose build runplan
+
+log "Starting health-gated cutover to $candidate_image"
+docker image tag "$candidate_image" runplan:local
+cutover_started=true
+compose_up
+check_external_health
+
+write_state successful-commit "$target_commit"
+rm -f "$state_dir/failed-commit"
+cutover_started=false
+record_failed_commit=false
+log "Successfully deployed $target_commit"

@@ -99,8 +99,8 @@ docker compose up -d --build
 
 Open the HTTPS URL exposed by the reverse proxy, or the configured local URL.
 Programs, users, Garmin credentials and tokens, and sync state are persisted in
-the `runplan-data` Docker volume. Stop the container without deleting that data
-with:
+the bind-mounted `runplan-data` directory. Stop the container without deleting
+that data with:
 
 ```bash
 docker compose down
@@ -112,6 +112,72 @@ unintended interface when either is missing. With, for example,
 to a reverse proxy on `http://127.0.0.1:8080`. Set
 `RUNPLAN_WEB_TRUST_PROXY=true` only when that proxy replaces
 `X-Forwarded-Proto` and prevents direct external access to the Runplan port.
+
+#### Automatic Docker host deployment
+
+The files in `deploy/` can update a dedicated production checkout from
+`origin/main` every five minutes. The deployment script serializes runs, allows
+only fast-forward updates, and builds the candidate while the current container
+continues running. It tags images with the full Git commit, switches containers
+only after the build succeeds, and waits for the Docker health check. If startup
+or the optional external health check fails, it restores the previous image and
+Git commit. A failed commit is not attempted again until a different commit is
+available or its marker is removed manually.
+
+The host needs Git, Docker Engine, Docker Compose with `--wait` support, and
+`flock`. Use a dedicated checkout because automatic rollback resets tracked
+files to the previously deployed commit. The checkout may contain the ignored
+production `.env` and `runplan-data` directory, but tracked files must not have
+local modifications.
+
+The supplied systemd service expects the checkout at `/srv/runplan` and a
+`runplan-deploy` user with access to Docker. Membership in the `docker` group is
+effectively root access; use a dedicated host or another appropriately secured
+Docker access mechanism. After cloning the repository and creating `.env`, adapt
+the paths and user in `deploy/runplan-deploy.service` if necessary, then install
+the units:
+
+```bash
+sudo install -m 0644 deploy/runplan-deploy.service /etc/systemd/system/
+sudo install -m 0644 deploy/runplan-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start runplan-deploy.service
+sudo systemctl enable --now runplan-deploy.timer
+```
+
+Optionally configure the tracked branch and an externally visible health URL in
+`/etc/runplan-deploy.env`:
+
+```dotenv
+RUNPLAN_DEPLOY_REMOTE=origin
+RUNPLAN_DEPLOY_BRANCH=main
+RUNPLAN_DEPLOY_HEALTH_URL=https://runplan.example.com/api/health
+```
+
+Without `RUNPLAN_DEPLOY_HEALTH_URL`, the deployment still waits for the image's
+internal `/api/health` check. With it, `curl` must also be installed. Inspect the
+timer and deployment logs with:
+
+```bash
+systemctl list-timers runplan-deploy.timer
+systemctl status runplan-deploy.service
+journalctl -u runplan-deploy.service
+```
+
+To retry the same commit after correcting an external problem, remove its marker
+and start the service:
+
+```bash
+sudo rm /var/lib/runplan-deploy/failed-commit
+sudo systemctl start runplan-deploy.service
+```
+
+Rollback deliberately covers the Git checkout and container image only. It does
+not restore `runplan-data`. If a release writes a persisted format that the
+previous image cannot read, automatic rollback may not recover service. Take a
+separate protected backup or filesystem snapshot before releases that migrate
+stored data. The data contains Garmin credentials, tokens, and health-related
+training history and must not be placed in an image or public backup.
 
 On the first visit, the browser asks which configured Runplan user to use. If
 the server has no users yet, the same dialog creates the first one from a

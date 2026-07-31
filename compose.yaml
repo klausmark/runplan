@@ -2,7 +2,7 @@ services:
   runplan:
     build:
       context: .
-    image: runplan:local
+    image: "${RUNPLAN_IMAGE:-runplan:local}"
     restart: unless-stopped
     ports:
       - "${RUNPLAN_HOST_IP:?Set RUNPLAN_HOST_IP in .env}:${RUNPLAN_HOST_PORT:?Set RUNPLAN_HOST_PORT in .env}:8000"

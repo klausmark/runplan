@@ -7,6 +7,9 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Added an optional systemd-driven Docker host deployment that polls Git,
+  retains commit-tagged images, waits for health, and restores the previous
+  image and checkout when deployment fails.
 - Improved Docker rebuild caching by installing locked production dependencies
   before copying frequently changed application source files.
 - Moved Garmin activity management above the workout YAML editor, collapsed

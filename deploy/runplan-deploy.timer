@@ -1,0 +1,12 @@
+[Unit]
+Description=Check periodically for a new Runplan release
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Persistent=true
+Unit=runplan-deploy.service
+
+[Install]
+WantedBy=timers.target

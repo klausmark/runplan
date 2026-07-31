@@ -1,0 +1,17 @@
+[Unit]
+Description=Deploy the latest Runplan main branch
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+ConditionPathExists=/srv/runplan/.git
+
+[Service]
+Type=oneshot
+User=runplan-deploy
+WorkingDirectory=/srv/runplan
+EnvironmentFile=-/etc/runplan-deploy.env
+StateDirectory=runplan-deploy
+StateDirectoryMode=0750
+UMask=0027
+ExecStart=/srv/runplan/deploy/runplan-deploy
+TimeoutStartSec=30min
