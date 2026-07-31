@@ -12,6 +12,8 @@ changes may be released in a new minor version.
 - Added manual linking of one or more same-day Garmin runs to missed workouts.
   Linked activities can also be added to or removed from completed workouts;
   Runplan sums their distance and duration without changing Garmin data.
+- Renamed the workout card action to **Edit** and moved Garmin activity linking
+  into that dialog alongside YAML editing and workout deletion.
 - Added YAML-based workout creation from empty calendar days, including a valid
   starter template and an in-dialog syntax reference.
 - Added confirmed workout deletion while deferring cleanup of synchronized

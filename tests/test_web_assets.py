@@ -177,7 +177,9 @@ class TestWebAsset:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
-        assert 'id="activity-link-dialog"' in html
+        assert 'id="activity-link-dialog"' not in html
+        assert 'id="workout-activities"' in html
+        assert 'id="activity-apply"' in html
         assert 'id="activity-unlink-dialog"' not in html
         assert "Show ±3 days" not in html
         assert "workout.can_manage_activities" in script
@@ -185,6 +187,9 @@ class TestWebAsset:
         assert "activityIds" in script
         assert "activity-links" in script
         assert 'checkbox.type = "checkbox"' in script
+        assert 'edit.textContent = "Edit →"' in script
+        assert '$("#activity-apply").disabled = yamlChanged' in script
+        assert '$("#save-workout-button").disabled = activitiesChanged' in script
         assert ".activity-candidate" in styles
 
     def test_mobile_header_uses_a_compact_menu_and_bottom_sheet(self) -> None:

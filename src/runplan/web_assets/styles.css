@@ -127,8 +127,7 @@ main { width: min(1500px, 94vw); margin: 0 auto; padding: 46px 0 80px; }
 .workout-actions { display: flex; align-items: center; justify-content: end; gap: 10px; }
 .add-workout { width: 100%; min-height: 72px; border: 1px dashed var(--field-line); border-radius: 10px; color: var(--green); background: transparent; font-size: 11px; font-weight: 800; cursor: pointer; }
 .add-workout:hover, .add-workout:focus-visible { border-color: var(--green); background: var(--day-start); }
-.edit-workout, .move-workout, .link-activity, .unlink-activity { color: var(--green); background: transparent; border: 0; padding: 3px 0; font-size: 11px; font-weight: 800; cursor: pointer; }
-.unlink-activity { color: var(--muted); }
+.edit-workout, .move-workout { color: var(--green); background: transparent; border: 0; padding: 3px 0; font-size: 11px; font-weight: 800; cursor: pointer; }
 .move-workout { display: none; color: var(--muted); }
 .touch-drag-source { opacity: .3; }
 .touch-drag-ghost { position: fixed; top: 0; left: 0; z-index: 1000; pointer-events: none; opacity: .92; cursor: grabbing; box-shadow: 0 18px 45px rgba(14, 31, 23, .3); will-change: transform; }
@@ -178,6 +177,9 @@ dialog footer { display: flex; justify-content: end; gap: 10px; margin-top: 4px;
 .sync-legacy { border-left: 4px solid var(--muted); }
 .sync-error { margin: 0; padding: 11px 12px; border-radius: 9px; background: #fde3df; color: #7b241a; font-size: 13px; }
 .activity-list { display: grid; gap: 10px; max-height: min(55vh, 520px); overflow-y: auto; }
+.workout-activities { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.workout-activities h3 { margin: 0 0 8px; font-size: 15px; }
+.workout-activities > .button { justify-self: end; }
 .activity-candidate { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .activity-candidate div { min-width: 0; display: grid; gap: 4px; }
 .activity-choice { justify-content: start; cursor: pointer; }

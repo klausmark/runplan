@@ -1,4 +1,4 @@
-const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null, activityLink: null };
+const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null };
 const $ = (selector) => document.querySelector(selector);
 const TOUCH_DRAG_DELAY = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
@@ -413,7 +413,7 @@ function workoutCard(week, workout) {
   const edit = document.createElement("button");
   edit.className = "edit-workout";
   edit.type = "button";
-  edit.textContent = "Edit YAML →";
+  edit.textContent = "Edit →";
   edit.addEventListener("click", () => openWorkout(week, workout));
   const actions = document.createElement("div");
   actions.className = "workout-actions";
@@ -426,14 +426,6 @@ function workoutCard(week, workout) {
     move.setAttribute("aria-label", `Move ${workout.name}`);
     move.addEventListener("click", () => openMove(week, workout));
     actions.append(move);
-  }
-  if (workout.can_manage_activities) {
-    const link = document.createElement("button");
-    link.className = "link-activity";
-    link.type = "button";
-    link.textContent = workout.status === "missed" ? "Link activity" : "Manage activities";
-    link.addEventListener("click", () => openActivityLink(week, workout));
-    actions.append(link);
   }
   actions.append(edit);
   if (workout.can_move) {
@@ -449,26 +441,34 @@ function workoutCard(week, workout) {
 }
 
 function activityLinkUrl() {
-  const link = state.activityLink;
-  return `/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activities?${userQuery()}`;
+  const workout = state.workout;
+  return `/api/programs/${encodeURIComponent(state.program.file)}/workouts/${workout.week}/${encodeURIComponent(workout.workoutId)}/activities?${userQuery()}`;
 }
 
-async function openActivityLink(week, workout) {
-  state.activityLink = { week, workoutId: workout.id, name: workout.name };
-  $("#activity-apply").disabled = false;
-  $("#activity-link-title").textContent = `${workout.status === "missed" ? "Link" : "Manage"} activities · ${workout.name}`;
-  $("#activity-link-help").textContent = `Select every Garmin run from ${dateLabel(workout.date)} that belongs to this workout.`;
-  $("#activity-link-dialog").showModal();
-  await loadActivityCandidates();
+function selectedActivityIds() {
+  return Array.from(
+    $("#activity-list").querySelectorAll('input[type="checkbox"]:checked'),
+    input => Number(input.value),
+  ).sort((left, right) => left - right);
+}
+
+function updateWorkoutActions() {
+  if (!state.workout) return;
+  const yamlChanged = $("#workout-yaml").value !== state.workout.originalYaml;
+  const activitiesChanged = Array.isArray(state.workout.activityIds)
+    && selectedActivityIds().join(",") !== state.workout.activityIds.join(",");
+  $("#save-workout-button").disabled = activitiesChanged;
+  $("#activity-apply").disabled = yamlChanged || !activitiesChanged;
 }
 
 async function loadActivityCandidates() {
+  const workout = state.workout;
   const list = $("#activity-list");
   list.setAttribute("aria-busy", "true");
   list.replaceChildren(Object.assign(document.createElement("p"), { textContent: "Loading Garmin activities…" }));
   try {
     const result = await request(activityLinkUrl());
-    if (!state.activityLink) return;
+    if (state.workout !== workout || workout.mode !== "edit") return;
     list.replaceChildren();
     if (!result.activities.length) {
       list.append(Object.assign(document.createElement("p"), {
@@ -483,6 +483,7 @@ async function loadActivityCandidates() {
       checkbox.type = "checkbox";
       checkbox.value = activity.id;
       checkbox.checked = activity.selected;
+      checkbox.addEventListener("change", updateWorkoutActions);
       const details = document.createElement("div");
       const title = document.createElement("strong");
       title.textContent = activity.name;
@@ -498,8 +499,14 @@ async function loadActivityCandidates() {
       item.append(checkbox, details);
       list.append(item);
     }
+    state.workout.activityIds = result.activities
+      .filter(activity => activity.selected)
+      .map(activity => activity.id)
+      .sort((left, right) => left - right);
+    updateWorkoutActions();
   } catch (error) {
     list.replaceChildren(Object.assign(document.createElement("p"), { className: "sync-error", textContent: error.message }));
+    $("#activity-apply").disabled = true;
   } finally {
     list.removeAttribute("aria-busy");
   }
@@ -509,18 +516,24 @@ async function applyActivityLinks() {
   const button = $("#activity-apply");
   button.disabled = true;
   try {
-    const link = state.activityLink;
-    const activityIds = Array.from($("#activity-list").querySelectorAll('input[type="checkbox"]:checked'), input => Number(input.value));
-    const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activity-links`, {
+    const workout = state.workout;
+    const activityIds = selectedActivityIds();
+    const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}/workouts/${workout.week}/${encodeURIComponent(workout.workoutId)}/activity-links`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: state.user.id, revision: state.program.revision, activityIds }),
     });
-    $("#activity-link-dialog").close();
-    state.activityLink = null;
     render(updated);
+    if (state.workout !== workout) return;
+    const refreshed = updated.weeks
+      .find(item => item.week === workout.week).workouts
+      .find(item => item.id === workout.workoutId);
+    state.workout.name = refreshed.name;
+    state.workout.originalYaml = refreshed.yaml;
+    $("#workout-yaml").value = refreshed.yaml;
+    await loadActivityCandidates();
   } catch (error) {
-    button.disabled = false;
+    updateWorkoutActions();
     showError(error.message);
   }
 }
@@ -749,7 +762,7 @@ async function moveWorkout(toWeek, toDay, cell) {
 }
 
 function openWorkout(week, workout) {
-  state.workout = { mode: "edit", week, workoutId: workout.id, name: workout.name };
+  state.workout = { mode: "edit", week, workoutId: workout.id, name: workout.name, originalYaml: workout.yaml, activityIds: null };
   $("#workout-title").textContent = workout.name;
   $("#workout-yaml-reference").classList.add("hidden");
   const weekWorkouts = state.program.weeks.find((item) => item.week === week).workouts;
@@ -761,6 +774,14 @@ function openWorkout(week, workout) {
   deleteButton.title = deleteButton.disabled ? "A week must contain at least one workout." : "";
   $("#save-workout-button").textContent = "Validate & save";
   $("#workout-yaml").value = workout.yaml;
+  $("#save-workout-button").disabled = false;
+  const activities = $("#workout-activities");
+  activities.classList.toggle("hidden", !workout.can_manage_activities);
+  if (workout.can_manage_activities) {
+    $("#workout-activities-help").textContent = `Select every Garmin run from ${dateLabel(workout.date)} that belongs to this workout. Save YAML changes separately.`;
+    $("#activity-apply").disabled = true;
+    loadActivityCandidates();
+  }
   $("#workout-dialog").showModal();
 }
 
@@ -790,7 +811,9 @@ function openAddWorkout(weekNumber, day) {
   $("#workout-editor-help").textContent = "Start with the valid template below. You may change every field, including the day, before validation.";
   $("#workout-yaml-reference").classList.remove("hidden");
   $("#delete-workout-button").classList.add("hidden");
+  $("#workout-activities").classList.add("hidden");
   $("#save-workout-button").textContent = "Validate & add";
+  $("#save-workout-button").disabled = false;
   $("#workout-yaml").value = workoutTemplate(week, day);
   $("#workout-dialog").showModal();
 }
@@ -1031,6 +1054,9 @@ $("#workout-form").addEventListener("submit", async (event) => {
   try { await saveEdit(change); $("#workout-dialog").close(); }
   catch (error) { setSaveFailure(error); showError(error.message); }
 });
+$("#workout-yaml").addEventListener("input", updateWorkoutActions);
+$("#activity-apply").addEventListener("click", applyActivityLinks);
+$("#workout-dialog").addEventListener("close", () => { state.workout = null; });
 
 $("#delete-workout-button").addEventListener("click", () => {
   $("#delete-workout-title").textContent = `Delete ${state.workout.name}?`;
@@ -1047,11 +1073,6 @@ $("#delete-workout-form").addEventListener("submit", async (event) => {
     $("#delete-workout-dialog").close();
     $("#workout-dialog").close();
   } catch (error) { setSaveFailure(error); showError(error.message); }
-});
-$("#activity-link-dialog").addEventListener("close", () => { state.activityLink = null; });
-$("#activity-link-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await applyActivityLinks();
 });
 $("#move-form").addEventListener("submit", async (event) => {
   event.preventDefault();
