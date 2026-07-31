@@ -9,8 +9,8 @@ changes may be released in a new minor version.
 
 - Prevented completed workouts from being dragged, moved, swapped, or moved through
   undo in the web calendar; direct YAML editing remains available as an escape hatch.
-- Added manual linking of scheduled or missed workouts to unlinked Garmin running
-  activities from the workout date or an explicitly expanded three-day window.
+- Added manual linking of missed workouts to unlinked Garmin running activities
+  from the workout date.
 - Added confirmed unlinking for manually linked activities without changing or
   deleting the Garmin activity.
 - Added YAML-based workout creation from empty calendar days, including a valid

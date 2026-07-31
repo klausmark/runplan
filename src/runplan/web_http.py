@@ -213,7 +213,6 @@ class RunplanHandler(BaseHTTPRequestHandler):
                     parts[2],
                     parts[3],
                     user_id,
-                    query.get("windowDays", ["0"])[0],
                 ),
             )
             return

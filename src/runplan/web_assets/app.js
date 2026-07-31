@@ -456,33 +456,31 @@ function workoutCard(week, workout) {
   return card;
 }
 
-function activityLinkUrl(windowDays) {
+function activityLinkUrl() {
   const link = state.activityLink;
-  return `/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activities?${userQuery()}&windowDays=${windowDays}`;
+  return `/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activities?${userQuery()}`;
 }
 
 async function openActivityLink(week, workout) {
-  state.activityLink = { week, workoutId: workout.id, name: workout.name, windowDays: 0 };
+  state.activityLink = { week, workoutId: workout.id, name: workout.name };
   $("#activity-link-title").textContent = `Link ${workout.name}`;
   $("#activity-link-help").textContent = `Choose an unlinked Garmin running activity from ${dateLabel(workout.date)}.`;
-  $("#activity-expand").classList.remove("hidden");
   $("#activity-link-dialog").showModal();
-  await loadActivityCandidates(0);
+  await loadActivityCandidates();
 }
 
-async function loadActivityCandidates(windowDays) {
+async function loadActivityCandidates() {
   const list = $("#activity-list");
   list.setAttribute("aria-busy", "true");
   list.replaceChildren(Object.assign(document.createElement("p"), { textContent: "Loading Garmin activities…" }));
   try {
-    const result = await request(activityLinkUrl(windowDays));
+    const result = await request(activityLinkUrl());
     if (!state.activityLink) return;
-    state.activityLink.windowDays = windowDays;
     list.replaceChildren();
     if (!result.activities.length) {
       list.append(Object.assign(document.createElement("p"), {
         className: "activity-empty",
-        textContent: windowDays ? "No unlinked running activities found within three days." : "No unlinked running activities found on this date.",
+        textContent: "No unlinked running activities found on this date.",
       }));
     }
     for (const activity of result.activities) {
@@ -503,7 +501,6 @@ async function loadActivityCandidates(windowDays) {
       item.append(details, button);
       list.append(item);
     }
-    $("#activity-expand").classList.toggle("hidden", windowDays === 3);
   } catch (error) {
     list.replaceChildren(Object.assign(document.createElement("p"), { className: "sync-error", textContent: error.message }));
   } finally {
@@ -518,7 +515,7 @@ async function linkActivity(activityId, button) {
     const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activity-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: state.user.id, revision: state.program.revision, activityId, windowDays: link.windowDays }),
+      body: JSON.stringify({ userId: state.user.id, revision: state.program.revision, activityId }),
     });
     $("#activity-link-dialog").close();
     state.activityLink = null;
@@ -1058,7 +1055,6 @@ $("#delete-workout-form").addEventListener("submit", async (event) => {
     $("#workout-dialog").close();
   } catch (error) { setSaveFailure(error); showError(error.message); }
 });
-$("#activity-expand").addEventListener("click", () => loadActivityCandidates(3));
 $("#activity-link-dialog").addEventListener("close", () => { state.activityLink = null; });
 $("#activity-unlink-dialog").addEventListener("close", () => { state.activityLink = null; });
 $("#activity-unlink-form").addEventListener("submit", async (event) => {

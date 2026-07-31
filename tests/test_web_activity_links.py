@@ -83,17 +83,14 @@ def activity_service(tmp_path: Path):
     return service, repository, client
 
 
-def test_candidates_start_on_workout_date_and_expand_to_three_days(activity_service) -> None:
+def test_candidates_only_query_running_activities_on_workout_date(activity_service) -> None:
     service, _, client = activity_service
 
-    same_day = service.activity_links.candidates("plan.yaml", "1", "mixed", None, 0)
-    expanded = service.activity_links.candidates("plan.yaml", "1", "mixed", None, 3)
+    result = service.activity_links.candidates("plan.yaml", "1", "mixed", None)
 
-    assert [item["id"] for item in same_day["activities"]] == [900]
-    assert [item["id"] for item in expanded["activities"]] == [900, 901]
+    assert [item["id"] for item in result["activities"]] == [900]
     assert [event for event in client.events if event[0] == "get_activities_by_date"] == [
         ("get_activities_by_date", "2026-12-28", "2026-12-28", "running"),
-        ("get_activities_by_date", "2026-12-25", "2026-12-31", "running"),
     ]
 
 
@@ -105,7 +102,7 @@ def test_link_persists_manual_completed_result_without_mutating_garmin(activity_
         "plan.yaml",
         "1",
         "mixed",
-        {"revision": revision, "activityId": 900, "windowDays": 0},
+        {"revision": revision, "activityId": 900},
     )
 
     record = repository.load("characterization-plan")["workouts"]["week-01/mixed"]
@@ -126,7 +123,7 @@ def test_unlink_manual_activity_restores_missed_status(activity_service) -> None
         "plan.yaml",
         "1",
         "mixed",
-        {"revision": revision, "activityId": 900, "windowDays": 0},
+        {"revision": revision, "activityId": 900},
     )
 
     service.activity_links.unlink("plan.yaml", "1", "mixed", {"revision": linked["revision"]})
@@ -137,7 +134,7 @@ def test_unlink_manual_activity_restores_missed_status(activity_service) -> None
     assert "activity_link_source" not in record
 
 
-def test_link_rejects_stale_revision_and_activity_outside_window(activity_service) -> None:
+def test_link_rejects_stale_revision_and_activity_from_another_date(activity_service) -> None:
     service, repository, _ = activity_service
     revision = service.store.get("plan.yaml", repository=repository)["revision"]
 
@@ -150,8 +147,16 @@ def test_link_rejects_stale_revision_and_activity_outside_window(activity_servic
             "plan.yaml",
             "1",
             "mixed",
-            {"revision": revision, "activityId": 901, "windowDays": 0},
+            {"revision": revision, "activityId": 901},
         )
+
+
+def test_scheduled_workout_cannot_link_activity(activity_service) -> None:
+    service, repository, _ = activity_service
+    repository.load("characterization-plan")["workouts"]["week-01/mixed"]["status"] = "scheduled"
+
+    with pytest.raises(WebError, match="Only missed workouts"):
+        service.activity_links.candidates("plan.yaml", "1", "mixed", None)
 
 
 def test_automatic_activity_link_cannot_be_unlinked(activity_service) -> None:

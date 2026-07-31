@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
@@ -75,9 +75,7 @@ class WebActivityLinkService:
         week: str,
         workout_id: str,
         user_id: str | None,
-        window_days: Any,
     ) -> dict[str, Any]:
-        window = self._window(window_days)
         user = self.sync.users.get(user_id or self.sync.users.default_id)
         program = self.sync.store_for(user.id).get(
             name,
@@ -86,18 +84,16 @@ class WebActivityLinkService:
         )
         workout = self._workout(program, week, workout_id)
         if not workout.get("can_link_activity"):
-            raise WebError(
-                HTTPStatus.CONFLICT, "Only scheduled or missed workouts can link an activity"
-            )
-        activities = self._activities(name, user.id, program, workout, window)
-        return {"revision": program["revision"], "windowDays": window, "activities": activities}
+            raise WebError(HTTPStatus.CONFLICT, "Only missed workouts can link an activity")
+        activities = self._activities(name, user.id, program, workout)
+        return {"revision": program["revision"], "activities": activities}
 
     def link(
         self, name: str, week: str, workout_id: str, request: dict[str, Any]
     ) -> dict[str, Any]:
         user = self.sync.users.get(request.get("userId") or self.sync.users.default_id)
         self._require_revision(name, user.id, request.get("revision"))
-        listing = self.candidates(name, week, workout_id, user.id, request.get("windowDays", 0))
+        listing = self.candidates(name, week, workout_id, user.id)
         activity_id = request.get("activityId")
         selected = next((item for item in listing["activities"] if item["id"] == activity_id), None)
         if selected is None:
@@ -182,11 +178,9 @@ class WebActivityLinkService:
         user_id: str,
         program: dict[str, Any],
         workout: dict[str, Any],
-        window: int,
     ) -> list[dict[str, Any]]:
         target = date.fromisoformat(workout["date"])
-        start = (target - timedelta(days=window)).isoformat()
-        end = (target + timedelta(days=window)).isoformat()
+        activity_date = target.isoformat()
         repository = self.sync.repository_for(user_id, name)
         records = list(repository.load(program["program"]["id"])["workouts"].values())
         linked_ids = {
@@ -201,7 +195,7 @@ class WebActivityLinkService:
         }
         try:
             client = self.sync.client_for(user_id)
-            summaries = client.get_activities_by_date(start, end, "running")
+            summaries = client.get_activities_by_date(activity_date, activity_date, "running")
             result = []
             for item in summaries:
                 if not isinstance(item, dict) or not isinstance(item.get("activityId"), int):
@@ -232,16 +226,6 @@ class WebActivityLinkService:
     def _require_revision(self, name: str, user_id: str, revision: Any) -> None:
         if revision != self.sync.store_for(user_id).revision(name):
             raise WebError(HTTPStatus.CONFLICT, "The program changed; reload before saving")
-
-    @staticmethod
-    def _window(value: Any) -> int:
-        try:
-            window = int(value)
-        except (TypeError, ValueError) as exc:
-            raise WebError(HTTPStatus.BAD_REQUEST, "windowDays must be 0 or 3") from exc
-        if window not in {0, 3}:
-            raise WebError(HTTPStatus.BAD_REQUEST, "windowDays must be 0 or 3")
-        return window
 
     @staticmethod
     def _record_key(week: str, workout_id: str) -> str:

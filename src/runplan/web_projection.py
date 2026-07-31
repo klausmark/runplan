@@ -61,7 +61,7 @@ def _workout_view(
         "status": status,
         "can_move": status != "completed",
         "activity_link_source": record.get("activity_link_source"),
-        "can_link_activity": status in {"scheduled", "missed"},
+        "can_link_activity": status == "missed",
         "can_unlink_activity": (
             status == "completed" and record.get("activity_link_source") == "manual"
         ),
