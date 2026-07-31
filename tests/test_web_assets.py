@@ -132,9 +132,18 @@ class TestWebAsset:
     def test_yaml_editor_uses_horizontal_scrolling_instead_of_wrapping(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert '<details id="workout-yaml-details" class="yaml-details">' in html
+        assert "Advanced: Edit workout YAML" in html
         assert 'id="workout-yaml" class="code-editor" wrap="off"' in html
         assert "overflow-x: auto" in styles
         assert "white-space: pre" in styles
+
+    def test_workout_yaml_disclosure_matches_the_editor_mode(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert html.index('id="workout-activities"') < html.index('id="workout-yaml-details"')
+        assert '$("#workout-yaml-details").open = !workout.can_manage_activities;' in script
+        assert '$("#workout-yaml-details").open = true;' in script
 
     def test_calendar_undo_and_explicit_operation_states_are_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")

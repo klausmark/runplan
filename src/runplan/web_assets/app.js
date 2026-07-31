@@ -777,6 +777,7 @@ function openWorkout(week, workout) {
   $("#save-workout-button").disabled = false;
   const activities = $("#workout-activities");
   activities.classList.toggle("hidden", !workout.can_manage_activities);
+  $("#workout-yaml-details").open = !workout.can_manage_activities;
   if (workout.can_manage_activities) {
     $("#workout-activities-help").textContent = `Select every Garmin run from ${dateLabel(workout.date)} that belongs to this workout. Save YAML changes separately.`;
     $("#activity-apply").disabled = true;
@@ -812,6 +813,7 @@ function openAddWorkout(weekNumber, day) {
   $("#workout-yaml-reference").classList.remove("hidden");
   $("#delete-workout-button").classList.add("hidden");
   $("#workout-activities").classList.add("hidden");
+  $("#workout-yaml-details").open = true;
   $("#save-workout-button").textContent = "Validate & add";
   $("#save-workout-button").disabled = false;
   $("#workout-yaml").value = workoutTemplate(week, day);

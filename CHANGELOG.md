@@ -7,6 +7,8 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Moved Garmin activity management above the workout YAML editor and collapsed
+  YAML when activities are the primary edit action.
 - Prevented completed workouts from being dragged, moved, swapped, or moved through
   undo in the web calendar; direct YAML editing remains available as an escape hatch.
 - Added manual linking of one or more same-day Garmin runs to missed workouts.

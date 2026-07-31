@@ -131,23 +131,28 @@
       <form id="workout-form">
         <div class="dialog-heading"><div><p class="eyebrow">Advanced editor</p><h2 id="workout-title">Edit workout YAML</h2></div><button type="button" class="icon-button close">×</button></div>
         <p id="workout-editor-help" class="editor-help">The complete program is validated before saving.</p>
-        <section id="workout-yaml-reference" class="yaml-reference hidden" aria-labelledby="workout-yaml-reference-title">
-          <h3 id="workout-yaml-reference-title">Workout YAML syntax</h3>
-          <p><code>id</code>, <code>day</code>, <code>name</code>, and a non-empty <code>steps</code> list are required. <code>description</code> is optional. IDs use lowercase letters, numbers, and hyphens; days are 1–7 and must be free within the week.</p>
-          <p>Actions: <code>warmup</code>, <code>run</code>, <code>recovery</code>, <code>cooldown</code>, and <code>repeat</code>. Time examples: <code>30s</code>, <code>5m</code>, <code>1h</code>. Distance uses an explicit field, such as <code>{distance: 400m}</code> or <code>{distance: 1.5km}</code>.</p>
-          <pre><code>- run: {time: 8m, pace: "4:30-4:45 min/km"}
-- repeat:
-    count: 5
-    steps:
-      - run: {distance: 400m}
-      - recovery: 90s</code></pre>
-        </section>
-        <textarea id="workout-yaml" class="code-editor" wrap="off" spellcheck="false" aria-label="Workout YAML"></textarea>
         <section id="workout-activities" class="workout-activities hidden" aria-labelledby="workout-activities-title">
           <div><h3 id="workout-activities-title">Garmin activities</h3><p id="workout-activities-help" class="editor-help"></p></div>
           <div id="activity-list" class="activity-list" aria-live="polite"></div>
           <button id="activity-apply" type="button" class="button primary">Update activities</button>
         </section>
+        <details id="workout-yaml-details" class="yaml-details">
+          <summary>Advanced: Edit workout YAML</summary>
+          <div class="yaml-details-content">
+            <section id="workout-yaml-reference" class="yaml-reference hidden" aria-labelledby="workout-yaml-reference-title">
+              <h3 id="workout-yaml-reference-title">Workout YAML syntax</h3>
+              <p><code>id</code>, <code>day</code>, <code>name</code>, and a non-empty <code>steps</code> list are required. <code>description</code> is optional. IDs use lowercase letters, numbers, and hyphens; days are 1–7 and must be free within the week.</p>
+              <p>Actions: <code>warmup</code>, <code>run</code>, <code>recovery</code>, <code>cooldown</code>, and <code>repeat</code>. Time examples: <code>30s</code>, <code>5m</code>, <code>1h</code>. Distance uses an explicit field, such as <code>{distance: 400m}</code> or <code>{distance: 1.5km}</code>.</p>
+              <pre><code>- run: {time: 8m, pace: "4:30-4:45 min/km"}
+- repeat:
+    count: 5
+    steps:
+      - run: {distance: 400m}
+      - recovery: 90s</code></pre>
+            </section>
+            <textarea id="workout-yaml" class="code-editor" wrap="off" spellcheck="false" aria-label="Workout YAML"></textarea>
+          </div>
+        </details>
         <footer><button id="delete-workout-button" type="button" class="button danger hidden">Delete workout</button><button type="button" class="button secondary close">Cancel</button><button id="save-workout-button" class="button primary">Validate & save</button></footer>
       </form>
     </dialog>
