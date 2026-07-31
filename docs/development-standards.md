@@ -80,8 +80,10 @@ features or intentional breaking changes. Breaking changes must be explicit.
 
 `CHANGELOG.md` records changes that users or integrators notice, not every commit. Keep new
 entries under `Unreleased`. At a milestone, move them under the version and date, update the
-project version, and create a `vX.Y.Z` tag. Commit subjects remain short, imperative, and in
-English; Conventional Commits are not required.
+project version, and create a `vX.Y.Z` tag. Commit messages are a single subject line:
+short, imperative, and in English. Do not add a body; detailed change notes belong in
+`CHANGELOG.md` under `Unreleased` and in the PR description. Conventional Commits are not
+required.
 
 ## Known deviations
 

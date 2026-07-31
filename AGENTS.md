@@ -24,6 +24,9 @@ formatting as part of an unrelated change.
   [docs/development-standards.md](docs/development-standards.md).
 - Use [docs/code-quality-audit.md](docs/code-quality-audit.md) to choose and scope structural
   refactoring. Refresh its measurements with `uv run python scripts/audit_structure.py`.
+- Use a single-line subject for every commit: short, imperative, and in English. Never add a
+  body. Detailed change notes belong in `CHANGELOG.md` under `Unreleased` and in the PR
+  description. See [docs/development-standards.md](docs/development-standards.md) for context.
 
 ## Tests
 
