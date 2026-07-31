@@ -142,7 +142,7 @@ class TestWebAsset:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
         assert html.index('id="workout-activities"') < html.index('id="workout-yaml-details"')
-        assert '$("#workout-yaml-details").open = !workout.can_manage_activities;' in script
+        assert '$("#workout-yaml-details").open = false;' in script
         assert '$("#workout-yaml-details").open = true;' in script
 
     def test_calendar_undo_and_explicit_operation_states_are_packaged(self) -> None:
