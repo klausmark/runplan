@@ -173,17 +173,18 @@ class TestWebAsset:
         assert "deleteButton.disabled = onlyWorkout" in script
         assert "only workout and cannot be deleted" in script
 
-    def test_workout_activity_linking_uses_same_day_and_unlink_confirmation(self) -> None:
+    def test_workout_activity_checklist_manages_same_day_links(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
         assert 'id="activity-link-dialog"' in html
-        assert 'id="activity-unlink-dialog"' in html
+        assert 'id="activity-unlink-dialog"' not in html
         assert "Show ±3 days" not in html
-        assert "workout.can_link_activity" in script
-        assert "workout.can_unlink_activity" in script
+        assert "workout.can_manage_activities" in script
         assert "windowDays" not in script
-        assert "activity-unlink" in script
+        assert "activityIds" in script
+        assert "activity-links" in script
+        assert 'checkbox.type = "checkbox"' in script
         assert ".activity-candidate" in styles
 
     def test_mobile_header_uses_a_compact_menu_and_bottom_sheet(self) -> None:

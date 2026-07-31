@@ -22,6 +22,9 @@ def normalize_tracking(raw: Any, location: str) -> dict[str, Any]:
         result["scheduled_date"] = _iso_date(raw["scheduled_date"], location)
     _validate_content_hash(raw.get("synced_content_hash"), location)
     _validate_garmin(raw.get("garmin"), location)
+    activities = raw.get("activities")
+    if activities is not None:
+        result["activities"] = _normalize_activities(activities, status, location)
     actual = raw.get("actual")
     _validate_actual(actual, status, location)
     if isinstance(actual, dict):
@@ -79,6 +82,55 @@ def _validate_actual(actual: Any, status: str, location: str) -> None:
             not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0
         ):
             raise WorkoutDefinitionError(f"{location}.actual.{field}: must be positive")
+
+
+def _normalize_activities(activities: Any, status: str, location: str) -> list[dict[str, Any]]:
+    if not isinstance(activities, list):
+        raise WorkoutDefinitionError(f"{location}.activities: must be a list")
+    if activities and status != "completed":
+        raise WorkoutDefinitionError(
+            f"{location}.activities: linked activities require completed status"
+        )
+    result: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for index, raw in enumerate(activities, 1):
+        item_location = f"{location}.activities[{index}]"
+        if not isinstance(raw, dict):
+            raise WorkoutDefinitionError(f"{item_location}: must be an object")
+        activity_id = raw.get("activity_id")
+        if not isinstance(activity_id, int) or isinstance(activity_id, bool) or activity_id <= 0:
+            raise WorkoutDefinitionError(f"{item_location}.activity_id: must be positive")
+        if activity_id in seen:
+            raise WorkoutDefinitionError(f"{item_location}.activity_id: must be unique")
+        seen.add(activity_id)
+        if raw.get("link_source") not in {"automatic", "manual"}:
+            raise WorkoutDefinitionError(
+                f"{item_location}.link_source: must be 'automatic' or 'manual'"
+            )
+        name = raw.get("name")
+        if name is not None and (not isinstance(name, str) or not name.strip()):
+            raise WorkoutDefinitionError(f"{item_location}.name: must be non-empty")
+        normalized = dict(raw)
+        for field in ("distance_meters", "duration_seconds"):
+            value = raw.get(field)
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+                raise WorkoutDefinitionError(f"{item_location}.{field}: must be positive")
+            normalized[field] = float(value)
+        completed_at = raw.get("completed_at")
+        if completed_at is not None:
+            try:
+                parsed = (
+                    completed_at
+                    if isinstance(completed_at, datetime)
+                    else datetime.fromisoformat(completed_at)
+                )
+            except (TypeError, ValueError) as exc:
+                raise WorkoutDefinitionError(
+                    f"{item_location}.completed_at: must be an ISO timestamp"
+                ) from exc
+            normalized["completed_at"] = parsed.isoformat()
+        result.append(normalized)
+    return result
 
 
 def _normalize_actual(actual: dict[str, Any], location: str) -> dict[str, Any]:

@@ -11,6 +11,7 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
+from ..application.activity_records import apply_linked_activities, linked_activities
 from .json_repository import JsonStateRepository, new_state
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,15 @@ def record_from_workout_tracking(week: int, workout: dict[str, Any]) -> dict[str
         "actual_distance_meters": actual.get("distance_meters"),
         "actual_duration_seconds": actual.get("duration_seconds"),
     }
-    return {key: value for key, value in record.items() if value is not None}
+    result = {key: value for key, value in record.items() if value is not None}
+    activities = tracking.get("activities")
+    if isinstance(activities, list):
+        apply_linked_activities(
+            result, [dict(item) for item in activities if isinstance(item, dict)]
+        )
+    elif result.get("activity_id") is not None:
+        result["activities"] = linked_activities(result)
+    return result
 
 
 def tracking_from_record(record: dict[str, Any]) -> dict[str, Any]:
@@ -56,13 +65,14 @@ def tracking_from_record(record: dict[str, Any]) -> dict[str, Any]:
         tracking["scheduled_date"] = record["date"]
     if record.get("content_hash") is not None:
         tracking["synced_content_hash"] = record["content_hash"]
+    activities = linked_activities(record)
+    if activities:
+        tracking["activities"] = activities
     garmin = {
         key: record[source]
         for key, source in (
             ("workout_id", "workout_id"),
             ("schedule_id", "schedule_id"),
-            ("activity_id", "activity_id"),
-            ("activity_link_source", "activity_link_source"),
         )
         if record.get(source) is not None
     }

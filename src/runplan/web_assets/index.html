@@ -156,19 +156,11 @@
     </dialog>
 
     <dialog id="activity-link-dialog" class="activity-dialog">
-      <form method="dialog">
+      <form id="activity-link-form">
         <div class="dialog-heading"><div><p class="eyebrow">Garmin activity</p><h2 id="activity-link-title">Link activity</h2></div><button type="button" class="icon-button close">×</button></div>
         <p id="activity-link-help" class="editor-help"></p>
         <div id="activity-list" class="activity-list" aria-live="polite"></div>
-        <footer><button type="button" class="button secondary close">Cancel</button></footer>
-      </form>
-    </dialog>
-
-    <dialog id="activity-unlink-dialog" class="confirm-dialog">
-      <form id="activity-unlink-form">
-        <div class="dialog-heading"><div><p class="eyebrow">Garmin activity</p><h2 id="activity-unlink-title">Unlink activity?</h2></div><button type="button" class="icon-button close">×</button></div>
-        <p class="editor-help">This removes the manual link and actual totals from Runplan. The Garmin activity is never changed or deleted.</p>
-        <footer><button type="button" class="button secondary close">Cancel</button><button class="button danger">Unlink activity</button></footer>
+        <footer><button type="button" class="button secondary close">Cancel</button><button id="activity-apply" class="button primary">Update activities</button></footer>
       </form>
     </dialog>
 

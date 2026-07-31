@@ -427,21 +427,13 @@ function workoutCard(week, workout) {
     move.addEventListener("click", () => openMove(week, workout));
     actions.append(move);
   }
-  if (workout.can_link_activity) {
+  if (workout.can_manage_activities) {
     const link = document.createElement("button");
     link.className = "link-activity";
     link.type = "button";
-    link.textContent = "Link activity";
+    link.textContent = workout.status === "missed" ? "Link activity" : "Manage activities";
     link.addEventListener("click", () => openActivityLink(week, workout));
     actions.append(link);
-  }
-  if (workout.can_unlink_activity) {
-    const unlink = document.createElement("button");
-    unlink.className = "unlink-activity";
-    unlink.type = "button";
-    unlink.textContent = "Unlink activity";
-    unlink.addEventListener("click", () => openActivityUnlink(week, workout));
-    actions.append(unlink);
   }
   actions.append(edit);
   if (workout.can_move) {
@@ -463,8 +455,9 @@ function activityLinkUrl() {
 
 async function openActivityLink(week, workout) {
   state.activityLink = { week, workoutId: workout.id, name: workout.name };
-  $("#activity-link-title").textContent = `Link ${workout.name}`;
-  $("#activity-link-help").textContent = `Choose an unlinked Garmin running activity from ${dateLabel(workout.date)}.`;
+  $("#activity-apply").disabled = false;
+  $("#activity-link-title").textContent = `${workout.status === "missed" ? "Link" : "Manage"} activities · ${workout.name}`;
+  $("#activity-link-help").textContent = `Select every Garmin run from ${dateLabel(workout.date)} that belongs to this workout.`;
   $("#activity-link-dialog").showModal();
   await loadActivityCandidates();
 }
@@ -480,12 +473,16 @@ async function loadActivityCandidates() {
     if (!result.activities.length) {
       list.append(Object.assign(document.createElement("p"), {
         className: "activity-empty",
-        textContent: "No unlinked running activities found on this date.",
+        textContent: "No running activities found on this date.",
       }));
     }
     for (const activity of result.activities) {
-      const item = document.createElement("article");
-      item.className = "activity-candidate";
+      const item = document.createElement("label");
+      item.className = "activity-candidate activity-choice";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = activity.id;
+      checkbox.checked = activity.selected;
       const details = document.createElement("div");
       const title = document.createElement("strong");
       title.textContent = activity.name;
@@ -493,12 +490,12 @@ async function loadActivityCandidates() {
       const time = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(activity.startTimeLocal));
       summary.textContent = `${time} · ${distanceLabel(activity.distanceMeters)} · ${durationLabel(activity.durationSeconds)}`;
       details.append(title, summary);
-      const button = document.createElement("button");
-      button.className = "button primary";
-      button.type = "button";
-      button.textContent = "Link activity";
-      button.addEventListener("click", () => linkActivity(activity.id, button));
-      item.append(details, button);
+      if (activity.linkSource) {
+        const source = document.createElement("small");
+        source.textContent = `${activity.linkSource === "automatic" ? "Automatically" : "Manually"} linked`;
+        details.append(source);
+      }
+      item.append(checkbox, details);
       list.append(item);
     }
   } catch (error) {
@@ -508,14 +505,16 @@ async function loadActivityCandidates() {
   }
 }
 
-async function linkActivity(activityId, button) {
+async function applyActivityLinks() {
+  const button = $("#activity-apply");
   button.disabled = true;
   try {
     const link = state.activityLink;
-    const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activity-link`, {
+    const activityIds = Array.from($("#activity-list").querySelectorAll('input[type="checkbox"]:checked'), input => Number(input.value));
+    const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activity-links`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: state.user.id, revision: state.program.revision, activityId }),
+      body: JSON.stringify({ userId: state.user.id, revision: state.program.revision, activityIds }),
     });
     $("#activity-link-dialog").close();
     state.activityLink = null;
@@ -524,12 +523,6 @@ async function linkActivity(activityId, button) {
     button.disabled = false;
     showError(error.message);
   }
-}
-
-function openActivityUnlink(week, workout) {
-  state.activityLink = { week, workoutId: workout.id, name: workout.name };
-  $("#activity-unlink-title").textContent = `Unlink activity from ${workout.name}?`;
-  $("#activity-unlink-dialog").showModal();
 }
 
 function touchById(touches, identifier) {
@@ -1056,20 +1049,9 @@ $("#delete-workout-form").addEventListener("submit", async (event) => {
   } catch (error) { setSaveFailure(error); showError(error.message); }
 });
 $("#activity-link-dialog").addEventListener("close", () => { state.activityLink = null; });
-$("#activity-unlink-dialog").addEventListener("close", () => { state.activityLink = null; });
-$("#activity-unlink-form").addEventListener("submit", async (event) => {
+$("#activity-link-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  try {
-    const link = state.activityLink;
-    const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}/workouts/${link.week}/${encodeURIComponent(link.workoutId)}/activity-unlink`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: state.user.id, revision: state.program.revision }),
-    });
-    $("#activity-unlink-dialog").close();
-    state.activityLink = null;
-    render(updated);
-  } catch (error) { showError(error.message); }
+  await applyActivityLinks();
 });
 $("#move-form").addEventListener("submit", async (event) => {
   event.preventDefault();

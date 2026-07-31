@@ -7,6 +7,11 @@ from datetime import date
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
+from .application.activity_records import (
+    apply_linked_activities,
+    linked_activities,
+    linked_activity_ids,
+)
 from .users import WebError
 
 if TYPE_CHECKING:
@@ -83,21 +88,23 @@ class WebActivityLinkService:
             fallback_pace_value=user.default_pace,
         )
         workout = self._workout(program, week, workout_id)
-        if not workout.get("can_link_activity"):
-            raise WebError(HTTPStatus.CONFLICT, "Only missed workouts can link an activity")
-        activities = self._activities(name, user.id, program, workout)
+        if not workout.get("can_manage_activities"):
+            raise WebError(
+                HTTPStatus.CONFLICT, "Only missed or completed workouts can manage activities"
+            )
+        activities = self._activities(name, user.id, program, week, workout)
         return {"revision": program["revision"], "activities": activities}
 
-    def link(
+    def apply(
         self, name: str, week: str, workout_id: str, request: dict[str, Any]
     ) -> dict[str, Any]:
         user = self.sync.users.get(request.get("userId") or self.sync.users.default_id)
         self._require_revision(name, user.id, request.get("revision"))
         listing = self.candidates(name, week, workout_id, user.id)
-        activity_id = request.get("activityId")
-        selected = next((item for item in listing["activities"] if item["id"] == activity_id), None)
-        if selected is None:
-            raise WebError(HTTPStatus.CONFLICT, "The Garmin activity is no longer available")
+        selected_ids = self._selected_ids(request.get("activityIds"))
+        available = {item["id"]: item for item in listing["activities"]}
+        if not selected_ids.issubset(available):
+            raise WebError(HTTPStatus.CONFLICT, "A Garmin activity is no longer available")
         repository = self.sync.repository_for(user.id, name)
         program = self.sync.store_for(user.id).get(
             name, repository=repository, fallback_pace_value=user.default_pace
@@ -106,67 +113,35 @@ class WebActivityLinkService:
         state = repository.load(program["program"]["id"])
         key = self._record_key(week, workout_id)
         record = state["workouts"].get(key)
-        if not isinstance(record, dict) or not workout.get("can_link_activity"):
-            raise WebError(HTTPStatus.CONFLICT, "The workout can no longer link an activity")
-        record.update(
-            status="completed",
-            activity_id=selected["id"],
-            activity_link_source="manual",
-            completed_at=selected["startTimeLocal"],
-            actual_distance_meters=selected["distanceMeters"],
-            actual_duration_seconds=selected["durationSeconds"],
-        )
-        record.pop("content_hash", None)
-        record.pop("description", None)
+        if not isinstance(record, dict) or not workout.get("can_manage_activities"):
+            raise WebError(HTTPStatus.CONFLICT, "The workout can no longer manage activities")
+        current = {item["activity_id"]: item for item in linked_activities(record)}
+        selected = []
+        for activity_id in selected_ids:
+            item = available[activity_id]
+            previous = current.get(activity_id, {})
+            selected.append(
+                {
+                    "activity_id": activity_id,
+                    "link_source": previous.get("link_source", "manual"),
+                    "name": item["name"],
+                    "completed_at": item["startTimeLocal"],
+                    "distance_meters": item["distanceMeters"],
+                    "duration_seconds": item["durationSeconds"],
+                }
+            )
+        apply_linked_activities(record, selected)
+        record["status"] = "completed" if selected else "missed"
+        if selected:
+            record.pop("content_hash", None)
+            record.pop("description", None)
         repository.save(program["program"]["id"], state)
         logger.info(
-            "Garmin activity linked user=%s program_id=%s workout=%s activity_id=%s",
+            "Garmin activity links updated user=%s program_id=%s workout=%s activities=%s",
             user.id,
             program["program"]["id"],
             key,
-            selected["id"],
-        )
-        return self.sync.store_for(user.id).get(
-            name, repository=repository, fallback_pace_value=user.default_pace
-        )
-
-    def unlink(
-        self, name: str, week: str, workout_id: str, request: dict[str, Any]
-    ) -> dict[str, Any]:
-        user = self.sync.users.get(request.get("userId") or self.sync.users.default_id)
-        self._require_revision(name, user.id, request.get("revision"))
-        repository = self.sync.repository_for(user.id, name)
-        program = self.sync.store_for(user.id).get(
-            name, repository=repository, fallback_pace_value=user.default_pace
-        )
-        workout = self._workout(program, week, workout_id)
-        if not workout.get("can_unlink_activity"):
-            raise WebError(HTTPStatus.CONFLICT, "Only manually linked activities can be unlinked")
-        state = repository.load(program["program"]["id"])
-        record = state["workouts"].get(self._record_key(week, workout_id))
-        if not isinstance(record, dict) or record.get("activity_link_source") != "manual":
-            raise WebError(HTTPStatus.CONFLICT, "The activity link can no longer be removed")
-        for field in (
-            "activity_id",
-            "activity_link_source",
-            "completed_at",
-            "actual_distance_meters",
-            "actual_duration_seconds",
-        ):
-            record.pop(field, None)
-        workout_date = date.fromisoformat(workout["date"])
-        if workout_date < self.sync.today():
-            record["status"] = "missed"
-        elif record.get("schedule_id") is not None:
-            record["status"] = "scheduled"
-        else:
-            record["status"] = "planned"
-        repository.save(program["program"]["id"], state)
-        logger.info(
-            "Garmin activity unlinked user=%s program_id=%s workout=%s",
-            user.id,
-            program["program"]["id"],
-            self._record_key(week, workout_id),
+            ",".join(str(value) for value in sorted(selected_ids)) or "none",
         )
         return self.sync.store_for(user.id).get(
             name, repository=repository, fallback_pace_value=user.default_pace
@@ -177,20 +152,30 @@ class WebActivityLinkService:
         name: str,
         user_id: str,
         program: dict[str, Any],
+        week: str,
         workout: dict[str, Any],
     ) -> list[dict[str, Any]]:
         target = date.fromisoformat(workout["date"])
         activity_date = target.isoformat()
         repository = self.sync.repository_for(user_id, name)
-        records = list(repository.load(program["program"]["id"])["workouts"].values())
-        linked_ids = {
-            record["activity_id"]
-            for record in records
-            if isinstance(record, dict) and record.get("activity_id") is not None
+        records_by_key = repository.load(program["program"]["id"])["workouts"]
+        target_key = self._record_key(week, workout["id"])
+        target_record = records_by_key.get(target_key, {})
+        current = {
+            item["activity_id"]: item
+            for item in linked_activities(target_record)
+            if isinstance(item.get("activity_id"), int)
+        }
+        linked_elsewhere = {
+            activity_id
+            for key, record in records_by_key.items()
+            if key != target_key and isinstance(record, dict)
+            for activity_id in linked_activity_ids(record)
         }
         tracked_workout_ids = {
             record["workout_id"]
-            for record in records
+            for key, record in records_by_key.items()
+            if key != target_key
             if isinstance(record, dict) and record.get("workout_id") is not None
         }
         try:
@@ -202,7 +187,7 @@ class WebActivityLinkService:
                     continue
                 detail = client.get_activity(str(item["activityId"]))
                 normalized = _candidate(detail, item)
-                if normalized is None or normalized["id"] in linked_ids:
+                if normalized is None or normalized["id"] in linked_elsewhere:
                     continue
                 if normalized["associatedWorkoutId"] in tracked_workout_ids:
                     continue
@@ -213,15 +198,38 @@ class WebActivityLinkService:
             raise WebError(
                 HTTPStatus.BAD_GATEWAY, f"Could not read Garmin activities: {exc}"
             ) from exc
-        result.sort(
-            key=lambda item: (
-                abs((date.fromisoformat(item["date"]) - target).days),
-                item["startTimeLocal"],
-            )
-        )
+        by_id = {item["id"]: item for item in result}
+        for activity_id, entry in current.items():
+            by_id.setdefault(activity_id, self._stored_candidate(entry, activity_date))
+        result = list(by_id.values())
+        result.sort(key=lambda item: (item["startTimeLocal"], item["id"]))
         for item in result:
             item.pop("associatedWorkoutId", None)
+            previous = current.get(item["id"])
+            item["selected"] = previous is not None
+            item["linkSource"] = previous.get("link_source") if previous else None
         return result
+
+    @staticmethod
+    def _stored_candidate(entry: dict[str, Any], activity_date: str) -> dict[str, Any]:
+        return {
+            "id": entry["activity_id"],
+            "name": entry.get("name", f"Garmin activity {entry['activity_id']}"),
+            "startTimeLocal": entry.get("completed_at", f"{activity_date}T00:00:00"),
+            "date": str(entry.get("completed_at", activity_date))[:10],
+            "distanceMeters": entry["distance_meters"],
+            "durationSeconds": entry["duration_seconds"],
+        }
+
+    @staticmethod
+    def _selected_ids(value: Any) -> set[int]:
+        if not isinstance(value, list):
+            raise WebError(HTTPStatus.BAD_REQUEST, "activityIds must be a list")
+        if any(not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in value):
+            raise WebError(HTTPStatus.BAD_REQUEST, "activityIds must contain positive integers")
+        if len(set(value)) != len(value):
+            raise WebError(HTTPStatus.BAD_REQUEST, "activityIds must be unique")
+        return set(value)
 
     def _require_revision(self, name: str, user_id: str, revision: Any) -> None:
         if revision != self.sync.store_for(user_id).revision(name):

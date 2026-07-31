@@ -110,16 +110,10 @@ class RunplanHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, self.sync.execute(parts[0], payload))
             return
         if len(parts) == 5 and parts[1] == "workouts":
-            if parts[4] == "activity-link":
+            if parts[4] == "activity-links":
                 self._json(
                     HTTPStatus.OK,
-                    self.sync.activity_links.link(parts[0], parts[2], parts[3], payload),
-                )
-                return
-            if parts[4] == "activity-unlink":
-                self._json(
-                    HTTPStatus.OK,
-                    self.sync.activity_links.unlink(parts[0], parts[2], parts[3], payload),
+                    self.sync.activity_links.apply(parts[0], parts[2], parts[3], payload),
                 )
                 return
         raise WebError(HTTPStatus.NOT_FOUND, "Not found")

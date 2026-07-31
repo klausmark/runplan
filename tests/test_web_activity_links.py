@@ -16,6 +16,8 @@ def activity(
     activity_id: int,
     started: str,
     *,
+    distance: float = 10_000.0,
+    duration: float = 3_600.0,
     associated_workout_id: int | None = None,
     activity_type: str = "running",
 ) -> dict:
@@ -26,13 +28,13 @@ def activity(
         "activityId": activity_id,
         "activityName": f"Run {activity_id}",
         "startTimeLocal": started,
-        "distance": 10_000.0,
-        "duration": 3_600.0,
+        "distance": distance,
+        "duration": duration,
         "activityType": {"typeKey": activity_type},
         "summaryDTO": {
             "startTimeLocal": started,
-            "distance": 10_000.0,
-            "duration": 3_600.0,
+            "distance": distance,
+            "duration": duration,
         },
         "metadataDTO": metadata,
     }
@@ -63,14 +65,16 @@ def activity_service(tmp_path: Path):
         "activity_id": 902,
         "actual_distance_meters": 5_000.0,
         "actual_duration_seconds": 1_800.0,
+        "completed_at": "2026-12-31T08:00:00",
     }
     client = FakeGarmin(
         activities=[
-            activity(900, "2026-12-28T18:30:00"),
+            activity(900, "2026-12-28T18:30:00", distance=6_000, duration=2_100),
             activity(901, "2026-12-27T09:00:00"),
-            activity(902, "2026-12-28T10:00:00"),
+            activity(902, "2026-12-31T08:00:00", distance=5_000, duration=1_800),
             activity(903, "2026-12-28T11:00:00", associated_workout_id=11),
             activity(904, "2026-12-28T12:00:00", activity_type="cycling"),
+            activity(905, "2026-12-28T17:00:00", distance=4_000, duration=1_500),
         ]
     )
     store = ProgramStore(tmp_path, repository=repository)
@@ -83,85 +87,101 @@ def activity_service(tmp_path: Path):
     return service, repository, client
 
 
-def test_candidates_only_query_running_activities_on_workout_date(activity_service) -> None:
+def test_candidates_query_same_day_and_mark_current_links(activity_service) -> None:
     service, _, client = activity_service
 
-    result = service.activity_links.candidates("plan.yaml", "1", "mixed", None)
+    missed = service.activity_links.candidates("plan.yaml", "1", "mixed", None)
+    completed = service.activity_links.candidates("plan.yaml", "1", "easy", None)
 
-    assert [item["id"] for item in result["activities"]] == [900]
+    assert [item["id"] for item in missed["activities"]] == [905, 900]
+    assert not any(item["selected"] for item in missed["activities"])
+    assert [item["id"] for item in completed["activities"]] == [902]
+    assert completed["activities"][0]["selected"]
+    assert completed["activities"][0]["linkSource"] == "automatic"
     assert [event for event in client.events if event[0] == "get_activities_by_date"] == [
         ("get_activities_by_date", "2026-12-28", "2026-12-28", "running"),
+        ("get_activities_by_date", "2026-12-31", "2026-12-31", "running"),
     ]
 
 
-def test_link_persists_manual_completed_result_without_mutating_garmin(activity_service) -> None:
+def test_apply_multiple_activities_sums_actual_result(activity_service) -> None:
     service, repository, client = activity_service
     revision = service.store.get("plan.yaml", repository=repository)["revision"]
 
-    result = service.activity_links.link(
+    result = service.activity_links.apply(
         "plan.yaml",
         "1",
         "mixed",
-        {"revision": revision, "activityId": 900},
+        {"revision": revision, "activityIds": [900, 905]},
     )
 
     record = repository.load("characterization-plan")["workouts"]["week-01/mixed"]
     assert record["status"] == "completed"
-    assert record["activity_id"] == 900
-    assert record["activity_link_source"] == "manual"
-    assert record["workout_id"] == 10
-    assert record["schedule_id"] == 20
+    assert [item["activity_id"] for item in record["activities"]] == [905, 900]
+    assert {item["link_source"] for item in record["activities"]} == {"manual"}
+    assert record["actual_distance_meters"] == 10_000
+    assert record["actual_duration_seconds"] == 3_600
+    assert record["completed_at"] == "2026-12-28T17:00:00"
     workout = result["weeks"][0]["workouts"][0]
-    assert workout["can_unlink_activity"]
+    assert len(workout["activities"]) == 2
     assert not [event for event in client.events if event[0] in {"delete", "unschedule"}]
 
 
-def test_unlink_manual_activity_restores_missed_status(activity_service) -> None:
+def test_apply_can_remove_automatic_activity_and_mark_workout_missed(activity_service) -> None:
     service, repository, _ = activity_service
     revision = service.store.get("plan.yaml", repository=repository)["revision"]
-    linked = service.activity_links.link(
-        "plan.yaml",
-        "1",
-        "mixed",
-        {"revision": revision, "activityId": 900},
+
+    service.activity_links.apply(
+        "plan.yaml", "1", "easy", {"revision": revision, "activityIds": []}
     )
 
-    service.activity_links.unlink("plan.yaml", "1", "mixed", {"revision": linked["revision"]})
-
-    record = repository.load("characterization-plan")["workouts"]["week-01/mixed"]
+    record = repository.load("characterization-plan")["workouts"]["week-01/easy"]
     assert record["status"] == "missed"
+    assert "activities" not in record
     assert "activity_id" not in record
-    assert "activity_link_source" not in record
+    assert "actual_distance_meters" not in record
 
 
-def test_link_rejects_stale_revision_and_activity_from_another_date(activity_service) -> None:
+def test_apply_preserves_automatic_source_and_adds_manual_source(activity_service) -> None:
+    service, repository, client = activity_service
+    client.activities.append(activity(906, "2026-12-31T09:00:00", distance=2_000, duration=700))
+    revision = service.store.get("plan.yaml", repository=repository)["revision"]
+
+    service.activity_links.apply(
+        "plan.yaml",
+        "1",
+        "easy",
+        {"revision": revision, "activityIds": [902, 906]},
+    )
+
+    activities = repository.load("characterization-plan")["workouts"]["week-01/easy"]["activities"]
+    assert [(item["activity_id"], item["link_source"]) for item in activities] == [
+        (902, "automatic"),
+        (906, "manual"),
+    ]
+
+
+def test_apply_rejects_stale_revision_invalid_ids_and_other_date(activity_service) -> None:
     service, repository, _ = activity_service
     revision = service.store.get("plan.yaml", repository=repository)["revision"]
 
     with pytest.raises(WebError, match="program changed"):
-        service.activity_links.link(
-            "plan.yaml", "1", "mixed", {"revision": "stale", "activityId": 900}
+        service.activity_links.apply(
+            "plan.yaml", "1", "mixed", {"revision": "stale", "activityIds": [900]}
+        )
+    with pytest.raises(WebError, match="positive integers"):
+        service.activity_links.apply(
+            "plan.yaml", "1", "mixed", {"revision": revision, "activityIds": ["900"]}
         )
     with pytest.raises(WebError, match="no longer available"):
-        service.activity_links.link(
-            "plan.yaml",
-            "1",
-            "mixed",
-            {"revision": revision, "activityId": 901},
+        service.activity_links.apply(
+            "plan.yaml", "1", "mixed", {"revision": revision, "activityIds": [901]}
         )
 
 
-def test_scheduled_workout_cannot_link_activity(activity_service) -> None:
+def test_scheduled_workout_cannot_manage_activities(activity_service) -> None:
     service, repository, _ = activity_service
     repository.load("characterization-plan")["workouts"]["week-01/mixed"]["status"] = "scheduled"
 
-    with pytest.raises(WebError, match="Only missed workouts"):
+    with pytest.raises(WebError, match="Only missed or completed"):
         service.activity_links.candidates("plan.yaml", "1", "mixed", None)
-
-
-def test_automatic_activity_link_cannot_be_unlinked(activity_service) -> None:
-    service, repository, _ = activity_service
-    revision = service.store.get("plan.yaml", repository=repository)["revision"]
-
-    with pytest.raises(WebError, match="manually linked"):
-        service.activity_links.unlink("plan.yaml", "1", "easy", {"revision": revision})

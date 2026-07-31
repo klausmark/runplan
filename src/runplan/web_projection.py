@@ -11,6 +11,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .application.activity_records import linked_activities
 from .application.ports import StateRepository
 from .application.sync import workout_content_hash
 from .domain.errors import WorkoutDefinitionError
@@ -62,9 +63,8 @@ def _workout_view(
         "can_move": status != "completed",
         "activity_link_source": record.get("activity_link_source"),
         "can_link_activity": status == "missed",
-        "can_unlink_activity": (
-            status == "completed" and record.get("activity_link_source") == "manual"
-        ),
+        "can_manage_activities": status in {"missed", "completed"},
+        "activities": linked_activities(record),
         "actual_distance_meters": record.get("actual_distance_meters"),
         "actual_duration_seconds": record.get("actual_duration_seconds"),
         "effective_distance_meters": distance,

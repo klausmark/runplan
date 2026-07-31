@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 from ..integrations.garmin.client import scheduled_items_for_dates
+from .activity_records import apply_linked_activities
 from .ports import GarminClient, StateRepository
 from .results import ReconcileResult
 from .sync_support import TERMINAL_STATUSES, SyncSelection, schedule_for_record, validate_selections
@@ -20,14 +21,18 @@ def _complete_record(
     """Apply one completed Garmin occurrence to an existing tracked record."""
     activity_id = occurrence["associatedActivityId"]
     completed_at = occurrence.get("associatedActivityDateTime")
-    record.update(
-        status="completed",
-        activity_id=activity_id,
-        actual_distance_meters=occurrence["actualDistanceMeters"],
-        actual_duration_seconds=occurrence["actualDurationSeconds"],
-    )
+    activity = {
+        "activity_id": activity_id,
+        "link_source": "automatic",
+        "distance_meters": occurrence["actualDistanceMeters"],
+        "duration_seconds": occurrence["actualDurationSeconds"],
+    }
     if completed_at:
-        record["completed_at"] = completed_at
+        activity["completed_at"] = completed_at
+    if occurrence.get("associatedActivityName"):
+        activity["name"] = occurrence["associatedActivityName"]
+    record["status"] = "completed"
+    apply_linked_activities(record, [activity])
     record.pop("content_hash", None)
     record.pop("description", None)
     result.add(
@@ -100,10 +105,18 @@ def _completed_selected_record(
         "date": definition["schedule_date"],
         "name": definition["name"],
         "status": "completed",
-        "activity_id": occurrence["associatedActivityId"],
-        "actual_distance_meters": occurrence["actualDistanceMeters"],
-        "actual_duration_seconds": occurrence["actualDurationSeconds"],
     }
+    activity = {
+        "activity_id": occurrence["associatedActivityId"],
+        "link_source": "automatic",
+        "distance_meters": occurrence["actualDistanceMeters"],
+        "duration_seconds": occurrence["actualDurationSeconds"],
+    }
+    if occurrence.get("associatedActivityDateTime"):
+        activity["completed_at"] = occurrence["associatedActivityDateTime"]
+    if occurrence.get("associatedActivityName"):
+        activity["name"] = occurrence["associatedActivityName"]
+    apply_linked_activities(completed, [activity])
     optional = {
         "workout_id": occurrence.get("workoutId"),
         "schedule_id": occurrence.get("workoutScheduleId", occurrence.get("id")),

@@ -36,6 +36,13 @@ def _step_model(raw: Any, location: str) -> Step:
     )
 
 
+def _activity_id(tracking: dict[str, Any]) -> int | None:
+    activities = tracking.get("activities")
+    if isinstance(activities, list) and activities and isinstance(activities[0], dict):
+        return activities[0].get("activity_id")
+    return tracking.get("garmin", {}).get("activity_id")
+
+
 def program_model(normalized: dict[str, Any]) -> Program:
     """Build a typed domain program from validated normalized data.
 
@@ -64,7 +71,7 @@ def program_model(normalized: dict[str, Any]) -> Program:
                     garmin_schedule_id=workout.get("tracking", {})
                     .get("garmin", {})
                     .get("schedule_id"),
-                    activity_id=workout.get("tracking", {}).get("garmin", {}).get("activity_id"),
+                    activity_id=_activity_id(workout.get("tracking", {})),
                     completed_at=workout.get("tracking", {}).get("actual", {}).get("completed_at"),
                     actual_distance_meters=workout.get("tracking", {})
                     .get("actual", {})

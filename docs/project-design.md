@@ -284,7 +284,10 @@ Every real sync first reconciles historical managed schedules. A Garmin
 `associatedActivityId`, or an activity summary whose
 `metadataDTO.associatedWorkoutId` matches the managed workout, marks a workout
 completed. The completed record includes Garmin's actual distance and total
-duration; a past occurrence without an
+duration. A completed or missed workout may retain multiple linked runs; their
+distance and duration are aggregated while each Garmin activity ID and link
+source remains in YAML. Manual selection is restricted to the workout's exact
+calendar date. A past occurrence without an
 associated activity becomes missed. Both are terminal for automatic sync and
 prune. Their owned Garmin schedule and workout template are automatically
 cleaned up, but recorded activities are never deleted. Compact terminal history

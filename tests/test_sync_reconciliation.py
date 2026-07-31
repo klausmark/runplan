@@ -68,6 +68,7 @@ class TestSyncReconciliation(SyncTestBase):
         state = load_state("characterization-plan")["workouts"]
         assert "completed" == state["week-01/completed"]["status"]
         assert 900 == state["week-01/completed"]["activity_id"]
+        assert state["week-01/completed"]["activities"][0]["link_source"] == "automatic"
         assert "content_hash" not in state["week-01/completed"]
         assert "description" not in state["week-01/completed"]
         assert "missed" == state["week-01/missed"]["status"]

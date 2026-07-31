@@ -209,6 +209,8 @@ def _apply_activity(
     ):
         raise RuntimeError(f"Garmin activity {activity_id} has invalid distance or duration")
     occurrence["associatedActivityId"] = summary.get("activityId", activity_id)
+    if isinstance(summary.get("activityName"), str):
+        occurrence["associatedActivityName"] = summary["activityName"]
     occurrence["associatedActivityDateTime"] = details.get("startTimeLocal", fallback_time)
     occurrence["actualDistanceMeters"] = float(distance)
     occurrence["actualDurationSeconds"] = float(duration)

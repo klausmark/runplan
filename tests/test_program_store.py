@@ -137,6 +137,24 @@ class TestProgramStore:
             {"status": "scheduled", "scheduled_date": "not-a-date"},
             {"status": "scheduled", "synced_content_hash": "short"},
             {"status": "scheduled", "garmin": {"workout_id": -1}},
+            {"status": "missed", "activities": [{"activity_id": 1}]},
+            {
+                "status": "completed",
+                "activities": [
+                    {
+                        "activity_id": 1,
+                        "link_source": "manual",
+                        "distance_meters": 10,
+                        "duration_seconds": 20,
+                    },
+                    {
+                        "activity_id": 1,
+                        "link_source": "manual",
+                        "distance_meters": 10,
+                        "duration_seconds": 20,
+                    },
+                ],
+            },
             {"status": "completed", "actual": {"distance_meters": 10, "duration_seconds": 0}},
             {
                 "status": "completed",

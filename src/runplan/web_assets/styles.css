@@ -180,6 +180,8 @@ dialog footer { display: flex; justify-content: end; gap: 10px; margin-top: 4px;
 .activity-list { display: grid; gap: 10px; max-height: min(55vh, 520px); overflow-y: auto; }
 .activity-candidate { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .activity-candidate div { min-width: 0; display: grid; gap: 4px; }
+.activity-choice { justify-content: start; cursor: pointer; }
+.activity-choice input { flex: 0 0 auto; }
 .activity-candidate strong { font-size: 13px; }
 .activity-candidate span, .activity-empty, .activity-list > p { color: var(--muted); font-size: 12px; margin: 0; }
 .activity-candidate .button { flex: 0 0 auto; }
