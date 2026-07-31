@@ -141,7 +141,10 @@ class TestWebAsset:
     def test_workout_yaml_disclosure_matches_the_editor_mode(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-        assert html.index('id="workout-activities"') < html.index('id="workout-yaml-details"')
+        details_start = html.index('id="workout-yaml-details"')
+        details_end = html.index("</details>", details_start)
+        assert html.index('id="workout-activities"') < details_start
+        assert details_start < html.index('id="save-workout-button"') < details_end
         assert '$("#workout-yaml-details").open = false;' in script
         assert '$("#workout-yaml-details").open = true;' in script
 
