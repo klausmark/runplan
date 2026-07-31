@@ -201,9 +201,15 @@ class TestProgramStore:
             for week in loaded["weeks"]
             for workout in week["workouts"]
         }
+        movable = {
+            workout["id"]: workout["can_move"]
+            for week in loaded["weeks"]
+            for workout in week["workouts"]
+        }
         assert "scheduled" == statuses["mixed"]
         assert "completed" == statuses["easy"]
         assert "changed" == statuses["long"]
+        assert movable == {"mixed": True, "easy": False, "long": True}
 
     def test_edits_metadata_and_rejects_stale_revision(self) -> None:
         loaded = self.store.get("plan.yaml")
@@ -245,6 +251,58 @@ class TestProgramStore:
         )
         days = {item["id"]: item["day"] for item in swapped["weeks"][0]["workouts"]}
         assert days == {"mixed": 4, "easy": 2}
+
+    def test_completed_workout_moves_require_direct_yaml_editing(self) -> None:
+        state = self.repository.load("characterization-plan")
+        state["workouts"]["week-01/easy"] = {
+            "status": "completed",
+            "date": "2026-12-31",
+            "activity_id": 30,
+            "actual_distance_meters": 5000.0,
+            "actual_duration_seconds": 1800.0,
+        }
+        loaded = self.store.get("plan.yaml")
+
+        with pytest.raises(WebError, match="Completed workouts"):
+            self.store.edit(
+                "plan.yaml",
+                {
+                    "revision": loaded["revision"],
+                    "move": {
+                        "from_week": 1,
+                        "workout_id": "easy",
+                        "to_week": 1,
+                        "to_day": 5,
+                    },
+                },
+            )
+        with pytest.raises(WebError, match="completed workout"):
+            self.store.edit(
+                "plan.yaml",
+                {
+                    "revision": loaded["revision"],
+                    "move": {
+                        "from_week": 1,
+                        "workout_id": "mixed",
+                        "to_week": 1,
+                        "to_day": 4,
+                    },
+                },
+            )
+
+        completed = loaded["weeks"][0]["workouts"][1]
+        updated = self.store.edit(
+            "plan.yaml",
+            {
+                "revision": loaded["revision"],
+                "workout": {
+                    "week": 1,
+                    "workout_id": "easy",
+                    "yaml": completed["yaml"].replace("day: 4", "day: 5"),
+                },
+            },
+        )
+        assert updated["weeks"][0]["workouts"][1]["day"] == 5
 
     def test_moving_between_weeks_recalculates_week_distances(self) -> None:
         loaded = self.store.get("plan.yaml")

@@ -43,6 +43,9 @@ Calendar movement supports pointer interaction first, with touch and keyboard
 alternatives required before the workflow is complete. Moves retain stable
 workout IDs and content. Save, validation, and Garmin sync state must be
 distinct and unambiguous, and reversible local edits should offer undo.
+Completed workouts are immutable on the calendar: they cannot be dragged, moved,
+used in a swap, or moved by undo on desktop or mobile. Direct YAML editing is the
+deliberate escape hatch for correcting their scheduled day.
 
 An empty day can create a workout from a valid YAML template, with the supported
 syntax documented in the creation dialog. Workout additions, edits, moves, and

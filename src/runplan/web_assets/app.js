@@ -111,6 +111,9 @@ function setSaveFailure(error) {
 }
 
 function updateUndoControl() {
+  if (state.undoMove && !canMoveRequest(state.undoMove.fromWeek, state.undoMove.workoutId, state.undoMove.toWeek, state.undoMove.toDay)) {
+    state.undoMove = null;
+  }
   $("#undo-move").classList.toggle("hidden", !state.undoMove);
 }
 
@@ -348,6 +351,7 @@ function render(program) {
       cell.dataset.week = week.week;
       cell.dataset.day = day;
       const workout = week.workouts.find((item) => item.day === day);
+      cell.dataset.moveLocked = String(workout?.can_move === false);
       const label = document.createElement("div");
       label.className = "day-label";
       const dayName = document.createElement("span");
@@ -367,7 +371,11 @@ function render(program) {
         add.addEventListener("click", () => openAddWorkout(week.week, day));
         cell.append(add);
       }
-      cell.addEventListener("dragover", (event) => { event.preventDefault(); cell.classList.add("drag-over"); });
+      cell.addEventListener("dragover", (event) => {
+        if (cell.dataset.moveLocked === "true") return;
+        event.preventDefault();
+        cell.classList.add("drag-over");
+      });
       cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
       cell.addEventListener("drop", () => moveWorkout(week.week, day, cell));
       days.append(cell);
@@ -387,7 +395,8 @@ function render(program) {
 function workoutCard(week, workout) {
   const card = document.createElement("article");
   card.className = "workout";
-  card.draggable = true;
+  card.draggable = workout.can_move;
+  card.classList.toggle("workout-locked", !workout.can_move);
   const title = document.createElement("h3");
   title.textContent = workout.name.replace(/^Week \d+\s*-\s*/, "");
   const status = document.createElement("span");
@@ -406,16 +415,18 @@ function workoutCard(week, workout) {
   edit.type = "button";
   edit.textContent = "Edit YAML →";
   edit.addEventListener("click", () => openWorkout(week, workout));
-  const move = document.createElement("button");
-  move.className = "move-workout";
-  move.type = "button";
-  move.textContent = "↕ Move";
-  move.title = "Hold and drag the card, or tap to choose a day";
-  move.setAttribute("aria-label", `Move ${workout.name}`);
-  move.addEventListener("click", () => openMove(week, workout));
   const actions = document.createElement("div");
   actions.className = "workout-actions";
-  actions.append(move);
+  if (workout.can_move) {
+    const move = document.createElement("button");
+    move.className = "move-workout";
+    move.type = "button";
+    move.textContent = "↕ Move";
+    move.title = "Hold and drag the card, or tap to choose a day";
+    move.setAttribute("aria-label", `Move ${workout.name}`);
+    move.addEventListener("click", () => openMove(week, workout));
+    actions.append(move);
+  }
   if (workout.can_link_activity) {
     const link = document.createElement("button");
     link.className = "link-activity";
@@ -433,12 +444,14 @@ function workoutCard(week, workout) {
     actions.append(unlink);
   }
   actions.append(edit);
-  card.addEventListener("dragstart", () => { state.dragged = { week, workoutId: workout.id }; card.style.opacity = ".45"; });
-  card.addEventListener("dragend", () => { state.dragged = null; card.style.opacity = ""; });
-  card.addEventListener("touchstart", (event) => beginTouchDrag(event, card, week, workout), { passive: true });
-  card.addEventListener("contextmenu", (event) => {
-    if (state.touchDrag?.card === card) event.preventDefault();
-  });
+  if (workout.can_move) {
+    card.addEventListener("dragstart", () => { state.dragged = { week, workoutId: workout.id }; card.style.opacity = ".45"; });
+    card.addEventListener("dragend", () => { state.dragged = null; card.style.opacity = ""; });
+    card.addEventListener("touchstart", (event) => beginTouchDrag(event, card, week, workout), { passive: true });
+    card.addEventListener("contextmenu", (event) => {
+      if (state.touchDrag?.card === card) event.preventDefault();
+    });
+  }
   card.append(status, title, summary, description, actions);
   return card;
 }
@@ -577,7 +590,8 @@ function positionTouchGhost(x, y) {
 function updateTouchTarget(x, y) {
   const drag = state.touchDrag;
   if (!drag?.active) return;
-  const target = document.elementFromPoint(x, y)?.closest(".day") || null;
+  const candidate = document.elementFromPoint(x, y)?.closest(".day") || null;
+  const target = candidate?.dataset.moveLocked === "true" ? null : candidate;
   if (target === drag.target) return;
   drag.target?.classList.remove("touch-drag-over");
   drag.target = target;
@@ -653,6 +667,7 @@ document.addEventListener("touchend", endTouchDrag, { passive: false });
 document.addEventListener("touchcancel", cancelTouchDrag);
 
 function openMove(week, workout) {
+  if (!workout.can_move) return;
   state.move = { week, workoutId: workout.id, day: workout.day };
   $("#move-title").textContent = `Move ${workout.name.replace(/^Week \d+\s*-\s*/, "")}`;
   $("#move-week").replaceChildren(...state.program.weeks.map((item) => {
@@ -663,12 +678,36 @@ function openMove(week, workout) {
     return option;
   }));
   $("#move-day").value = workout.day;
+  updateMoveDayOptions(week);
   $("#move-dialog").showModal();
+}
+
+function updateMoveDayOptions(weekNumber) {
+  const selectedWeek = state.program.weeks.find((week) => week.week === weekNumber);
+  const daySelect = $("#move-day");
+  for (const option of daySelect.options) {
+    const occupant = selectedWeek?.workouts.find((workout) => workout.day === Number(option.value));
+    option.disabled = occupant?.can_move === false;
+  }
+  if (daySelect.selectedOptions[0]?.disabled) {
+    const available = Array.from(daySelect.options).find((option) => !option.disabled);
+    if (available) daySelect.value = available.value;
+  }
+}
+
+function canMoveRequest(fromWeek, workoutId, toWeek, toDay) {
+  const source = state.program?.weeks.find((week) => week.week === fromWeek)?.workouts.find((workout) => workout.id === workoutId);
+  if (!source?.can_move) return false;
+  const target = state.program.weeks.find((week) => week.week === toWeek)?.workouts.find((workout) => workout.day === toDay);
+  return !target || (toWeek === fromWeek && target.id === source.id) || target.can_move;
 }
 
 async function persistMove(fromWeek, workoutId, toWeek, toDay) {
   const source = state.program.weeks.find((week) => week.week === fromWeek)?.workouts.find((workout) => workout.id === workoutId);
   if (!source) throw new Error("Workout no longer exists at its original position.");
+  if (!canMoveRequest(fromWeek, workoutId, toWeek, toDay)) {
+    throw new Error("Completed workouts can only be moved by editing YAML directly.");
+  }
   setAppStatus("saving", "Saving move…");
   const updated = await request(`/api/programs/${encodeURIComponent(state.program.file)}`, {
     method: "POST",
@@ -712,6 +751,7 @@ async function undoLastMove() {
 
 async function moveWorkout(toWeek, toDay, cell) {
   cell.classList.remove("drag-over");
+  if (cell.dataset.moveLocked === "true") return;
   if (!state.dragged || (state.dragged.week === toWeek && state.program.weeks.find(w => w.week === toWeek).workouts.find(w => w.id === state.dragged.workoutId)?.day === toDay)) return;
   try {
     await persistMove(state.dragged.week, state.dragged.workoutId, toWeek, toDay);
@@ -1082,6 +1122,9 @@ $("#auth-form").addEventListener("submit", async (event) => {
   } finally {
     submit.disabled = false;
   }
+});
+$("#move-week").addEventListener("change", (event) => {
+  updateMoveDayOptions(Number(event.target.value));
 });
 
 initializeAuthentication();

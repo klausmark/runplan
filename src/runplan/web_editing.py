@@ -66,8 +66,10 @@ class ProgramEditor:
         raw, text = self._read(path)
         if request.get("revision") != _revision(text):
             raise WebError(HTTPStatus.CONFLICT, "The program changed; reload before saving")
+        state_repository = repository or self.store.repository
+        completed = self._completed_workouts(raw, state_repository)
         metadata, move, workout_edit, workout_add, workout_delete = self._apply_request(
-            raw, request
+            raw, request, completed
         )
         self._validate(raw)
         rendered = dump_editable_yaml(raw)
@@ -86,7 +88,10 @@ class ProgramEditor:
         )
 
     def _apply_request(
-        self, raw: dict[str, Any], request: dict[str, Any]
+        self,
+        raw: dict[str, Any],
+        request: dict[str, Any],
+        completed: set[tuple[int, str]],
     ) -> tuple[Any, Any, Any, Any, Any]:
         metadata = request.get("program")
         if metadata is not None:
@@ -98,7 +103,7 @@ class ProgramEditor:
 
         move = request.get("move")
         if move is not None:
-            self._move(raw, move)
+            self._move(raw, move, completed)
 
         workout_edit = request.get("workout")
         if workout_edit is not None:
@@ -112,6 +117,28 @@ class ProgramEditor:
         if workout_delete is not None:
             self._delete_workout(raw, workout_delete)
         return metadata, move, workout_edit, workout_add, workout_delete
+
+    @staticmethod
+    def _completed_workouts(
+        raw: dict[str, Any], repository: StateRepository
+    ) -> set[tuple[int, str]]:
+        program_id = raw.get("program", {}).get("id")
+        records = repository.load(program_id).get("workouts", {})
+        completed: set[tuple[int, str]] = set()
+        for week in raw.get("weeks", []):
+            if not isinstance(week, dict) or not isinstance(week.get("week"), int):
+                continue
+            for workout in week.get("workouts", []):
+                if not isinstance(workout, dict) or not isinstance(workout.get("id"), str):
+                    continue
+                tracking = workout.get("tracking")
+                key = f"week-{week['week']:02d}/{workout['id']}"
+                record = records.get(key) if isinstance(records, dict) else None
+                if (isinstance(tracking, dict) and tracking.get("status") == "completed") or (
+                    isinstance(record, dict) and record.get("status") == "completed"
+                ):
+                    completed.add((week["week"], workout["id"]))
+        return completed
 
     @staticmethod
     def _validate(raw: dict[str, Any]) -> None:
@@ -158,7 +185,7 @@ class ProgramEditor:
                 return week
         raise WebError(HTTPStatus.BAD_REQUEST, f"Unknown week {number}")
 
-    def _move(self, raw: dict[str, Any], move: Any) -> None:
+    def _move(self, raw: dict[str, Any], move: Any, completed: set[tuple[int, str]]) -> None:
         if not isinstance(move, dict):
             raise WebError(HTTPStatus.BAD_REQUEST, "move must be an object")
         try:
@@ -175,9 +202,23 @@ class ProgramEditor:
         workout = next((item for item in source["workouts"] if item.get("id") == workout_id), None)
         if workout is None:
             raise WebError(HTTPStatus.BAD_REQUEST, "Workout not found in source week")
+        if (source_number, workout_id) in completed:
+            raise WebError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Completed workouts can only be moved by editing YAML directly",
+            )
         occupied = next(
             (item for item in target["workouts"] if item.get("day") == target_day), None
         )
+        if (
+            occupied is not None
+            and occupied is not workout
+            and (target_number, occupied.get("id")) in completed
+        ):
+            raise WebError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "A completed workout can only be moved by editing YAML directly",
+            )
         old_day = workout["day"]
         if occupied is not None and occupied is not workout:
             occupied["day"] = old_day

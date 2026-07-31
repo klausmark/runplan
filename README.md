@@ -46,6 +46,9 @@ workout and an inline reference for the supported step, duration, distance,
 pace, and repeat syntax. A week must retain at least one workout. Deleting a
 previously synchronized workout queues its Garmin cleanup for the next reviewed
 and confirmed sync rather than contacting Garmin immediately.
+Completed workouts are locked in the calendar and cannot be dragged, moved, or
+swapped on desktop or mobile. Change their `day` directly in YAML only when a
+completed history entry genuinely needs correction.
 
 `runplan serve` writes operational logs to stdout for container and service
 log collectors. `INFO` is the default and includes YAML changes, user and plan

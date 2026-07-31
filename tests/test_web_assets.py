@@ -200,3 +200,14 @@ class TestWebAsset:
         assert ".topbar.menu-open .topbar-actions-shell" in styles
         assert "body.mobile-menu-open .mobile-menu-backdrop" in styles
         assert "prefers-reduced-motion: reduce" in styles
+
+    def test_completed_workouts_are_locked_out_of_every_calendar_move_path(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert "card.draggable = workout.can_move" in script
+        assert "if (workout.can_move)" in script
+        assert "cell.dataset.moveLocked = String(workout?.can_move === false)" in script
+        assert 'candidate?.dataset.moveLocked === "true" ? null : candidate' in script
+        assert "function canMoveRequest(" in script
+        assert "Completed workouts can only be moved by editing YAML directly." in script
+        assert ".workout-locked" in styles
