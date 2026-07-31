@@ -60,6 +60,9 @@ def _validate_garmin(value: Any, location: str) -> None:
         item = value.get(field)
         if item is not None and (not isinstance(item, int) or isinstance(item, bool) or item <= 0):
             raise WorkoutDefinitionError(f"{location}.garmin.{field}: must be a positive integer")
+    source = value.get("activity_link_source")
+    if source is not None and source != "manual":
+        raise WorkoutDefinitionError(f"{location}.garmin.activity_link_source: must be 'manual'")
 
 
 def _validate_actual(actual: Any, status: str, location: str) -> None:

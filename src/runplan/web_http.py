@@ -109,6 +109,19 @@ class RunplanHandler(BaseHTTPRequestHandler):
         if len(parts) == 2 and parts[1] == "sync":
             self._json(HTTPStatus.OK, self.sync.execute(parts[0], payload))
             return
+        if len(parts) == 5 and parts[1] == "workouts":
+            if parts[4] == "activity-link":
+                self._json(
+                    HTTPStatus.OK,
+                    self.sync.activity_links.link(parts[0], parts[2], parts[3], payload),
+                )
+                return
+            if parts[4] == "activity-unlink":
+                self._json(
+                    HTTPStatus.OK,
+                    self.sync.activity_links.unlink(parts[0], parts[2], parts[3], payload),
+                )
+                return
         raise WebError(HTTPStatus.NOT_FOUND, "Not found")
 
     def _upload_program(self, payload: dict[str, Any]) -> None:
@@ -191,6 +204,18 @@ class RunplanHandler(BaseHTTPRequestHandler):
             return
         if len(parts) == 3 and parts[1:] == ["sync", "preview"]:
             self._json(HTTPStatus.OK, self.sync.preview(parts[0], user_id))
+            return
+        if len(parts) == 5 and parts[1] == "workouts" and parts[4] == "activities":
+            self._json(
+                HTTPStatus.OK,
+                self.sync.activity_links.candidates(
+                    parts[0],
+                    parts[2],
+                    parts[3],
+                    user_id,
+                    query.get("windowDays", ["0"])[0],
+                ),
+            )
             return
         raise WebError(HTTPStatus.NOT_FOUND, "Not found")
 

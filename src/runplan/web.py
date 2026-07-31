@@ -95,6 +95,9 @@ class WebSyncService:
         self.repository = repository
         self.client_factory = client_factory
         self.today = today
+        from .web_activity_links import WebActivityLinkService
+
+        self.activity_links = WebActivityLinkService(self)
 
     def store_for(self, user_id: str | None) -> ProgramStore:
         user = self.users.get(user_id or self.users.default_id)

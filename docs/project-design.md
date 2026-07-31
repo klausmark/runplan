@@ -79,6 +79,13 @@ saving the plan. It uses the CLI's selection and synchronization use cases,
 shows a structured diff before confirmation, and reports progress, results,
 and actionable errors. Credentials remain on the server.
 
+The calendar may manually link a scheduled or missed workout to an existing
+Garmin running activity without mutating Garmin. Discovery begins on the planned
+date and can be explicitly expanded to three days before and after it. Activities
+already linked inside the active plan are excluded. Only manual links can be
+unlinked through the focused UI; Garmin-associated completion remains governed by
+normal reconciliation, while the advanced YAML editor remains the escape hatch.
+
 The web application is protected by one shared Runplan Studio password and
 exposes multiple server-configured Runplan users after that login. Each user has a stable non-secret ID,
 display name, Garmin credentials-file path, Garmin token-store directory, and

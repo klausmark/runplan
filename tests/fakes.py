@@ -4,7 +4,9 @@ import copy
 
 
 class FakeGarmin:
-    def __init__(self, workouts=None, schedules=None, fail_upload_number=None) -> None:
+    def __init__(
+        self, workouts=None, schedules=None, fail_upload_number=None, activities=None
+    ) -> None:
         self.workouts = copy.deepcopy(workouts or [])
         self.schedules = copy.deepcopy(schedules or [])
         self.fail_upload_number = fail_upload_number
@@ -12,6 +14,7 @@ class FakeGarmin:
         self.events: list[tuple] = []
         self.next_workout_id = 1000
         self.next_schedule_id = 2000
+        self.activities = copy.deepcopy(activities or [])
 
     def get_workouts(self, start: int, limit: int) -> list[dict]:
         self.events.append(("get_workouts", start, limit))
@@ -28,6 +31,11 @@ class FakeGarmin:
 
     def get_activity(self, activity_id: str) -> dict:
         self.events.append(("get_activity", activity_id))
+        match = next(
+            (item for item in self.activities if item.get("activityId") == int(activity_id)), None
+        )
+        if match is not None:
+            return copy.deepcopy(match)
         return {
             "activityId": int(activity_id),
             "summaryDTO": {
@@ -37,6 +45,19 @@ class FakeGarmin:
             },
             "metadataDTO": {},
         }
+
+    def get_activities_by_date(
+        self, startdate: str, enddate: str | None = None, activitytype: str | None = None
+    ) -> list[dict]:
+        self.events.append(("get_activities_by_date", startdate, enddate, activitytype))
+        last = enddate or startdate
+        return copy.deepcopy(
+            [
+                item
+                for item in self.activities
+                if startdate <= str(item.get("startTimeLocal", ""))[:10] <= last
+            ]
+        )
 
     def upload_running_workout(self, workout) -> dict:
         self.upload_count += 1

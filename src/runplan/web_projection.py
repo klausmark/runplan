@@ -59,6 +59,11 @@ def _workout_view(
         "distance_is_approximate": estimate.distance_is_approximate,
         "duration_is_approximate": estimate.duration_is_approximate,
         "status": status,
+        "activity_link_source": record.get("activity_link_source"),
+        "can_link_activity": status in {"scheduled", "missed"},
+        "can_unlink_activity": (
+            status == "completed" and record.get("activity_link_source") == "manual"
+        ),
         "actual_distance_meters": record.get("actual_distance_meters"),
         "actual_duration_seconds": record.get("actual_duration_seconds"),
         "effective_distance_meters": distance,

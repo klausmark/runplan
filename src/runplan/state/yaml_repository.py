@@ -39,6 +39,7 @@ def record_from_workout_tracking(week: int, workout: dict[str, Any]) -> dict[str
         "workout_id": garmin.get("workout_id"),
         "schedule_id": garmin.get("schedule_id"),
         "activity_id": garmin.get("activity_id"),
+        "activity_link_source": garmin.get("activity_link_source"),
         "content_hash": tracking.get("synced_content_hash"),
         "completed_at": actual.get("completed_at"),
         "actual_distance_meters": actual.get("distance_meters"),
@@ -61,6 +62,7 @@ def tracking_from_record(record: dict[str, Any]) -> dict[str, Any]:
             ("workout_id", "workout_id"),
             ("schedule_id", "schedule_id"),
             ("activity_id", "activity_id"),
+            ("activity_link_source", "activity_link_source"),
         )
         if record.get(source) is not None
     }

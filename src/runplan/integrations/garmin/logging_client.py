@@ -82,6 +82,19 @@ class LoggingGarminClient:
             context=f"activity_id={activity_id}",
         )
 
+    def get_activities_by_date(
+        self,
+        startdate: str,
+        enddate: str | None = None,
+        activitytype: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return self._call(
+            logging.DEBUG,
+            "get_activities_by_date",
+            lambda: self.client.get_activities_by_date(startdate, enddate, activitytype),
+            context=f"start={startdate} end={enddate} type={activitytype}",
+        )
+
     def upload_running_workout(self, workout: Any) -> dict[str, Any]:
         name = getattr(workout, "workoutName", "Unknown workout")
         result = self._call(

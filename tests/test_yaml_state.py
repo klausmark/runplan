@@ -22,6 +22,7 @@ def test_round_trips_completed_tracking_and_actual_totals(tmp_path: Path) -> Non
         "workout_id": 10,
         "schedule_id": 20,
         "activity_id": 30,
+        "activity_link_source": "manual",
         "content_hash": "abc",
         "completed_at": "2026-12-28T12:00:00",
         "actual_distance_meters": 11158.74,
@@ -33,6 +34,7 @@ def test_round_trips_completed_tracking_and_actual_totals(tmp_path: Path) -> Non
 
     assert loaded["status"] == "completed"
     assert loaded["activity_id"] == 30
+    assert loaded["activity_link_source"] == "manual"
     assert loaded["actual_distance_meters"] == 11158.74
     assert "owner_id" not in loaded
     assert "tracking:" in path.read_text(encoding="utf-8")
