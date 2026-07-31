@@ -2,17 +2,25 @@
 
 FROM python:3.13-slim AS builder
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    VIRTUAL_ENV=/opt/runplan
+COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /bin/
 
-RUN python -m venv "$VIRTUAL_ENV"
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/runplan \
+    UV_PYTHON_DOWNLOADS=0 \
+    PATH=/opt/runplan/bin:$PATH
 
 WORKDIR /build
-COPY pyproject.toml README.md ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-dev --no-install-project --no-editable
+
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN pip install .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable
 
 
 FROM python:3.13-slim AS runtime

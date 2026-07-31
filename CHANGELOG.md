@@ -7,6 +7,8 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Improved Docker rebuild caching by installing locked production dependencies
+  before copying frequently changed application source files.
 - Moved Garmin activity management above the workout YAML editor and collapsed
   YAML when activities are the primary edit action.
 - Prevented completed workouts from being dragged, moved, swapped, or moved through
