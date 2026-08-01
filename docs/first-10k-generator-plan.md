@@ -390,7 +390,7 @@ Verification: Run the complete repository check.
 
 Commit: `Document first 10K generator roadmap`
 
-### [ ] Bid 1: Add the generation input model
+### [x] Bid 1: Add the generation input model
 
 Add immutable dataclasses and enums for the provider-independent generation
 request. Support the main race, current training, longest run in time or
