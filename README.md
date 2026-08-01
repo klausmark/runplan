@@ -50,6 +50,44 @@ Completed workouts are locked in the calendar and cannot be dragged, moved, or
 swapped on desktop or mobile. Change their `day` directly in YAML only when a
 completed history entry genuinely needs correction.
 
+### Generate a first 10K program
+
+Runplan Studio can use MiniMax M3 to generate a **Complete your first 10K**
+program. Generation is optional: the server starts normally without a key, but
+the generation action remains unavailable. To enable it for a local server, set
+the MiniMax Subscription Key only in the server environment:
+
+```bash
+export RUNPLAN_MINIMAX_API_KEY='your-subscription-key'
+uv run runplan serve
+```
+
+For Docker Compose, set `RUNPLAN_MINIMAX_API_KEY` in the local `.env` file. The
+key is passed to the container and is never sent to the browser or written to a
+program.
+
+Select **Generate program**, enter the current weekly training, longest recent
+run, available weekdays, long-run day, and optional race date, then generate the
+draft. Runplan recommends a period and builds a fixed calendar outline before
+MiniMax fills in the workout details. The collapsed **Advanced** section covers
+custom periods, running-club sessions, B races, progression, weekly and long-run
+limits, optional quality sessions, known pace data, and extra guidance.
+
+The result opens as validated, editable YAML. Review the warnings and complete
+program, make any needed edits, and select **Save program** only when it is
+ready. Generation itself neither saves the draft nor contacts Garmin. Saving
+adds the program to the existing calendar; Garmin changes still require the
+normal preview and explicit sync confirmation. Generated training is not a
+substitute for individual medical or coaching advice.
+
+Only the supplied training details, dates, constraints, club sessions, races,
+pace data, and additional guidance needed to create the program are sent to
+MiniMax. Health information included in additional guidance is therefore also
+sent to MiniMax. Runplan does not send Garmin credentials or tokens, Studio
+authentication secrets, names, email addresses, previous Garmin activities, or
+unrelated program files. The server keeps the MiniMax key private, omits request
+bodies and generated YAML from logs, and returns fixed provider error messages.
+
 `runplan serve` writes operational logs to stdout for container and service
 log collectors. `INFO` is the default and includes YAML changes, user and plan
 changes, Garmin mutations, sync summaries, and server lifecycle events. Use

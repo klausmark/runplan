@@ -23,8 +23,8 @@ The web frontend uses progressive disclosure. Program metadata and workout
 scheduling have focused visual controls, while an individual workout can be
 opened in a YAML editor. A form-based workout builder is a later capability.
 Generic programs are immutable source content: editing one creates a personal
-copy. Personalized LLM generation is also later and produces a reviewable,
-validated draft rather than content that is synced automatically.
+copy. Personalized LLM generation produces a reviewable, validated draft rather
+than content that is saved or synced automatically.
 
 ## Web planning experience
 
@@ -82,6 +82,22 @@ saving the plan. It uses the CLI's selection and synchronization use cases,
 shows a structured diff before confirmation, and reports progress, results,
 and actionable errors. Credentials remain on the server.
 
+Program generation is an application use case behind a provider-independent
+port. The first implementation supports one versioned **Complete your first
+10K** blueprint and a MiniMax M3 adapter configured by a server-side environment
+key. The domain normalizes runner constraints and creates an immutable workout
+outline before the provider is called; generated YAML then passes structural
+and coaching validation with at most one repair attempt. Generation returns an
+in-memory draft. The existing upload/save path is the only persistence boundary,
+and Garmin preview and confirmed sync remain separate later actions.
+
+The generation privacy boundary sends only the runner, schedule, race, club,
+pace, and free-text guidance needed for the requested program. It never sends
+Garmin credentials or tokens, web authentication secrets, profile identity,
+activity history, or unrelated programs. Provider credentials stay in the
+server adapter, while HTTP errors and operational logs use fixed messages rather
+than model output, prompt content, or user-entered details.
+
 The calendar may manually link a missed workout to an existing Garmin running
 activity without mutating Garmin. Discovery is limited to the planned date. Activities
 already linked inside the active plan are excluded. Only manual links can be
@@ -136,12 +152,13 @@ The former monolith has been removed. The package uses these boundaries:
 ```text
 src/runplan/
   domain/          models, step behavior, and domain errors
-  application/     preview, selection, sync, results, and ports
+  application/     generation, preview, selection, sync, results, and ports
   parsing/         YAML and human-readable value parsing
   exporters/       presentation-file exporters
-  integrations/    Garmin adapters and mapping
+  integrations/    Garmin and generation-provider adapters
   presentation/    human-readable and machine-readable formatters
   state/           state repository implementations
+  web_*.py          authenticated HTTP and web use-case orchestration
   cli.py            argument parsing and top-level orchestration
   cli_sync.py       compatibility path for single-week sync behavior
 ```
@@ -227,9 +244,11 @@ A maintained prompt should:
 - Explain supported duration, distance, pace, and repeat syntax.
 - Require validation by Runplan before sync.
 
-Planned prompt families include 5K, 10K, half marathon, marathon, return after
-a break, limited training days, and adapting an existing program. Future
-commands may expose them as `runplan prompt list` and `runplan prompt show`.
+The first implemented generation family is **Complete your first 10K**. Other
+planned prompt families include 5K, 10K time improvement, half marathon,
+marathon, return after a break, limited training days, and adapting an existing
+program. Future commands may expose them as `runplan prompt list` and
+`runplan prompt show`.
 
 ## Curated programs
 

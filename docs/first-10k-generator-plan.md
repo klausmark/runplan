@@ -1,6 +1,6 @@
 # First 10K program generator implementation plan
 
-Status: Ready for implementation
+Status: Complete
 
 ## Goal
 
@@ -68,6 +68,19 @@ Generation never saves a program or mutates Garmin automatically.
 - Background generation jobs or a queue.
 - Automatic Garmin synchronization.
 - Claims that generated programs are coach-approved.
+
+## Wishing well
+
+Potential follow-up work belongs here rather than expanding the completed MVP:
+
+- Add goal families such as 5K, 10K time improvement, half marathon, and
+  marathon.
+- Adapt an existing saved program or completed Garmin activity history only
+  behind explicit privacy and review boundaries.
+- Add provider choice, background jobs, or longer repair workflows if operational
+  experience demonstrates a need.
+- Add an explicit coaching review process without presenting generated plans as
+  coach-approved by default.
 
 ## Standard generation flow
 
@@ -505,7 +518,7 @@ smoke command may exist but must never run in the automated test suite.
 
 Commit: `Add 10K generation evaluation scenarios`
 
-### [ ] Bid 10: Document AI-generated 10K programs
+### [x] Bid 10: Document AI-generated 10K programs
 
 Document environment setup, the form and draft workflow, Garmin boundaries,
 and the MiniMax privacy model in the README. Update durable design decisions,

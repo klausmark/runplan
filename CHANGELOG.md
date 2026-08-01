@@ -7,6 +7,9 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Added optional MiniMax M3 generation of validated, editable **Complete your
+  first 10K** YAML drafts, with standard and advanced constraints, one repair
+  attempt, explicit saving, and no automatic Garmin synchronization.
 - Added an optional systemd-driven Docker host deployment that polls Git,
   retains commit-tagged images, waits for health, and restores the previous
   image and checkout when deployment fails.
