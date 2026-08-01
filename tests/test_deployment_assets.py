@@ -48,3 +48,11 @@ def test_runtime_data_is_excluded_from_the_docker_build_context() -> None:
     dockerignore = (PROJECT_ROOT / ".dockerignore").read_text(encoding="utf-8")
 
     assert "/runplan-data" in dockerignore.splitlines()
+
+
+def test_compose_forwards_optional_minimax_key() -> None:
+    compose = (PROJECT_ROOT / "compose.yaml").read_text(encoding="utf-8")
+    environment_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert 'RUNPLAN_MINIMAX_API_KEY: "${RUNPLAN_MINIMAX_API_KEY:-}"' in compose
+    assert "# RUNPLAN_MINIMAX_API_KEY=" in environment_example

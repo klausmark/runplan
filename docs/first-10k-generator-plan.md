@@ -429,7 +429,7 @@ missing or altered outline workouts.
 
 Commit: `Validate generated 10K programs`
 
-### [ ] Bid 4: Add the MiniMax adapter
+### [x] Bid 4: Add the MiniMax adapter
 
 Add `PlanGenerator` to the application ports and implement a synchronous
 MiniMax adapter with an injectable transport. Read

@@ -12,9 +12,11 @@ LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 _REDACTIONS = (
     (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "<redacted-email>"),
+    (re.compile(r"(?i)\bbearer\s+[^\s,;]+"), "Bearer <redacted>"),
     (
         re.compile(
-            r"(?i)\b(password|token|authorization|confirmation[_-]?token)\b"
+            r"(?i)\b(password|token|authorization|confirmation[_-]?token|"
+            r"(?:runplan[_-]?)?minimax[_-]?api[_-]?key)\b"
             r"(\s*[:=]\s*|\s+)([^\s,;]+)"
         ),
         r"\1\2<redacted>",

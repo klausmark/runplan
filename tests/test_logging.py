@@ -77,13 +77,21 @@ def test_log_formatter_redacts_secrets_in_messages_and_tracebacks() -> None:
     try:
         raise RuntimeError(
             "email runner@example.com password=hunter2 token=abc123 "
-            "path=/srv/users/klaus/credentials.toml"
+            "path=/srv/users/klaus/credentials.toml "
+            "Authorization: Bearer minimax-secret RUNPLAN_MINIMAX_API_KEY=other-secret"
         )
     except RuntimeError:
         logger.exception("Authentication failed for runner@example.com")
 
     rendered = output.getvalue()
-    for secret in ("runner@example.com", "hunter2", "abc123", "credentials.toml"):
+    for secret in (
+        "runner@example.com",
+        "hunter2",
+        "abc123",
+        "credentials.toml",
+        "minimax-secret",
+        "other-secret",
+    ):
         assert secret not in rendered
     assert "<redacted-email>" in rendered
     assert "<redacted>" in rendered
