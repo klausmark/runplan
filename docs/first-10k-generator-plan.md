@@ -483,7 +483,7 @@ mobile layout.
 
 Commit: `Add first 10K generation dialog`
 
-### [ ] Bid 8: Add advanced generation constraints
+### [x] Bid 8: Add advanced generation constraints
 
 Add the collapsed **Advanced** section with custom dates and duration, weekly
 and long-run maxima, progression, quality count, dynamic club sessions,

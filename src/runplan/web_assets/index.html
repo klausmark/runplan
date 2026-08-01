@@ -143,6 +143,31 @@
             </div>
             <label>Long-run day<select id="generation-long-run-day" required></select><small>Choose one of the selected training days.</small></label>
           </fieldset>
+          <details id="generation-advanced" class="generation-advanced">
+            <summary>Advanced</summary>
+            <div class="generation-advanced-content">
+              <p class="editor-help">Optional constraints for dates, training load, club sessions, and preparation races.</p>
+              <div class="generation-grid">
+                <label>Custom start week <span class="optional">optional</span><input id="generation-start-week" type="week"></label>
+                <label>Custom duration <span class="optional">optional, weeks</span><input id="generation-duration" type="number" min="4" max="52" step="1"></label>
+                <label>Maximum weekly distance <span class="optional">optional, km</span><input id="generation-maximum-weekly-km" type="number" min="0.1" step="0.1"></label>
+                <label>Maximum long-run distance <span class="optional">optional, km</span><input id="generation-maximum-long-run-km" type="number" min="0.1" step="0.1"></label>
+                <label>Progression<select id="generation-progression"><option value="cautious">Cautious</option><option value="balanced" selected>Balanced</option><option value="ambitious">Ambitious</option></select></label>
+                <label>Quality sessions per week<select id="generation-quality-sessions"><option value="0" selected>0</option><option value="1">1</option></select></label>
+              </div>
+              <section class="repeated-section" aria-labelledby="generation-club-title">
+                <div class="repeated-heading"><div><h3 id="generation-club-title">Recurring club sessions</h3><p>Club days must be selected training days.</p></div><button id="generation-add-club" type="button" class="button secondary" aria-label="Add recurring club session">Add club session</button></div>
+                <div id="generation-club-rows" class="repeated-rows"></div>
+              </section>
+              <section class="repeated-section" aria-labelledby="generation-b-races-title">
+                <div class="repeated-heading"><div><h3 id="generation-b-races-title">B races</h3><p>Preparation races must fall within the program period.</p></div><button id="generation-add-b-race" type="button" class="button secondary" aria-label="Add B race">Add B race</button></div>
+                <div id="generation-b-race-rows" class="repeated-rows"></div>
+              </section>
+              <label>Additional instructions <span class="optional">optional</span><textarea id="generation-additional-instructions" maxlength="1000" rows="4" placeholder="For example, prefer trails or avoid steep hills."></textarea><small>Maximum 1000 characters. The full generation prompt cannot be edited.</small></label>
+            </div>
+          </details>
+          <aside class="generation-privacy" aria-label="MiniMax privacy notice"><strong>Privacy</strong><p>Your training information and any health information you type here is sent to MiniMax to generate this program. Runplan does not send credentials or activity history.</p></aside>
+          <section id="generation-client-warnings" class="generation-client-warnings hidden" aria-labelledby="generation-client-warnings-title" aria-live="polite"><h3 id="generation-client-warnings-title">Before you generate</h3><ul></ul></section>
           <p id="generation-error" class="generation-error hidden" role="alert"></p>
           <footer><button type="button" class="button secondary generation-close">Cancel</button><button id="generation-submit" class="button primary">Generate program</button></footer>
         </div>

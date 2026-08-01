@@ -113,14 +113,7 @@ class TestWebAsset:
         assert 'id="generation-long-run-day"' in html
         assert 'id="generation-yaml"' in html
         assert 'id="generation-filename"' in html
-        assert (
-            "Advanced"
-            not in html[
-                html.index('id="generation-dialog"') : html.index(
-                    "</dialog>", html.index('id="generation-dialog"')
-                )
-            ]
-        )
+        assert '<details id="generation-advanced"' in html
 
         request_start = script.index("function standardGenerationRequest()")
         request_end = script.index("function fillDraftMessages", request_start)
@@ -130,10 +123,13 @@ class TestWebAsset:
         assert "longestRecentRun" in standard_request
         assert "recent5KDurationMinutes" in standard_request
         assert "easyPace" in standard_request
-        assert 'progression: "balanced"' in standard_request
-        assert "qualitySessionsPerWeek: 0" in standard_request
-        assert "startWeek" not in standard_request
-        assert "durationWeeks" not in standard_request
+        assert 'progression: $("#generation-progression").value' in standard_request
+        assert (
+            'qualitySessionsPerWeek: Number($("#generation-quality-sessions").value)'
+            in standard_request
+        )
+        assert "if (startWeek) generationRequest.startWeek = startWeek" in standard_request
+        assert "if (durationWeeks !== null)" in standard_request
         assert 'request("/api/programs/generate", {' in script
         assert 'request("/api/programs", {' in script
         assert "await loadPrograms(savedFilename)" in script
@@ -159,6 +155,71 @@ class TestWebAsset:
         assert ".generation-dialog footer" in styles
         assert "position: sticky" in styles
         assert "@media (max-width: 760px)" in styles
+
+    def test_advanced_generation_constraints_and_interactions_are_packaged(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+
+        advanced_start = html.index('id="generation-advanced"')
+        advanced_end = html.index("</details>", advanced_start)
+        advanced = html[advanced_start:advanced_end]
+        assert " open" not in html[advanced_start : html.index(">", advanced_start)]
+        assert "<summary>Advanced</summary>" in advanced
+        assert 'id="generation-start-week" type="week"' in advanced
+        assert 'id="generation-duration" type="number" min="4" max="52" step="1"' in advanced
+        assert 'id="generation-maximum-weekly-km" type="number" min="0.1"' in advanced
+        assert 'id="generation-maximum-long-run-km" type="number" min="0.1"' in advanced
+        assert '<option value="balanced" selected>Balanced</option>' in advanced
+        assert '<option value="0" selected>0</option>' in advanced
+        assert 'id="generation-club-rows"' in advanced
+        assert 'id="generation-b-race-rows"' in advanced
+        assert 'maxlength="1000"' in advanced
+        generation_dialog = html[
+            html.index('id="generation-dialog"') : html.index(
+                "</dialog>", html.index('id="generation-dialog"')
+            )
+        ]
+        assert "sent to MiniMax" in generation_dialog
+        assert "sent to MiniMax" not in advanced
+        assert "does not send credentials or activity history" in generation_dialog
+        assert "system prompt" not in advanced.lower()
+
+        assert "function isoWeekMonday(value)" in script
+        assert "Date.UTC(year, 0, 4)" in script
+        assert "generationRequest.startWeek = startWeek" in script
+        assert "generationRequest.maximumWeeklyKm = maximumWeeklyKm" in script
+        assert "generationRequest.maximumLongRunKm = maximumLongRunKm" in script
+        assert "generationRequest.additionalInstructions = additionalInstructions" in script
+        assert "generationRequest.clubSessions = clubSessions" in script
+        assert "generationRequest.bRaces = bRaces" in script
+        assert "amount: { [amountKind]:" in script
+        assert 'maxlength="500"' in script
+        assert 'value="training-run"' in script
+        assert 'aria-label="Remove recurring club session"' in script
+        assert 'aria-label="Remove B race"' in script
+        assert "row.remove()" in script
+
+        assert "updateGenerationClubDays()" in script
+        assert 'document.querySelectorAll(".generation-club-weekday")' in script
+        assert "Each club session must use a different training weekday." in script
+        assert "Each B race must use a different date." in script
+        assert "input.min = start" in script
+        assert "input.max = end" in script
+        assert "below 8 weeks" in script
+        assert "above 16 weeks" in script
+        assert "contains consecutive training days" in script
+        assert "main race takes precedence" in script
+        assert '$("#generation-advanced").open = false' in script
+        assert '$("#generation-club-rows").replaceChildren()' in script
+        assert '$("#generation-b-race-rows").replaceChildren()' in script
+
+        assert ".generation-advanced" in styles
+        assert ".repeated-row" in styles
+        assert "grid-template-columns: 1fr" in styles
+        mobile = styles[styles.index("@media (max-width: 760px)") :]
+        assert ".repeated-heading" in mobile
+        assert ".repeated-row .row-wide" in mobile
 
     def test_past_weeks_are_locally_persisted_collapsible_details(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

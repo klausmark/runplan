@@ -921,6 +921,143 @@ function selectedGenerationWeekdays() {
   return Array.from(document.querySelectorAll('input[name="generation-weekday"]:checked'), input => input.value);
 }
 
+function isoWeekMonday(value) {
+  const match = /^(\d{4})-W(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const januaryFourth = new Date(Date.UTC(year, 0, 4));
+  const monday = new Date(januaryFourth);
+  monday.setUTCDate(januaryFourth.getUTCDate() - ((januaryFourth.getUTCDay() + 6) % 7) + ((week - 1) * 7));
+  const result = monday.toISOString().slice(0, 10);
+  const check = new Date(`${result}T00:00:00Z`);
+  check.setUTCDate(check.getUTCDate() + 3);
+  const checkYear = check.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(checkYear, 0, 4));
+  const firstIsoDay = firstThursday.getUTCDay() || 7;
+  firstThursday.setUTCDate(4 + (4 - firstIsoDay));
+  const checkWeek = 1 + Math.round((check - firstThursday) / 604800000);
+  return checkYear === year && checkWeek === week ? result : null;
+}
+
+function mondayForDate(iso) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(date.valueOf())) return null;
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return date.toISOString().slice(0, 10);
+}
+
+function suggestedGenerationPeriod(mainRaceDate) {
+  const thisMonday = mondayForDate(localIsoDate());
+  const nextMonday = addDays(thisMonday, 7);
+  if (!mainRaceDate) return { start: nextMonday, duration: 12 };
+  const raceMonday = mondayForDate(mainRaceDate);
+  const available = raceMonday < nextMonday ? 1 : Math.round((new Date(raceMonday) - new Date(nextMonday)) / 604800000) + 1;
+  if (available > 16) return { start: addDays(raceMonday, -105), duration: 16 };
+  return { start: raceMonday < nextMonday ? raceMonday : nextMonday, duration: available };
+}
+
+function generationProgramBounds() {
+  const mainRaceDate = $("#generation-race-date").disabled ? "" : $("#generation-race-date").value;
+  const customDuration = optionalNumber("#generation-duration");
+  let start = isoWeekMonday($("#generation-start-week").value);
+  if (!start && mainRaceDate && customDuration !== null) {
+    start = addDays(mondayForDate(mainRaceDate), -(customDuration - 1) * 7);
+  }
+  const suggested = suggestedGenerationPeriod(mainRaceDate);
+  start ||= suggested.start;
+  let duration = customDuration;
+  if (duration === null && $("#generation-start-week").value && mainRaceDate) {
+    duration = Math.round((new Date(mondayForDate(mainRaceDate)) - new Date(start)) / 604800000) + 1;
+  }
+  duration ??= suggested.duration;
+  return { start, end: addDays(start, duration * 7 - 1) };
+}
+
+function updateGenerationRaceBounds() {
+  const { start, end } = generationProgramBounds();
+  document.querySelectorAll(".generation-b-race-date").forEach((input) => {
+    input.min = start;
+    input.max = end;
+  });
+}
+
+function validateGenerationRepeatedFields() {
+  const clubDays = Array.from(document.querySelectorAll(".generation-club-weekday"), input => input.value);
+  document.querySelectorAll(".generation-club-weekday").forEach((input) => {
+    input.setCustomValidity(clubDays.filter(day => day === input.value).length > 1 ? "Each club session must use a different training weekday." : "");
+  });
+  const raceDates = Array.from(document.querySelectorAll(".generation-b-race-date"), input => input.value).filter(Boolean);
+  document.querySelectorAll(".generation-b-race-date").forEach((input) => {
+    input.setCustomValidity(input.value && raceDates.filter(date => date === input.value).length > 1 ? "Each B race must use a different date." : "");
+  });
+}
+
+function updateGenerationClubDays() {
+  const selectedDays = selectedGenerationWeekdays();
+  document.querySelectorAll(".generation-club-weekday").forEach((select) => {
+    const previous = select.value;
+    select.replaceChildren(...selectedDays.map((day) => {
+      const option = document.createElement("option");
+      option.value = day;
+      option.textContent = day[0].toUpperCase() + day.slice(1);
+      return option;
+    }));
+    select.value = selectedDays.includes(previous) ? previous : selectedDays[0] || "";
+  });
+  validateGenerationRepeatedFields();
+}
+
+function updateGenerationWarnings() {
+  const warnings = [];
+  const duration = optionalNumber("#generation-duration");
+  if (duration !== null && duration < 8) warnings.push("A duration below 8 weeks is shorter than recommended for this program.");
+  if (duration !== null && duration > 16) warnings.push("A duration above 16 weeks is longer than the standard recommendation.");
+  const weekdayNumbers = selectedGenerationWeekdays().map(day => ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].indexOf(day) + 1);
+  if (weekdayNumbers.some(day => weekdayNumbers.includes(day % 7 + 1))) warnings.push("The selected schedule contains consecutive training days.");
+  const mainRaceDate = $("#generation-race-date").disabled ? "" : $("#generation-race-date").value;
+  if (mainRaceDate && Array.from(document.querySelectorAll(".generation-b-race-date"), input => input.value).includes(mainRaceDate)) {
+    warnings.push(`The main race takes precedence over the B race on ${mainRaceDate}.`);
+  }
+  const section = $("#generation-client-warnings");
+  section.querySelector("ul").replaceChildren(...warnings.map((warning) => {
+    const item = document.createElement("li");
+    item.textContent = warning;
+    return item;
+  }));
+  section.classList.toggle("hidden", !warnings.length);
+}
+
+function addGenerationClubSession() {
+  const row = document.createElement("div");
+  row.className = "repeated-row generation-club-row";
+  row.innerHTML = `<label>Weekday<select class="generation-club-weekday" required></select></label>
+    <label>Kind<select class="generation-club-kind"><option value="easy">Easy</option><option value="long">Long</option><option value="quality">Quality</option><option value="unknown">Unknown</option></select></label>
+    <label class="row-wide">Expected amount<span class="amount-fields"><input class="generation-club-amount" type="number" min="0.1" step="0.1" required aria-label="Club session expected amount"><select class="generation-club-amount-kind" aria-label="Club session expected amount unit"><option value="distanceKm">km</option><option value="durationMinutes">minutes</option></select></span></label>
+    <label class="row-wide">Note <span class="optional">optional</span><input class="generation-club-note" maxlength="500"></label>
+    <div class="repeated-row-actions"><button type="button" class="remove-repeated" aria-label="Remove recurring club session">Remove club session</button></div>`;
+  row.querySelector(".remove-repeated").addEventListener("click", () => { row.remove(); validateGenerationRepeatedFields(); });
+  row.querySelector(".generation-club-weekday").addEventListener("change", validateGenerationRepeatedFields);
+  $("#generation-club-rows").append(row);
+  updateGenerationClubDays();
+  row.querySelector(".generation-club-weekday").focus();
+}
+
+function addGenerationBRace() {
+  const row = document.createElement("div");
+  row.className = "repeated-row generation-b-race-row";
+  row.innerHTML = `<label>Date<input class="generation-b-race-date" type="date" required></label>
+    <label>Distance <span class="optional">km</span><input class="generation-b-race-distance" type="number" min="0.1" step="0.1" required></label>
+    <label>Intensity<select class="generation-b-race-intensity"><option value="all-out">All-out</option><option value="controlled">Controlled</option><option value="training-run">Training run</option></select></label>
+    <label>Note <span class="optional">optional</span><input class="generation-b-race-note" maxlength="500"></label>
+    <div class="repeated-row-actions"><button type="button" class="remove-repeated" aria-label="Remove B race">Remove B race</button></div>`;
+  row.querySelector(".remove-repeated").addEventListener("click", () => { row.remove(); validateGenerationRepeatedFields(); updateGenerationWarnings(); });
+  row.querySelector(".generation-b-race-date").addEventListener("change", () => { validateGenerationRepeatedFields(); updateGenerationWarnings(); });
+  $("#generation-b-race-rows").append(row);
+  updateGenerationRaceBounds();
+  row.querySelector(".generation-b-race-date").focus();
+}
+
 function updateGenerationLongRunDays() {
   const select = $("#generation-long-run-day");
   const previous = select.value;
@@ -932,6 +1069,8 @@ function updateGenerationLongRunDays() {
     return option;
   }));
   select.value = days.includes(previous) ? previous : days.includes("sunday") ? "sunday" : days[days.length - 1] || "";
+  updateGenerationClubDays();
+  updateGenerationWarnings();
 }
 
 function updateGenerationRaceDate() {
@@ -939,6 +1078,8 @@ function updateGenerationRaceDate() {
   const input = $("#generation-race-date");
   input.disabled = !hasDate;
   input.required = hasDate;
+  updateGenerationRaceBounds();
+  updateGenerationWarnings();
 }
 
 function showGenerationMessage(selector, message = "") {
@@ -949,6 +1090,9 @@ function showGenerationMessage(selector, message = "") {
 
 function resetGenerationDialog() {
   $("#generation-form").reset();
+  $("#generation-advanced").open = false;
+  $("#generation-club-rows").replaceChildren();
+  $("#generation-b-race-rows").replaceChildren();
   $("#generation-dialog-title").textContent = "Complete your first 10K";
   $("#generation-input-view").classList.remove("hidden");
   $("#generation-review-view").classList.add("hidden");
@@ -989,15 +1133,49 @@ function standardGenerationRequest() {
   };
   if (recent5K !== null) currentTraining.recent5KDurationMinutes = recent5K;
   if (easyPace) currentTraining.easyPace = easyPace;
-  return {
+  const generationRequest = {
     userId: state.user.id,
     currentTraining,
     mainRaceDate: $("#generation-race-date").disabled ? null : $("#generation-race-date").value,
     weekdays,
     longRunDay: $("#generation-long-run-day").value,
-    progression: "balanced",
-    qualitySessionsPerWeek: 0,
+    progression: $("#generation-progression").value,
+    qualitySessionsPerWeek: Number($("#generation-quality-sessions").value),
   };
+  const startWeek = isoWeekMonday($("#generation-start-week").value);
+  const durationWeeks = optionalNumber("#generation-duration");
+  const maximumWeeklyKm = optionalNumber("#generation-maximum-weekly-km");
+  const maximumLongRunKm = optionalNumber("#generation-maximum-long-run-km");
+  const additionalInstructions = $("#generation-additional-instructions").value.trim();
+  if (startWeek) generationRequest.startWeek = startWeek;
+  if (durationWeeks !== null) generationRequest.durationWeeks = durationWeeks;
+  if (maximumWeeklyKm !== null) generationRequest.maximumWeeklyKm = maximumWeeklyKm;
+  if (maximumLongRunKm !== null) generationRequest.maximumLongRunKm = maximumLongRunKm;
+  if (additionalInstructions) generationRequest.additionalInstructions = additionalInstructions;
+  const clubSessions = Array.from(document.querySelectorAll(".generation-club-row"), row => {
+    const amountKind = row.querySelector(".generation-club-amount-kind").value;
+    const session = {
+      weekday: row.querySelector(".generation-club-weekday").value,
+      kind: row.querySelector(".generation-club-kind").value,
+      amount: { [amountKind]: Number(row.querySelector(".generation-club-amount").value) },
+    };
+    const note = row.querySelector(".generation-club-note").value.trim();
+    if (note) session.note = note;
+    return session;
+  });
+  const bRaces = Array.from(document.querySelectorAll(".generation-b-race-row"), row => {
+    const race = {
+      date: row.querySelector(".generation-b-race-date").value,
+      distanceKm: Number(row.querySelector(".generation-b-race-distance").value),
+      intensity: row.querySelector(".generation-b-race-intensity").value,
+    };
+    const note = row.querySelector(".generation-b-race-note").value.trim();
+    if (note) race.note = note;
+    return race;
+  });
+  if (clubSessions.length) generationRequest.clubSessions = clubSessions;
+  if (bRaces.length) generationRequest.bRaces = bRaces;
+  return generationRequest;
 }
 
 function fillDraftMessages(listSelector, sectionSelector, messages) {
@@ -1170,6 +1348,11 @@ for (const selector of ["#generate-program-button", "#empty-generate-program-but
 document.querySelectorAll(".generation-close").forEach(button => button.addEventListener("click", closeGenerationDialog));
 document.querySelectorAll('input[name="race-date-choice"]').forEach(input => input.addEventListener("change", updateGenerationRaceDate));
 document.querySelectorAll('input[name="generation-weekday"]').forEach(input => input.addEventListener("change", updateGenerationLongRunDays));
+$("#generation-race-date").addEventListener("change", () => { updateGenerationRaceBounds(); updateGenerationWarnings(); });
+$("#generation-start-week").addEventListener("change", updateGenerationRaceBounds);
+$("#generation-duration").addEventListener("input", () => { updateGenerationRaceBounds(); updateGenerationWarnings(); });
+$("#generation-add-club").addEventListener("click", addGenerationClubSession);
+$("#generation-add-b-race").addEventListener("click", addGenerationBRace);
 $("#generation-form").addEventListener("submit", generateProgram);
 $("#generation-save").addEventListener("click", saveGeneratedProgram);
 $("#generation-dialog").addEventListener("cancel", (event) => {
