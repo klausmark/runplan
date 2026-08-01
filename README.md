@@ -66,6 +66,13 @@ For Docker Compose, set `RUNPLAN_MINIMAX_API_KEY` in the local `.env` file. The
 key is passed to the container and is never sent to the browser or written to a
 program.
 
+Complete programs can take several minutes to generate. MiniMax requests time
+out after 300 seconds by default; set `RUNPLAN_MINIMAX_TIMEOUT_SECONDS` to a
+value from 30 through 900 when needed. A reverse proxy in front of Runplan must
+allow more than twice this value because validation can trigger one additional
+MiniMax repair request. Otherwise the proxy can close the browser connection
+while Runplan is still waiting for MiniMax.
+
 Select **Generate program**, enter the current weekly training, longest recent
 run, available weekdays, long-run day, and optional race date, then generate the
 draft. Runplan recommends a period and builds a fixed calendar outline before

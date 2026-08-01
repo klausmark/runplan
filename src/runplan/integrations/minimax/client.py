@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -13,7 +14,9 @@ from urllib.request import Request, urlopen
 
 ENDPOINT = "https://api.minimax.io/v1/chat/completions"
 MODEL = "MiniMax-M3"
-TIMEOUT_SECONDS = 120.0
+TIMEOUT_SECONDS = 300.0
+MIN_TIMEOUT_SECONDS = 30.0
+MAX_TIMEOUT_SECONDS = 900.0
 MAX_COMPLETION_TOKENS = 16_384
 MAX_PROMPT_BYTES = 256 * 1024
 MAX_REQUEST_BYTES = 300 * 1024
@@ -108,9 +111,23 @@ def _read_bounded(response: HTTPResponse, maximum: int) -> bytes:
 class MiniMaxClient:
     """Generate text with the fixed MiniMax MVP configuration."""
 
-    def __init__(self, api_key: str | None, *, transport: HttpTransport | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None,
+        *,
+        transport: HttpTransport | None = None,
+        timeout_seconds: float = TIMEOUT_SECONDS,
+    ) -> None:
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(timeout_seconds)
+            or not MIN_TIMEOUT_SECONDS <= timeout_seconds <= MAX_TIMEOUT_SECONDS
+        ):
+            raise ValueError("MiniMax timeout must be from 30 to 900 seconds")
         self._api_key = api_key.strip() if isinstance(api_key, str) and api_key.strip() else None
         self._transport = transport or UrllibTransport()
+        self._timeout_seconds = float(timeout_seconds)
 
     @classmethod
     def from_environment(
@@ -120,7 +137,19 @@ class MiniMaxClient:
         transport: HttpTransport | None = None,
     ) -> MiniMaxClient:
         values = os.environ if environment is None else environment
-        return cls(values.get("RUNPLAN_MINIMAX_API_KEY"), transport=transport)
+        raw_timeout = values.get("RUNPLAN_MINIMAX_TIMEOUT_SECONDS", "").strip()
+        if raw_timeout:
+            try:
+                timeout_seconds = float(raw_timeout)
+            except ValueError:
+                raise ValueError("MiniMax timeout must be from 30 to 900 seconds") from None
+        else:
+            timeout_seconds = TIMEOUT_SECONDS
+        return cls(
+            values.get("RUNPLAN_MINIMAX_API_KEY"),
+            transport=transport,
+            timeout_seconds=timeout_seconds,
+        )
 
     @property
     def configured(self) -> bool:
@@ -157,7 +186,7 @@ class MiniMaxClient:
                     "Accept": "application/json",
                 },
                 body=body,
-                timeout=TIMEOUT_SECONDS,
+                timeout=self._timeout_seconds,
                 max_response_bytes=MAX_RESPONSE_BYTES,
             )
         except TimeoutError:

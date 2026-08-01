@@ -241,6 +241,26 @@ def test_provider_http_error_and_log_exclude_prompt_notes_and_secrets(
     assert api_secret not in rendered
 
 
+def test_disconnected_client_during_timeout_response_has_no_unhandled_exception(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    handler = request_handler(
+        tmp_path,
+        FakeGenerator(MiniMaxTimeoutError("private detail")),
+        "/api/programs/generate",
+        body=generation_payload(),
+    )
+    handler.wfile = Mock()
+    handler.wfile.write.side_effect = BrokenPipeError
+
+    with caplog.at_level(logging.INFO, logger="runplan.web"):
+        handler.do_POST()
+
+    assert "HTTP client disconnected" in caplog.text
+    assert "Unhandled HTTP exception" not in caplog.text
+    assert "private detail" not in caplog.text
+
+
 def test_busy_generation_returns_409(tmp_path: Path) -> None:
     handler = request_handler(
         tmp_path, FakeGenerator(), "/api/programs/generate", body=generation_payload()

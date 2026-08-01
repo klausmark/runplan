@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from .web_generation import WebProgramGenerationService
 
 logger = logging.getLogger("runplan.web")
+_CLIENT_DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 
 
 class RunplanHandler(BaseHTTPRequestHandler):
@@ -73,6 +74,14 @@ class RunplanHandler(BaseHTTPRequestHandler):
             exc,
         )
 
+    def _log_client_disconnect(self) -> None:
+        logger.info(
+            "HTTP client disconnected client=%s method=%s path=%s",
+            self.client_address[0],
+            self.command,
+            urlsplit(self.path).path,
+        )
+
     def do_GET(self) -> None:  # noqa: N802
         self._handle(self._get)
 
@@ -85,7 +94,12 @@ class RunplanHandler(BaseHTTPRequestHandler):
             operation()
         except WebError as exc:
             self._log_web_error(exc)
-            self._json(exc.status, {"error": str(exc)}, headers=exc.headers)
+            try:
+                self._json(exc.status, {"error": str(exc)}, headers=exc.headers)
+            except _CLIENT_DISCONNECT_ERRORS:
+                self._log_client_disconnect()
+        except _CLIENT_DISCONNECT_ERRORS:
+            self._log_client_disconnect()
         except Exception as exc:
             logger.exception(
                 "Unhandled HTTP exception client=%s method=%s path=%s exception=%s",
@@ -94,7 +108,10 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 urlsplit(self.path).path,
                 type(exc).__name__,
             )
-            self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Internal server error"})
+            try:
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Internal server error"})
+            except _CLIENT_DISCONNECT_ERRORS:
+                self._log_client_disconnect()
 
     def _post(self) -> None:
         payload = self._body()

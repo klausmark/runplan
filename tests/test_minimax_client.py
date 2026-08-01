@@ -52,7 +52,7 @@ def test_generate_sends_fixed_nonstreaming_request() -> None:
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    assert call["timeout"] == TIMEOUT_SECONDS == 120.0
+    assert call["timeout"] == TIMEOUT_SECONDS == 300.0
     assert call["max_response_bytes"] == MAX_RESPONSE_BYTES
     assert json.loads(call["body"]) == {
         "model": MODEL,
@@ -98,6 +98,27 @@ def test_environment_configuration_is_optional(monkeypatch) -> None:
         unconfigured.generate("prompt")
 
     assert not MiniMaxClient("   ").configured
+
+
+def test_environment_configures_bounded_timeout() -> None:
+    transport = FakeTransport()
+    client = MiniMaxClient.from_environment(
+        {
+            "RUNPLAN_MINIMAX_API_KEY": "key",
+            "RUNPLAN_MINIMAX_TIMEOUT_SECONDS": "450",
+        },
+        transport=transport,
+    )
+
+    client.generate("prompt")
+
+    assert transport.calls[0]["timeout"] == 450.0
+
+
+@pytest.mark.parametrize("timeout", ["invalid", "29", "901", "nan"])
+def test_environment_rejects_invalid_timeout(timeout: str) -> None:
+    with pytest.raises(ValueError, match="MiniMax timeout must be from 30 to 900 seconds"):
+        MiniMaxClient.from_environment({"RUNPLAN_MINIMAX_TIMEOUT_SECONDS": timeout})
 
 
 @pytest.mark.parametrize("status", [401, 403])
