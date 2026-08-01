@@ -144,11 +144,16 @@ def _make_room_for_race(
     race_date: date,
     *,
     preferred_intent: WorkoutIntent,
+    maximum_slots: int,
 ) -> None:
-    if race_date in slots_by_date or not slots_by_date:
+    if race_date in slots_by_date or len(slots_by_date) < maximum_slots:
         return
     candidates = sorted(
-        slots_by_date.values(),
+        (
+            slot
+            for slot in slots_by_date.values()
+            if slot.source not in (WorkoutSource.B_RACE, WorkoutSource.MAIN_RACE)
+        ),
         key=lambda slot: (
             slot.source != WorkoutSource.BLUEPRINT,
             slot.intent != preferred_intent,
@@ -156,7 +161,33 @@ def _make_room_for_race(
             slot.date,
         ),
     )
+    if not candidates:
+        raise ValueError("race insertion would replace an existing race")
     del slots_by_date[candidates[0].date]
+
+
+def _remove_conflicting_club_quality(
+    slots_by_date: dict[date, First10KWorkoutSlot], race_date: date
+) -> None:
+    for scheduled_date, slot in tuple(slots_by_date.items()):
+        if (
+            scheduled_date != race_date
+            and slot.club_session is not None
+            and slot.consumes_quality_capacity
+        ):
+            del slots_by_date[scheduled_date]
+
+
+def _remove_goal_week_long_run(
+    slots_by_date: dict[date, First10KWorkoutSlot], race_date: date
+) -> None:
+    for scheduled_date, slot in tuple(slots_by_date.items()):
+        is_long = slot.intent == WorkoutIntent.LONG or (
+            slot.club_session is not None and slot.club_session.kind == ClubSessionKind.LONG
+        )
+        if scheduled_date != race_date and is_long:
+            del slots_by_date[scheduled_date]
+            return
 
 
 def _assign_stable_ids(
@@ -220,10 +251,13 @@ def build_first_10k_outline(
             if race_date == inputs.main_race_date:
                 continue
             if week_start <= race_date <= week_end:
+                if _race_consumes_quality(race):
+                    _remove_conflicting_club_quality(slots_by_date, race_date)
                 _make_room_for_race(
                     slots_by_date,
                     race_date,
                     preferred_intent=WorkoutIntent.EASY,
+                    maximum_slots=len(inputs.weekdays),
                 )
                 slots_by_date[race_date] = _slot(
                     week_number=week_number,
@@ -235,10 +269,13 @@ def build_first_10k_outline(
                 )
 
         if inputs.main_race_date is not None and week_start <= inputs.main_race_date <= week_end:
+            _remove_conflicting_club_quality(slots_by_date, inputs.main_race_date)
+            _remove_goal_week_long_run(slots_by_date, inputs.main_race_date)
             _make_room_for_race(
                 slots_by_date,
                 inputs.main_race_date,
                 preferred_intent=WorkoutIntent.LONG,
+                maximum_slots=len(inputs.weekdays),
             )
             slots_by_date[inputs.main_race_date] = _slot(
                 week_number=week_number,
@@ -249,6 +286,7 @@ def build_first_10k_outline(
             )
         elif inputs.main_race_date is None and week_number == duration:
             test_date = week_start + timedelta(days=int(inputs.long_run_day) - 1)
+            _remove_conflicting_club_quality(slots_by_date, test_date)
             slots_by_date[test_date] = _slot(
                 week_number=week_number,
                 scheduled_date=test_date,

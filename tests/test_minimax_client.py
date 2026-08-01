@@ -185,8 +185,13 @@ def test_generate_maps_transport_failure_without_leaking_input() -> None:
     "body",
     [
         b"not JSON",
+        b"null",
+        b"[]",
         b"{}",
+        b'{"base_resp":"invalid","choices":[]}',
         b'{"choices":[]}',
+        b'{"choices":[null]}',
+        b'{"choices":[{"message":[]}] }',
         b'{"choices":[{"message":{}}]}',
         b'{"choices":[{"message":{"content":42}}]}',
     ],

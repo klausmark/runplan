@@ -123,6 +123,8 @@ class CurrentTraining:
             raise GenerationInputError("average weekly distance must be a number")
         if not math.isfinite(value) or value < 0:
             raise GenerationInputError("average weekly distance must be at least 0 km")
+        if value > 300:
+            raise GenerationInputError("average weekly distance must be at most 300 km")
         if (
             isinstance(self.run_days_per_week, bool)
             or not isinstance(self.run_days_per_week, int)
@@ -135,6 +137,8 @@ class CurrentTraining:
             self.recent_5k_duration, DurationMinutes
         ):
             raise GenerationInputError("recent 5K duration must be a duration")
+        if self.recent_5k_duration is not None and not 10 <= self.recent_5k_duration.value <= 180:
+            raise GenerationInputError("recent 5K duration must be from 10 to 180 minutes")
         if self.easy_pace is not None and not isinstance(self.easy_pace, Pace):
             raise GenerationInputError("easy pace must be a pace")
 
@@ -296,6 +300,14 @@ def _resolve_period(request: First10KGenerationInput, today: date) -> PeriodSugg
         and not start <= request.main_race_date <= period.end_date
     ):
         raise GenerationInputError("main race date must fall inside the program period")
+    if (
+        request.main_race_date is not None
+        and (request.start_week is not None or request.duration_weeks is not None)
+        and _iso_monday(request.main_race_date) != start + timedelta(weeks=duration - 1)
+    ):
+        raise GenerationInputError(
+            "main race date must fall in the final ISO week of a custom program"
+        )
     return period
 
 
@@ -338,6 +350,11 @@ def normalize_first_10k_input(
     if unselected := sorted(day for day in club_days if day not in weekdays):
         names = ", ".join(day.name.title() for day in unselected)
         raise GenerationInputError(f"club session weekdays must be selected training days: {names}")
+    long_day_club = next(
+        (session for session in request.club_sessions if session.weekday == long_run_day), None
+    )
+    if long_day_club is not None and long_day_club.kind != ClubSessionKind.LONG:
+        raise GenerationInputError("club session on the long-run day must have kind long")
 
     period = _resolve_period(request, today)
     if any(not isinstance(race, BRace) for race in request.b_races):
@@ -350,6 +367,22 @@ def normalize_first_10k_input(
         if not period.start_week <= race.date <= period.end_date:
             raise GenerationInputError(
                 f"B race on {race.date.isoformat()} must fall inside the program period"
+            )
+
+    race_dates_by_week: dict[date, set[date]] = {}
+    for race in races:
+        if race.date != request.main_race_date:
+            race_dates_by_week.setdefault(_iso_monday(race.date), set()).add(race.date)
+    if request.main_race_date is not None:
+        race_dates_by_week.setdefault(_iso_monday(request.main_race_date), set()).add(
+            request.main_race_date
+        )
+    for week_start, week_race_dates in sorted(race_dates_by_week.items()):
+        if len(week_race_dates) > len(weekdays):
+            year, week, _ = week_start.isocalendar()
+            raise GenerationInputError(
+                f"race week {year}-W{week:02d} has {len(week_race_dates)} distinct race dates "
+                f"but only {len(weekdays)} selected training weekdays"
             )
 
     for value, field in (

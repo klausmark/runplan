@@ -183,6 +183,69 @@ def _has_pace(steps: tuple[Step, ...]) -> bool:
     )
 
 
+def _paced_actions(steps: tuple[Step, ...]) -> set[str]:
+    actions: set[str] = set()
+    for step in steps:
+        if step.pace is not None:
+            actions.add(step.action)
+        if step.action == "repeat":
+            actions.update(_paced_actions(step.steps))
+    return actions
+
+
+def _validate_pace_policy(
+    program: Program,
+    mapped: tuple[_MappedWorkout, ...],
+    inputs: NormalizedFirst10KGenerationInput,
+) -> list[CandidateValidationIssue]:
+    issues: list[CandidateValidationIssue] = []
+    has_source = (
+        inputs.current_training.recent_5k_duration is not None
+        or inputs.current_training.easy_pace is not None
+    )
+    for week in program.weeks:
+        for workout in week.workouts:
+            actions = _paced_actions(workout.steps)
+            if not actions:
+                continue
+            occurrence = _workout_occurrence(week.number, workout)
+            if actions & {"warmup", "cooldown", "recovery"}:
+                issues.append(
+                    _issue(
+                        "error",
+                        "non_work_step_pace_target",
+                        "Warmup, cooldown, and recovery steps must not contain pace targets.",
+                        occurrence,
+                    )
+                )
+            if not has_source:
+                issues.append(
+                    _issue(
+                        "error",
+                        "pace_target_without_source",
+                        "Structured pace targets require a recent 5K duration or easy pace.",
+                        occurrence,
+                    )
+                )
+    for item in mapped:
+        if not _has_pace(item.workout.steps):
+            continue
+        quality_slot = item.slot.intent == WorkoutIntent.QUALITY or (
+            item.slot.club_session is not None
+            and item.slot.club_session.kind == ClubSessionKind.QUALITY
+        )
+        if not quality_slot:
+            issues.append(
+                _issue(
+                    "error",
+                    "slot_pace_target_not_allowed",
+                    "This workout slot must not contain a structured pace target.",
+                    _slot_occurrence(item.slot),
+                )
+            )
+    return issues
+
+
 def _validate_first_week(
     mapped: tuple[_MappedWorkout, ...],
     weekly_loads: tuple[float, ...],
@@ -308,6 +371,8 @@ def _validate_weekly_progression(
 
     for index, week in enumerate(outline.weeks[:-1]):
         if week.phase != TrainingPhase.CONSOLIDATION or index == 0:
+            continue
+        if outline.weeks[index + 1].phase == TrainingPhase.TAPER:
             continue
         prior_peak = max(weekly_loads[:index])
         rebound = weekly_loads[index + 1]
@@ -588,6 +653,7 @@ def validate_first_10k_candidate(
     issues.extend(_validate_long_runs(mapped, weekly_loads, inputs, len(outline.weeks)))
     issues.extend(_validate_quality(outline, inputs))
     issues.extend(_validate_club_and_races(mapped))
+    issues.extend(_validate_pace_policy(program, mapped, inputs))
     return tuple(issues)
 
 

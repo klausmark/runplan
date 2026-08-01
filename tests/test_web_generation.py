@@ -9,6 +9,7 @@ import pytest
 from runplan.domain.generation_inputs import (
     AmountKind,
     ClubSessionKind,
+    GenerationInputError,
     ProgressionProfile,
     RaceIntensity,
     Weekday,
@@ -133,6 +134,40 @@ def test_request_parser_uses_existing_easy_pace_string_syntax() -> None:
 
     assert request.current_training.easy_pace.fast_seconds_per_km == 350
     assert request.current_training.easy_pace.slow_seconds_per_km == 380
+
+
+def test_malformed_easy_pace_has_fixed_safe_error() -> None:
+    private_value = "PRIVATE-EASY-PACE-value"
+    payload = generation_payload()
+    payload["currentTraining"] = {
+        **payload["currentTraining"],
+        "easyPace": private_value,
+    }
+
+    with pytest.raises(GenerationInputError) as raised:
+        parse_first_10k_generation_request(payload)
+
+    assert str(raised.value) == "currentTraining.easyPace is invalid"
+    assert private_value not in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("averageWeeklyKm", -0.1, "at least 0 km"),
+        ("averageWeeklyKm", 300.1, "at most 300 km"),
+        ("recent5KDurationMinutes", 9.9, "from 10 to 180 minutes"),
+        ("recent5KDurationMinutes", 180.1, "from 10 to 180 minutes"),
+    ],
+)
+def test_request_parser_enforces_browser_numeric_bounds(
+    field: str, value: float, message: str
+) -> None:
+    payload = generation_payload()
+    payload["currentTraining"] = {**payload["currentTraining"], field: value}
+
+    with pytest.raises(GenerationInputError, match=message):
+        parse_first_10k_generation_request(payload)
 
 
 @pytest.mark.parametrize(

@@ -130,6 +130,34 @@ def test_custom_period_must_contain_main_race() -> None:
         )
 
 
+def test_custom_period_requires_main_race_in_final_iso_week() -> None:
+    with pytest.raises(
+        GenerationInputError,
+        match="main race date must fall in the final ISO week of a custom program",
+    ):
+        normalize_first_10k_input(
+            request(
+                main_race_date=date(2026, 8, 23),
+                start_week=date(2026, 8, 3),
+                duration_weeks=8,
+            ),
+            today=date(2026, 8, 1),
+        )
+
+
+def test_custom_period_accepts_main_race_in_final_iso_week() -> None:
+    normalized = normalize_first_10k_input(
+        request(
+            main_race_date=date(2026, 9, 27),
+            start_week=date(2026, 8, 3),
+            duration_weeks=8,
+        ),
+        today=date(2026, 8, 1),
+    )
+
+    assert normalized.period.end_date == date(2026, 9, 27)
+
+
 @pytest.mark.parametrize("duration", [3, 53, True, 4.5])
 def test_invalid_custom_duration_has_precise_error(duration: object) -> None:
     with pytest.raises(
@@ -199,6 +227,29 @@ def test_unselected_club_day_has_precise_error() -> None:
         normalize_first_10k_input(request(club_sessions=(session,)), today=date(2026, 8, 1))
 
 
+@pytest.mark.parametrize(
+    "kind",
+    [ClubSessionKind.EASY, ClubSessionKind.QUALITY, ClubSessionKind.UNKNOWN],
+)
+def test_club_session_on_long_run_day_must_be_long(kind: ClubSessionKind) -> None:
+    session = ClubSession(Weekday.SUNDAY, kind, TrainingAmount.distance_km(8))
+
+    with pytest.raises(
+        GenerationInputError, match="club session on the long-run day must have kind long"
+    ):
+        normalize_first_10k_input(request(club_sessions=(session,)), today=date(2026, 8, 1))
+
+
+def test_long_club_session_is_valid_on_long_run_day() -> None:
+    session = ClubSession(Weekday.SUNDAY, ClubSessionKind.LONG, TrainingAmount.distance_km(8))
+
+    normalized = normalize_first_10k_input(
+        request(club_sessions=(session,)), today=date(2026, 8, 1)
+    )
+
+    assert normalized.club_sessions == (session,)
+
+
 def test_races_are_sorted_and_main_race_precedence_is_explicit() -> None:
     main_date = date(2026, 10, 18)
     races = (
@@ -233,6 +284,72 @@ def test_b_races_must_use_unique_dates() -> None:
 
     with pytest.raises(GenerationInputError, match="B races must use unique dates"):
         normalize_first_10k_input(request(b_races=(race, race)), today=date(2026, 8, 1))
+
+
+def test_race_week_must_fit_selected_training_day_count() -> None:
+    main_race = date(2026, 8, 30)
+    races = (
+        BRace(date(2026, 8, 25), 5, RaceIntensity.CONTROLLED),
+        BRace(date(2026, 8, 27), 5, RaceIntensity.TRAINING_RUN),
+    )
+
+    with pytest.raises(
+        GenerationInputError,
+        match=(
+            "race week 2026-W35 has 3 distinct race dates but only 2 selected training weekdays"
+        ),
+    ):
+        normalize_first_10k_input(
+            request(
+                weekdays=(Weekday.TUESDAY, Weekday.SUNDAY),
+                main_race_date=main_race,
+                b_races=races,
+                start_week=date(2026, 8, 3),
+                duration_weeks=4,
+            ),
+            today=date(2026, 8, 1),
+        )
+
+
+def test_b_race_on_main_race_date_does_not_oversubscribe_week() -> None:
+    main_race = date(2026, 8, 30)
+    normalized = normalize_first_10k_input(
+        request(
+            weekdays=(Weekday.TUESDAY, Weekday.SUNDAY),
+            main_race_date=main_race,
+            b_races=(BRace(main_race, 5, RaceIntensity.CONTROLLED),),
+            start_week=date(2026, 8, 3),
+            duration_weeks=4,
+        ),
+        today=date(2026, 8, 1),
+    )
+
+    assert normalized.main_race_date == main_race
+
+
+@pytest.mark.parametrize("average", [300, 300.1])
+def test_average_weekly_distance_has_browser_aligned_maximum(average: float) -> None:
+    if average == 300:
+        assert CurrentTraining(average, 3, TrainingAmount.distance_km(5)).average_weekly_km == 300
+        return
+
+    with pytest.raises(GenerationInputError, match="at most 300 km"):
+        CurrentTraining(average, 3, TrainingAmount.distance_km(5))
+
+
+@pytest.mark.parametrize("minutes", [9.9, 10, 180, 180.1])
+def test_recent_5k_duration_has_browser_aligned_bounds(minutes: float) -> None:
+    if 10 <= minutes <= 180:
+        current = CurrentTraining(
+            12, 3, TrainingAmount.distance_km(5), recent_5k_duration=DurationMinutes(minutes)
+        )
+        assert current.recent_5k_duration is not None
+        return
+
+    with pytest.raises(GenerationInputError, match="from 10 to 180 minutes"):
+        CurrentTraining(
+            12, 3, TrainingAmount.distance_km(5), recent_5k_duration=DurationMinutes(minutes)
+        )
 
 
 def test_malformed_nested_values_have_domain_errors() -> None:

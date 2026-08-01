@@ -13,6 +13,7 @@ from runplan.domain.generation_inputs import (
     ClubSession,
     ClubSessionKind,
     CurrentTraining,
+    DurationMinutes,
     First10KGenerationInput,
     Pace,
     ProgressionProfile,
@@ -310,6 +311,17 @@ def test_recovery_rebound_must_not_materially_exceed_prior_peak() -> None:
     assert "recovery_rebound_too_high" in issue_codes(program, inputs, outline)
 
 
+def test_taper_after_consolidation_allows_required_ten_kilometer_event() -> None:
+    inputs, outline = generation_context(
+        current_training=CurrentTraining(6, 2, TrainingAmount.distance_km(3)),
+        weekdays=(Weekday.MONDAY, Weekday.TUESDAY),
+        long_run_day=Weekday.TUESDAY,
+    )
+    program = candidate(outline, (6, 6, 5.1, 10.5))
+
+    assert "recovery_rebound_too_high" not in issue_codes(program, inputs, outline)
+
+
 def test_requested_weekly_and_long_run_maxima_are_hard_limits() -> None:
     inputs, outline = generation_context(maximum_weekly_km=14.5, maximum_long_run_km=5.5)
 
@@ -514,6 +526,117 @@ def test_goal_race_must_not_receive_structured_pace_target() -> None:
     )
 
     assert "goal_race_pace_target" in issue_codes(program, inputs, outline)
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["easy", "long", "easy-club", "unknown-club", "b-race", "test-run"],
+)
+def test_non_quality_slots_must_not_receive_pace_targets(case: str) -> None:
+    changes: dict[str, object] = {}
+    workout_id = "w01-tue-easy"
+    if case == "long":
+        workout_id = "w01-sun-long"
+    elif case in ("easy-club", "unknown-club"):
+        kind = ClubSessionKind.EASY if case == "easy-club" else ClubSessionKind.UNKNOWN
+        changes["club_sessions"] = (
+            ClubSession(Weekday.THURSDAY, kind, TrainingAmount.distance_km(5)),
+        )
+        workout_id = "w01-thu-club"
+    elif case == "b-race":
+        changes["b_races"] = (BRace(date(2026, 8, 6), 5, RaceIntensity.TRAINING_RUN),)
+        workout_id = "w01-thu-b-race"
+    elif case == "test-run":
+        workout_id = "w04-sun-test-run"
+
+    inputs, outline = generation_context(**changes)
+    program = replace_workout(
+        candidate(outline),
+        workout_id,
+        steps=(Step(action="run", end_kind="distance", end_value=5_000, pace=(360, 390)),),
+    )
+
+    assert "slot_pace_target_not_allowed" in issue_codes(program, inputs, outline)
+
+
+@pytest.mark.parametrize("action", ["warmup", "cooldown", "recovery"])
+def test_non_work_steps_must_not_receive_pace_targets_recursively(action: str) -> None:
+    training = CurrentTraining(
+        15,
+        3,
+        TrainingAmount.distance_km(6),
+        recent_5k_duration=DurationMinutes(30),
+    )
+    inputs, outline = generation_context(current_training=training, quality_sessions_per_week=1)
+    program = replace_workout(
+        candidate(outline),
+        "w01-tue-quality",
+        steps=(
+            Step(
+                action="repeat",
+                count=2,
+                steps=(
+                    Step(
+                        action=action,  # type: ignore[arg-type]
+                        end_kind="distance",
+                        end_value=1_000,
+                        pace=(360, 390),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert "non_work_step_pace_target" in issue_codes(program, inputs, outline)
+
+
+def test_structured_pace_requires_a_runner_pace_source() -> None:
+    inputs, outline = generation_context(quality_sessions_per_week=1)
+    program = replace_workout(
+        candidate(outline),
+        "w01-tue-quality",
+        steps=(Step(action="run", end_kind="distance", end_value=5_000, pace=(360, 390)),),
+    )
+
+    assert "pace_target_without_source" in issue_codes(program, inputs, outline)
+
+
+def test_pace_source_policy_also_checks_unmapped_candidate_workouts() -> None:
+    inputs, outline = generation_context()
+    program = replace_workout(
+        candidate(outline),
+        "w01-tue-easy",
+        id="invented-workout",
+        steps=(Step(action="run", end_kind="distance", end_value=5_000, pace=(360, 390)),),
+    )
+
+    assert "pace_target_without_source" in issue_codes(program, inputs, outline)
+
+
+def test_quality_run_work_may_use_pace_with_a_source() -> None:
+    training = CurrentTraining(
+        15,
+        3,
+        TrainingAmount.distance_km(6),
+        easy_pace=Pace(390, 420),
+    )
+    inputs, outline = generation_context(current_training=training, quality_sessions_per_week=1)
+    program = replace_workout(
+        candidate(outline),
+        "w01-tue-quality",
+        steps=(Step(action="run", end_kind="distance", end_value=5_000, pace=(360, 390)),),
+    )
+
+    codes = issue_codes(program, inputs, outline)
+
+    assert (
+        not {
+            "non_work_step_pace_target",
+            "slot_pace_target_not_allowed",
+            "pace_target_without_source",
+        }
+        & codes
+    )
 
 
 def test_invalid_fallback_pace_is_rejected_at_api_boundary() -> None:

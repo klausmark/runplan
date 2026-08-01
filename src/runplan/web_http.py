@@ -49,6 +49,18 @@ class RunplanHandler(BaseHTTPRequestHandler):
     def _log_web_error(self, exc: WebError) -> None:
         cause = exc.__cause__
         level = logging.ERROR if exc.status >= HTTPStatus.INTERNAL_SERVER_ERROR else logging.WARNING
+        if exc.status < HTTPStatus.INTERNAL_SERVER_ERROR:
+            logger.log(
+                level,
+                "HTTP request failed client=%s method=%s path=%s status=%d exception=%s cause=%s",
+                self.client_address[0],
+                self.command,
+                urlsplit(self.path).path,
+                exc.status,
+                type(exc).__name__,
+                type(cause).__name__ if cause is not None else "none",
+            )
+            return
         logger.log(
             level,
             "HTTP request failed client=%s method=%s path=%s status=%d exception=%s cause=%s message=%s",
@@ -145,9 +157,11 @@ class RunplanHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.UNPROCESSABLE_ENTITY, _invalid_generation(exc))
             return
         except MiniMaxRateLimitError as exc:
-            raise WebError(HTTPStatus.TOO_MANY_REQUESTS, str(exc)) from exc
+            raise WebError(
+                HTTPStatus.TOO_MANY_REQUESTS, "Program generation quota or rate limit reached"
+            ) from exc
         except MiniMaxTimeoutError as exc:
-            raise WebError(HTTPStatus.GATEWAY_TIMEOUT, str(exc)) from exc
+            raise WebError(HTTPStatus.GATEWAY_TIMEOUT, "Program generation timed out") from exc
         except MiniMaxError as exc:
             raise WebError(
                 HTTPStatus.SERVICE_UNAVAILABLE, "Program generation is unavailable"

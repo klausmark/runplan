@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock
@@ -9,6 +10,7 @@ import pytest
 
 from runplan.integrations.minimax import (
     MiniMaxAuthenticationError,
+    MiniMaxProtocolError,
     MiniMaxRateLimitError,
     MiniMaxTimeoutError,
     MiniMaxUnconfiguredError,
@@ -127,6 +129,43 @@ def test_invalid_input_returns_400(tmp_path: Path) -> None:
     handler.send_response.assert_called_once_with(400)
 
 
+def test_client_error_log_omits_arbitrary_input_text(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    private_key = "PRIVATE-FORM-KEY-918"
+    payload = generation_payload() | {private_key: "PRIVATE-FORM-VALUE-372"}
+    handler = request_handler(tmp_path, FakeGenerator(), "/api/programs/generate", body=payload)
+
+    with caplog.at_level(logging.WARNING, logger="runplan.web"):
+        handler.do_POST()
+
+    assert handler.send_response.call_args.args == (400,)
+    assert private_key not in caplog.text
+    assert "PRIVATE-FORM-VALUE-372" not in caplog.text
+    assert "status=400" in caplog.text
+    assert "exception=WebError" in caplog.text
+
+
+def test_malformed_easy_pace_is_absent_from_http_and_log(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    private_pace = "PRIVATE-PACE-INPUT-624"
+    payload = generation_payload()
+    payload["currentTraining"] = {
+        **payload["currentTraining"],
+        "easyPace": private_pace,
+    }
+    handler = request_handler(tmp_path, FakeGenerator(), "/api/programs/generate", body=payload)
+
+    with caplog.at_level(logging.WARNING, logger="runplan.web"):
+        handler.do_POST()
+
+    rendered = handler.wfile.getvalue().decode() + caplog.text
+    assert handler.send_response.call_args.args == (400,)
+    assert response_json(handler) == {"error": "currentTraining.easyPace is invalid"}
+    assert private_pace not in rendered
+
+
 def test_repeated_invalid_candidate_returns_bounded_structured_422(tmp_path: Path) -> None:
     handler = request_handler(
         tmp_path,
@@ -148,10 +187,11 @@ def test_repeated_invalid_candidate_returns_bounded_structured_422(tmp_path: Pat
 @pytest.mark.parametrize(
     ("error", "status"),
     [
-        (MiniMaxRateLimitError("rate"), 429),
-        (MiniMaxTimeoutError("timeout"), 504),
+        (MiniMaxRateLimitError("secret detail"), 429),
+        (MiniMaxTimeoutError("secret detail"), 504),
         (MiniMaxUnconfiguredError("secret detail"), 503),
         (MiniMaxAuthenticationError("secret detail"), 503),
+        (MiniMaxProtocolError("secret detail"), 503),
         (MiniMaxUpstreamError("upstream detail"), 503),
     ],
 )
@@ -169,9 +209,34 @@ def test_provider_errors_have_stable_http_mapping(
 
     response = response_json(handler)
     handler.send_response.assert_called_once_with(status)
+    assert "secret detail" not in handler.wfile.getvalue().decode()
     if status == 503:
         assert response == {"error": "Program generation is unavailable"}
-        assert "detail" not in handler.wfile.getvalue().decode()
+
+
+def test_provider_http_error_and_log_exclude_prompt_notes_and_secrets(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    sensitive_note = "MEDICAL-NOTE-739"
+    api_secret = "sk-minimax-http-secret-4821"
+    payload = generation_payload() | {
+        "additionalInstructions": f"Use private guidance {sensitive_note}"
+    }
+    handler = request_handler(
+        tmp_path,
+        FakeGenerator(MiniMaxUpstreamError(f"{sensitive_note} {api_secret}")),
+        "/api/programs/generate",
+        body=payload,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="runplan.web"):
+        handler.do_POST()
+
+    rendered = handler.wfile.getvalue().decode() + caplog.text
+    handler.send_response.assert_called_once_with(503)
+    assert response_json(handler) == {"error": "Program generation is unavailable"}
+    assert sensitive_note not in rendered
+    assert api_secret not in rendered
 
 
 def test_busy_generation_returns_409(tmp_path: Path) -> None:

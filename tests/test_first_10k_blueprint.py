@@ -85,7 +85,14 @@ def test_club_classification_is_explicit_and_repeats_each_week(
     club = ClubSession(Weekday.THURSDAY, kind, TrainingAmount.duration_minutes(60))
     program_outline = outline(club_sessions=(club,))
 
-    club_slots = [week.workouts[1] for week in program_outline.weeks]
+    club_slots = [
+        slot
+        for week in program_outline.weeks
+        for slot in week.workouts
+        if slot.club_session is club
+    ]
+    expected_repetitions = 3 if consumes_quality else 4
+    assert len(club_slots) == expected_repetitions
     assert all(slot.intent == WorkoutIntent.CLUB for slot in club_slots)
     assert all(slot.source == WorkoutSource.CLUB for slot in club_slots)
     assert all(slot.club_session is club for slot in club_slots)
@@ -93,7 +100,7 @@ def test_club_classification_is_explicit_and_repeats_each_week(
 
 
 def test_main_race_uses_exact_unselected_date_and_wins_b_race_conflict() -> None:
-    race_date = date(2026, 8, 8)
+    race_date = date(2026, 8, 29)
     b_race = BRace(race_date, 5, RaceIntensity.ALL_OUT)
     program_outline = outline(main_race_date=race_date, b_races=(b_race,))
 
@@ -102,8 +109,19 @@ def test_main_race_uses_exact_unselected_date_and_wins_b_race_conflict() -> None
     assert race_slot.source == WorkoutSource.MAIN_RACE
     assert race_slot.b_race is None
     assert race_slot.weekday == Weekday.SATURDAY
-    assert len(program_outline.weeks[0].workouts) == 3
-    assert not any(slot.intent == WorkoutIntent.LONG for slot in program_outline.weeks[0].workouts)
+    assert len(program_outline.weeks[-1].workouts) == 3
+    assert not any(slot.intent == WorkoutIntent.LONG for slot in program_outline.weeks[-1].workouts)
+
+
+def test_main_race_on_selected_easy_day_also_replaces_goal_week_long_run() -> None:
+    race_date = date(2026, 8, 25)
+
+    program_outline = outline(main_race_date=race_date)
+
+    final_week = program_outline.weeks[-1]
+    assert slot_on(program_outline, race_date).intent == WorkoutIntent.GOAL_RACE
+    assert not any(slot.intent == WorkoutIntent.LONG for slot in final_week.workouts)
+    assert len(final_week.workouts) == 2
 
 
 @pytest.mark.parametrize(
@@ -161,6 +179,35 @@ def test_quality_is_not_added_when_club_or_race_consumes_weekly_capacity() -> No
         not any(slot.intent == WorkoutIntent.QUALITY for slot in week.workouts)
         for week in program_outline.weeks[:2]
     )
+
+
+@pytest.mark.parametrize("kind", [ClubSessionKind.QUALITY, ClubSessionKind.UNKNOWN])
+def test_quality_b_race_replaces_different_day_quality_club(
+    kind: ClubSessionKind,
+) -> None:
+    club = ClubSession(Weekday.THURSDAY, kind, TrainingAmount.distance_km(5))
+    race = BRace(date(2026, 8, 8), 5, RaceIntensity.CONTROLLED)
+
+    program_outline = outline(club_sessions=(club,), b_races=(race,))
+    first_week = program_outline.weeks[0]
+
+    assert len(first_week.workouts) == 3
+    assert not any(slot.club_session is club for slot in first_week.workouts)
+    assert slot_on(program_outline, race.date).intent == WorkoutIntent.B_RACE
+    assert sum(slot.consumes_quality_capacity for slot in first_week.workouts) == 1
+
+
+@pytest.mark.parametrize("kind", [ClubSessionKind.QUALITY, ClubSessionKind.UNKNOWN])
+def test_goal_event_replaces_conflicting_club_quality_in_final_week(
+    kind: ClubSessionKind,
+) -> None:
+    club = ClubSession(Weekday.THURSDAY, kind, TrainingAmount.distance_km(5))
+    program_outline = outline(club_sessions=(club,))
+
+    final_week = program_outline.weeks[-1]
+
+    assert not any(slot.club_session is club for slot in final_week.workouts)
+    assert sum(slot.consumes_quality_capacity for slot in final_week.workouts) == 1
 
 
 def test_optional_quality_avoids_adjacent_intentions_across_week_boundary() -> None:

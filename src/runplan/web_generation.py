@@ -117,8 +117,8 @@ def _easy_pace(value: object) -> Pace | None:
     if isinstance(value, str):
         try:
             fast, slow = parse_pace(value, "currentTraining.easyPace")
-        except WorkoutDefinitionError as exc:
-            raise GenerationInputError(str(exc)) from exc
+        except WorkoutDefinitionError:
+            raise GenerationInputError("currentTraining.easyPace is invalid") from None
         return Pace(fast, slow)
     raw = _object(
         value,

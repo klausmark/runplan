@@ -495,7 +495,7 @@ validation, conflicts, warnings, and narrow layouts.
 
 Commit: `Add advanced 10K generation options`
 
-### [ ] Bid 9: Add evaluation scenarios and hardening
+### [x] Bid 9: Add evaluation scenarios and hardening
 
 Add 10 to 15 anonymized requests and fake model outputs spanning low and
 moderate starting volume, two to five days, every club type, race and no-race

@@ -198,19 +198,29 @@ class MiniMaxClient:
 
         try:
             payload = json.loads(response_body)
-            base_status = payload.get("base_resp", {}).get("status_code", 0)
-            if base_status in (1004,):
-                raise MiniMaxAuthenticationError("MiniMax authentication failed")
-            if base_status in (1002, 1008):
-                raise MiniMaxRateLimitError("MiniMax quota or rate limit reached")
-            if base_status in (1001,):
-                raise MiniMaxTimeoutError("MiniMax request timed out")
-            if base_status:
-                raise MiniMaxUpstreamError("MiniMax returned an unsuccessful response")
-            choices = payload["choices"]
-            content = choices[0]["message"]["content"]
-        except (UnicodeDecodeError, json.JSONDecodeError, KeyError, IndexError, TypeError):
+        except (UnicodeDecodeError, json.JSONDecodeError):
             raise MiniMaxProtocolError("MiniMax returned an invalid response") from None
+        if not isinstance(payload, Mapping):
+            raise MiniMaxProtocolError("MiniMax returned an invalid response")
+        base_response = payload.get("base_resp", {})
+        if not isinstance(base_response, Mapping):
+            raise MiniMaxProtocolError("MiniMax returned an invalid response")
+        base_status = base_response.get("status_code", 0)
+        if base_status in (1004,):
+            raise MiniMaxAuthenticationError("MiniMax authentication failed")
+        if base_status in (1002, 1008):
+            raise MiniMaxRateLimitError("MiniMax quota or rate limit reached")
+        if base_status in (1001,):
+            raise MiniMaxTimeoutError("MiniMax request timed out")
+        if base_status:
+            raise MiniMaxUpstreamError("MiniMax returned an unsuccessful response")
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
+            raise MiniMaxProtocolError("MiniMax returned an invalid response")
+        message = choices[0].get("message")
+        if not isinstance(message, Mapping):
+            raise MiniMaxProtocolError("MiniMax returned an invalid response")
+        content = message.get("content")
         if not isinstance(content, str):
             raise MiniMaxProtocolError("MiniMax returned an invalid response")
         return content
