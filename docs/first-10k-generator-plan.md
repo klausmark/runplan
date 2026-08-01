@@ -404,7 +404,7 @@ and custom durations, invalid values, club sessions, and B races.
 
 Commit: `Add first 10K generation inputs`
 
-### [ ] Bid 2: Build the first 10K blueprint and outline
+### [x] Bid 2: Build the first 10K blueprint and outline
 
 Add the versioned blueprint and deterministic outline of weeks and workout
 slots. Assign stable workout IDs and intents. Place club sessions before normal
