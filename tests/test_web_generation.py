@@ -123,17 +123,40 @@ def test_request_parser_covers_standard_and_advanced_typed_fields() -> None:
     assert request.additional_instructions == "Prefer shaded routes."
 
 
-def test_request_parser_uses_existing_easy_pace_string_syntax() -> None:
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("5:50", (350, 350)),
+        ("5:50-6:20", (350, 380)),
+        ("5:50-6:20 min/km", (350, 380)),
+    ],
+)
+def test_request_parser_accepts_easy_pace_form_syntax(
+    value: str, expected: tuple[int, int]
+) -> None:
     payload = generation_payload()
     payload["currentTraining"] = {
         **payload["currentTraining"],
-        "easyPace": "5:50-6:20 min/km",
+        "easyPace": value,
     }
 
     request = parse_first_10k_generation_request(payload)
 
-    assert request.current_training.easy_pace.fast_seconds_per_km == 350
-    assert request.current_training.easy_pace.slow_seconds_per_km == 380
+    assert request.current_training.easy_pace is not None
+    assert request.current_training.easy_pace.fast_seconds_per_km == expected[0]
+    assert request.current_training.easy_pace.slow_seconds_per_km == expected[1]
+
+
+def test_request_parser_treats_blank_easy_pace_as_missing() -> None:
+    payload = generation_payload()
+    payload["currentTraining"] = {
+        **payload["currentTraining"],
+        "easyPace": "   ",
+    }
+
+    request = parse_first_10k_generation_request(payload)
+
+    assert request.current_training.easy_pace is None
 
 
 def test_malformed_easy_pace_has_fixed_safe_error() -> None:
@@ -147,7 +170,7 @@ def test_malformed_easy_pace_has_fixed_safe_error() -> None:
     with pytest.raises(GenerationInputError) as raised:
         parse_first_10k_generation_request(payload)
 
-    assert str(raised.value) == "currentTraining.easyPace is invalid"
+    assert str(raised.value) == "currentTraining.easyPace must use M:SS or M:SS-M:SS per km"
     assert private_value not in str(raised.value)
 
 

@@ -115,10 +115,18 @@ def _easy_pace(value: object) -> Pace | None:
     if value is None:
         return None
     if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
         try:
-            fast, slow = parse_pace(value, "currentTraining.easyPace")
+            fast, slow = parse_pace(text, "currentTraining.easyPace")
         except WorkoutDefinitionError:
-            raise GenerationInputError("currentTraining.easyPace is invalid") from None
+            try:
+                fast, slow = parse_pace(f"{text} min/km", "currentTraining.easyPace")
+            except WorkoutDefinitionError:
+                raise GenerationInputError(
+                    "currentTraining.easyPace must use M:SS or M:SS-M:SS per km"
+                ) from None
         return Pace(fast, slow)
     raw = _object(
         value,

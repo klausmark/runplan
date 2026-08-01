@@ -162,7 +162,9 @@ def test_malformed_easy_pace_is_absent_from_http_and_log(
 
     rendered = handler.wfile.getvalue().decode() + caplog.text
     assert handler.send_response.call_args.args == (400,)
-    assert response_json(handler) == {"error": "currentTraining.easyPace is invalid"}
+    assert response_json(handler) == {
+        "error": "currentTraining.easyPace must use M:SS or M:SS-M:SS per km"
+    }
     assert private_pace not in rendered
 
 

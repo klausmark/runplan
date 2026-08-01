@@ -107,6 +107,8 @@ class TestWebAsset:
         assert 'aria-labelledby="generation-dialog-title"' in html
         assert "Complete your first 10K" in html
         assert "I don't have a race date" in html
+        assert 'id="generation-easy-pace" placeholder="6:15"' in html
+        assert "Use M:SS, for example 6:15." in html
         assert 'value="tuesday" checked' in html
         assert 'value="thursday" checked' in html
         assert 'value="sunday" checked' in html

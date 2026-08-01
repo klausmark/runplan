@@ -10,6 +10,8 @@ changes may be released in a new minor version.
 - Added optional MiniMax M3 generation of validated, editable **Complete your
   first 10K** YAML drafts, with standard and advanced constraints, one repair
   attempt, explicit saving, and no automatic Garmin synchronization.
+- Fixed first 10K generation to accept an easy pace such as `6:15` without
+  requiring the redundant `min/km` suffix.
 - Added an optional systemd-driven Docker host deployment that polls Git,
   retains commit-tagged images, waits for health, and restores the previous
   image and checkout when deployment fails.
