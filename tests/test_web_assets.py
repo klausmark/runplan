@@ -96,6 +96,70 @@ class TestWebAsset:
         assert 'request("/api/programs", {' in script
         assert "filename: file.name" in script
 
+    def test_standard_first_10k_generation_dialog_is_packaged(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+
+        assert 'id="generate-program-button"' in html
+        assert 'id="empty-generate-program-button"' in html
+        assert 'id="generation-dialog"' in html
+        assert 'aria-labelledby="generation-dialog-title"' in html
+        assert "Complete your first 10K" in html
+        assert "I don't have a race date" in html
+        assert 'value="tuesday" checked' in html
+        assert 'value="thursday" checked' in html
+        assert 'value="sunday" checked' in html
+        assert 'id="generation-long-run-day"' in html
+        assert 'id="generation-yaml"' in html
+        assert 'id="generation-filename"' in html
+        assert (
+            "Advanced"
+            not in html[
+                html.index('id="generation-dialog"') : html.index(
+                    "</dialog>", html.index('id="generation-dialog"')
+                )
+            ]
+        )
+
+        request_start = script.index("function standardGenerationRequest()")
+        request_end = script.index("function fillDraftMessages", request_start)
+        standard_request = script[request_start:request_end]
+        assert "averageWeeklyKm" in standard_request
+        assert "runDaysPerWeek" in standard_request
+        assert "longestRecentRun" in standard_request
+        assert "recent5KDurationMinutes" in standard_request
+        assert "easyPace" in standard_request
+        assert 'progression: "balanced"' in standard_request
+        assert "qualitySessionsPerWeek: 0" in standard_request
+        assert "startWeek" not in standard_request
+        assert "durationWeeks" not in standard_request
+        assert 'request("/api/programs/generate", {' in script
+        assert 'request("/api/programs", {' in script
+        assert "await loadPrograms(savedFilename)" in script
+        assert "/active-program" in script
+        assert (
+            "syncGarmin"
+            not in script[request_start : script.index("function fillUserSelects", request_start)]
+        )
+
+        assert 'request("/api/program-generation/status")' in script
+        assert "button.disabled = !configured" in script
+        assert "Program generation is not configured on this server" in script
+        assert (
+            "catch (_)"
+            in script[script.index("async function loadGenerationStatus") : request_start]
+        )
+        assert "state.generation.submitting" in script
+        assert 'button.textContent = "Generating…"' in script
+        assert "error.status === 422" in script
+        assert '$("#generation-dialog").showModal()' in script
+        assert '$("#generation-dialog").addEventListener("cancel"' in script
+        assert '$("#generation-review-view").classList.contains("hidden")' in script
+        assert ".generation-dialog footer" in styles
+        assert "position: sticky" in styles
+        assert "@media (max-width: 760px)" in styles
+
     def test_past_weeks_are_locally_persisted_collapsible_details(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")

@@ -46,6 +46,7 @@
         <div class="top-actions">
           <div class="user-control"><label class="user-picker">User <select id="user-select" aria-label="Runplan user"></select></label><button id="add-user-button" class="add-user-button" type="button">Add user</button></div>
           <label class="program-picker">Program <select id="program-select"></select></label>
+          <button id="generate-program-button" class="button secondary" type="button">Generate program</button>
           <button id="upload-program-button" class="button secondary" type="button">Upload program</button>
           <button id="sync-button" class="button primary">Sync Garmin</button>
           <button id="user-settings-button" class="button secondary">User settings</button>
@@ -81,9 +82,10 @@
       <div id="notice" class="notice hidden" role="alert"></div>
       <section id="empty-programs" class="empty-state hidden">
         <p class="eyebrow">No programs yet</p>
-        <h2>Upload your first running program</h2>
-        <p>Choose a valid Runplan YAML file. It will be stored only for the selected user.</p>
-        <button id="empty-upload-program-button" class="button primary" type="button">Upload program</button>
+        <h2>Create your first running program</h2>
+        <p>Generate a first 10K program or upload a valid Runplan YAML file. It will be stored only for the selected user.</p>
+        <p id="generation-configuration-help" class="configuration-help hidden">Program generation is not configured. Add <code>RUNPLAN_MINIMAX_API_KEY</code> to the server environment to enable it.</p>
+        <div class="empty-actions"><button id="empty-generate-program-button" class="button primary" type="button">Generate program</button><button id="empty-upload-program-button" class="button secondary" type="button">Upload program</button></div>
       </section>
       <section id="calendar" class="calendar" aria-label="Training weeks"></section>
       <input id="program-file-input" class="visually-hidden" type="file" accept=".yaml,.yml,application/yaml,text/yaml">
@@ -101,6 +103,58 @@
           <label>Full name<input id="new-full-name" autocomplete="name" maxlength="100" placeholder="Sample Runner"></label>
         </div>
         <footer><button id="user-cancel" type="button" class="button secondary hidden">Cancel</button><button id="user-submit" class="button primary">Continue</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="generation-dialog" class="generation-dialog" aria-labelledby="generation-dialog-title">
+      <form id="generation-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Program generator</p><h2 id="generation-dialog-title">Complete your first 10K</h2></div><button type="button" class="icon-button generation-close" aria-label="Close program generator">×</button></div>
+        <div id="generation-input-view" class="generation-view">
+          <p class="editor-help">Tell Runplan about your recent running. The server will propose a balanced program, normally 12 weeks when there is no race date.</p>
+          <fieldset class="generation-section">
+            <legend>Goal</legend>
+            <div class="race-options">
+              <label class="choice"><input type="radio" name="race-date-choice" value="none" checked> I don't have a race date</label>
+              <label class="choice"><input type="radio" name="race-date-choice" value="date"> My main 10K race is on</label>
+            </div>
+            <label id="generation-race-date-label" class="subfield">Main race date<input id="generation-race-date" type="date" disabled></label>
+          </fieldset>
+          <fieldset class="generation-section">
+            <legend>Current running</legend>
+            <div class="generation-grid">
+              <label>Average weekly km<input id="generation-weekly-km" type="number" min="0" max="300" step="0.1" value="0" required></label>
+              <label>Current run days<input id="generation-current-days" type="number" min="0" max="7" step="1" value="3" required></label>
+              <label class="wide-field">Longest recent run<span class="amount-fields"><input id="generation-longest-amount" type="number" min="0.1" step="0.1" value="5" aria-label="Longest recent run amount" required><select id="generation-longest-kind" aria-label="Longest recent run unit"><option value="distanceKm">km</option><option value="durationMinutes">minutes</option></select></span></label>
+              <label>Recent 5K duration <span class="optional">optional, minutes</span><input id="generation-recent-5k" type="number" min="10" max="180" step="0.1"></label>
+              <label>Normal easy pace <span class="optional">optional</span><input id="generation-easy-pace" placeholder="6:15 min/km"></label>
+            </div>
+          </fieldset>
+          <fieldset class="generation-section">
+            <legend>Weekly schedule</legend>
+            <span class="field-label">Training weekdays</span>
+            <div class="weekday-options" role="group" aria-label="Training weekdays">
+              <label><input type="checkbox" name="generation-weekday" value="monday"> Mon</label>
+              <label><input type="checkbox" name="generation-weekday" value="tuesday" checked> Tue</label>
+              <label><input type="checkbox" name="generation-weekday" value="wednesday"> Wed</label>
+              <label><input type="checkbox" name="generation-weekday" value="thursday" checked> Thu</label>
+              <label><input type="checkbox" name="generation-weekday" value="friday"> Fri</label>
+              <label><input type="checkbox" name="generation-weekday" value="saturday"> Sat</label>
+              <label><input type="checkbox" name="generation-weekday" value="sunday" checked> Sun</label>
+            </div>
+            <label>Long-run day<select id="generation-long-run-day" required></select><small>Choose one of the selected training days.</small></label>
+          </fieldset>
+          <p id="generation-error" class="generation-error hidden" role="alert"></p>
+          <footer><button type="button" class="button secondary generation-close">Cancel</button><button id="generation-submit" class="button primary">Generate program</button></footer>
+        </div>
+        <div id="generation-review-view" class="generation-view hidden">
+          <p id="generation-summary" class="draft-summary"></p>
+          <section id="generation-warnings-section" class="draft-messages hidden" aria-labelledby="generation-warnings-title"><h3 id="generation-warnings-title">Warnings</h3><ul id="generation-warnings"></ul></section>
+          <section id="generation-diagnostics-section" class="draft-messages draft-errors hidden" aria-labelledby="generation-diagnostics-title"><h3 id="generation-diagnostics-title">Draft diagnostics</h3><p>The generated candidate did not pass validation. Correct the YAML below before adding it to Runplan.</p><ul id="generation-diagnostics"></ul></section>
+          <label>Filename<input id="generation-filename" required pattern="[^/\\]+\.ya?ml" aria-describedby="generation-filename-help" disabled><small id="generation-filename-help">Use a safe .yaml or .yml filename without folders.</small></label>
+          <label>Program YAML<textarea id="generation-yaml" class="code-editor generation-editor" wrap="off" spellcheck="false" required disabled></textarea></label>
+          <p id="generation-save-error" class="generation-error hidden" role="alert"></p>
+          <footer><button type="button" class="button secondary generation-close">Cancel</button><button id="generation-save" type="button" class="button primary">Add to Runplan</button></footer>
+        </div>
       </form>
     </dialog>
 

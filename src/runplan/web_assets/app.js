@@ -1,4 +1,4 @@
-const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null };
+const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null, generation: { submitting: false, saving: false } };
 const $ = (selector) => document.querySelector(selector);
 const TOUCH_DRAG_DELAY = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
@@ -25,6 +25,7 @@ async function request(url, options = {}) {
   if (!response.ok) {
     const error = new Error(body?.error || `Request failed (${response.status})`);
     error.status = response.status;
+    error.body = body;
     if (response.status === 401 && !url.startsWith("/api/auth/")) showLogin();
     throw error;
   }
@@ -142,6 +143,26 @@ function showProgramControls() {
   $("#program-select").disabled = false;
   for (const selector of ["#sync-button", "#settings-button", "#export-button"]) {
     $(selector).disabled = false;
+  }
+}
+
+function setGenerationAvailability(configured) {
+  const title = configured ? "Generate a Complete your first 10K program" : "Program generation is not configured on this server";
+  for (const selector of ["#generate-program-button", "#empty-generate-program-button"]) {
+    const button = $(selector);
+    button.disabled = !configured;
+    button.title = title;
+    button.setAttribute("aria-disabled", String(!configured));
+  }
+  $("#generation-configuration-help").classList.toggle("hidden", configured);
+}
+
+async function loadGenerationStatus() {
+  try {
+    const status = await request("/api/program-generation/status");
+    setGenerationAvailability(status.configured !== false);
+  } catch (_) {
+    // Generation capability must not prevent the rest of Studio from loading.
   }
 }
 
@@ -831,7 +852,7 @@ async function saveEdit(payload) {
   render(updated);
 }
 
-async function loadPrograms() {
+async function loadPrograms(preferred = null) {
   try {
     const result = await request(`/api/programs?${userQuery()}`);
     const select = $("#program-select");
@@ -844,8 +865,10 @@ async function loadPrograms() {
     }
     const active = state.user.activeProgram;
     const saved = storedValue(programStorageKey(state.user.id));
-    const selected = result.programs.some((program) => program.file === active)
-      ? active
+    const selected = result.programs.some((program) => program.file === preferred)
+      ? preferred
+      : result.programs.some((program) => program.file === active)
+        ? active
       : result.programs.some((program) => program.file === saved)
         ? saved
         : result.programs[0].file;
@@ -894,6 +917,181 @@ async function loadProgram(file) {
   storeValue(programStorageKey(state.user.id), file);
 }
 
+function selectedGenerationWeekdays() {
+  return Array.from(document.querySelectorAll('input[name="generation-weekday"]:checked'), input => input.value);
+}
+
+function updateGenerationLongRunDays() {
+  const select = $("#generation-long-run-day");
+  const previous = select.value;
+  const days = selectedGenerationWeekdays();
+  select.replaceChildren(...days.map((day) => {
+    const option = document.createElement("option");
+    option.value = day;
+    option.textContent = day[0].toUpperCase() + day.slice(1);
+    return option;
+  }));
+  select.value = days.includes(previous) ? previous : days.includes("sunday") ? "sunday" : days[days.length - 1] || "";
+}
+
+function updateGenerationRaceDate() {
+  const hasDate = document.querySelector('input[name="race-date-choice"]:checked')?.value === "date";
+  const input = $("#generation-race-date");
+  input.disabled = !hasDate;
+  input.required = hasDate;
+}
+
+function showGenerationMessage(selector, message = "") {
+  const element = $(selector);
+  element.textContent = message;
+  element.classList.toggle("hidden", !message);
+}
+
+function resetGenerationDialog() {
+  $("#generation-form").reset();
+  $("#generation-dialog-title").textContent = "Complete your first 10K";
+  $("#generation-input-view").classList.remove("hidden");
+  $("#generation-review-view").classList.add("hidden");
+  $("#generation-race-date").min = localIsoDate();
+  $("#generation-filename").disabled = true;
+  $("#generation-yaml").disabled = true;
+  showGenerationMessage("#generation-error");
+  showGenerationMessage("#generation-save-error");
+  updateGenerationRaceDate();
+  updateGenerationLongRunDays();
+}
+
+function openGenerationDialog() {
+  if (!state.user) return;
+  resetGenerationDialog();
+  $("#generation-dialog").showModal();
+}
+
+function closeGenerationDialog() {
+  if (state.generation.submitting || state.generation.saving) return;
+  $("#generation-dialog").close();
+}
+
+function optionalNumber(selector) {
+  const value = $(selector).value.trim();
+  return value ? Number(value) : null;
+}
+
+function standardGenerationRequest() {
+  const weekdays = selectedGenerationWeekdays();
+  const recent5K = optionalNumber("#generation-recent-5k");
+  const easyPace = $("#generation-easy-pace").value.trim();
+  const longestKind = $("#generation-longest-kind").value;
+  const currentTraining = {
+    averageWeeklyKm: Number($("#generation-weekly-km").value),
+    runDaysPerWeek: Number($("#generation-current-days").value),
+    longestRecentRun: { [longestKind]: Number($("#generation-longest-amount").value) },
+  };
+  if (recent5K !== null) currentTraining.recent5KDurationMinutes = recent5K;
+  if (easyPace) currentTraining.easyPace = easyPace;
+  return {
+    userId: state.user.id,
+    currentTraining,
+    mainRaceDate: $("#generation-race-date").disabled ? null : $("#generation-race-date").value,
+    weekdays,
+    longRunDay: $("#generation-long-run-day").value,
+    progression: "balanced",
+    qualitySessionsPerWeek: 0,
+  };
+}
+
+function fillDraftMessages(listSelector, sectionSelector, messages) {
+  const list = $(listSelector);
+  list.replaceChildren(...messages.map((item) => {
+    const entry = document.createElement("li");
+    entry.textContent = item.message || String(item);
+    return entry;
+  }));
+  $(sectionSelector).classList.toggle("hidden", !messages.length);
+}
+
+function showGenerationReview(draft, invalid = false) {
+  $("#generation-input-view").classList.add("hidden");
+  $("#generation-review-view").classList.remove("hidden");
+  $("#generation-dialog-title").textContent = invalid ? "Review the generated draft" : "Review your first 10K program";
+  $("#generation-summary").textContent = invalid
+    ? "The model returned an editable draft that still needs correction. Nothing has been saved."
+    : `${draft.summary.weeks} weeks · ${draft.summary.workouts} workouts · Nothing is saved until you add it.`;
+  fillDraftMessages("#generation-warnings", "#generation-warnings-section", draft.warnings || []);
+  fillDraftMessages("#generation-diagnostics", "#generation-diagnostics-section", draft.diagnostics || []);
+  $("#generation-filename").disabled = false;
+  $("#generation-yaml").disabled = false;
+  $("#generation-filename").value = draft.filename || "first-10k-draft.yaml";
+  $("#generation-yaml").value = draft.content ?? draft.candidate ?? "";
+  showGenerationMessage("#generation-save-error");
+  $("#generation-filename").focus();
+}
+
+async function generateProgram(event) {
+  event.preventDefault();
+  if (!$("#generation-review-view").classList.contains("hidden")) {
+    await saveGeneratedProgram();
+    return;
+  }
+  if (state.generation.submitting || !$("#generation-form").reportValidity()) return;
+  if (selectedGenerationWeekdays().length < 2) {
+    showGenerationMessage("#generation-error", "Select at least two training weekdays.");
+    return;
+  }
+  state.generation.submitting = true;
+  const button = $("#generation-submit");
+  button.disabled = true;
+  button.textContent = "Generating…";
+  showGenerationMessage("#generation-error");
+  try {
+    const draft = await request("/api/programs/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(standardGenerationRequest()),
+    });
+    showGenerationReview(draft);
+  } catch (error) {
+    if (error.status === 422 && error.body && "candidate" in error.body) {
+      showGenerationReview(error.body, true);
+    } else {
+      showGenerationMessage("#generation-error", error.message);
+    }
+  } finally {
+    state.generation.submitting = false;
+    button.disabled = false;
+    button.textContent = "Generate program";
+  }
+}
+
+async function saveGeneratedProgram() {
+  if (state.generation.saving) return;
+  const filename = $("#generation-filename");
+  const content = $("#generation-yaml");
+  if (!filename.reportValidity() || !content.reportValidity()) return;
+  state.generation.saving = true;
+  const button = $("#generation-save");
+  button.disabled = true;
+  button.textContent = "Adding…";
+  showGenerationMessage("#generation-save-error");
+  try {
+    await request("/api/programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: state.user.id, filename: filename.value, content: content.value }),
+    });
+    const savedFilename = filename.value;
+    storeValue(programStorageKey(state.user.id), savedFilename);
+    await loadPrograms(savedFilename);
+    $("#generation-dialog").close();
+  } catch (error) {
+    showGenerationMessage("#generation-save-error", error.message);
+  } finally {
+    state.generation.saving = false;
+    button.disabled = false;
+    button.textContent = "Add to Runplan";
+  }
+}
+
 function fillUserSelects() {
   for (const select of [$("#user-select"), $("#user-choice")]) {
     select.replaceChildren(...state.users.map((user) => {
@@ -933,11 +1131,13 @@ async function selectUser(userId, persist = true) {
   state.program = null;
   $("#user-select").value = user.id;
   if (persist) storeValue(USER_STORAGE_KEY, user.id);
+  loadGenerationStatus();
   await loadPrograms();
 }
 
 async function initialize() {
   try {
+    loadGenerationStatus();
     const result = await request("/api/users");
     state.users = result.users || [];
     fillUserSelects();
@@ -964,6 +1164,18 @@ $("#program-select").addEventListener("change", (event) => {
 for (const selector of ["#upload-program-button", "#empty-upload-program-button"]) {
   $(selector).addEventListener("click", () => $("#program-file-input").click());
 }
+for (const selector of ["#generate-program-button", "#empty-generate-program-button"]) {
+  $(selector).addEventListener("click", openGenerationDialog);
+}
+document.querySelectorAll(".generation-close").forEach(button => button.addEventListener("click", closeGenerationDialog));
+document.querySelectorAll('input[name="race-date-choice"]').forEach(input => input.addEventListener("change", updateGenerationRaceDate));
+document.querySelectorAll('input[name="generation-weekday"]').forEach(input => input.addEventListener("change", updateGenerationLongRunDays));
+$("#generation-form").addEventListener("submit", generateProgram);
+$("#generation-save").addEventListener("click", saveGeneratedProgram);
+$("#generation-dialog").addEventListener("cancel", (event) => {
+  if (state.generation.submitting || state.generation.saving) event.preventDefault();
+});
+$("#generation-dialog").addEventListener("close", resetGenerationDialog);
 $("#program-file-input").addEventListener("change", (event) => {
   uploadProgram(event.target.files[0]);
 });

@@ -469,7 +469,7 @@ program files before explicit upload.
 
 Commit: `Expose program generation API`
 
-### [ ] Bid 7: Add the standard generation dialog
+### [x] Bid 7: Add the standard generation dialog
 
 Add the responsive, accessible **Generate program** action and standard dialog.
 Support race date or no date, current training, optional pace data, explicit
