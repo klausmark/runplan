@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import asdict
+from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING, Any
@@ -15,6 +17,7 @@ from .web_auth_http import AuthResponse, WebAuthHttpAdapter
 
 if TYPE_CHECKING:
     from .web import ProgramStore, WebSyncService
+    from .web_generation import WebProgramGenerationService
 
 logger = logging.getLogger("runplan.web")
 
@@ -27,6 +30,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
     """
 
     sync: WebSyncService
+    generation: WebProgramGenerationService
     registry: UserRegistry
     auth: WebAuthHttpAdapter
 
@@ -92,6 +96,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 {"user": self.registry.create(payload.get("username"), payload.get("fullName"))},
             )
             return
+        if path == "/api/programs/generate":
+            self._generate_program(payload)
+            return
         if path == "/api/programs":
             self._upload_program(payload)
             return
@@ -117,6 +124,35 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 )
                 return
         raise WebError(HTTPStatus.NOT_FOUND, "Not found")
+
+    def _generate_program(self, payload: dict[str, Any]) -> None:
+        from .application.generate_first_10k import InvalidGeneratedProgramError
+        from .domain.generation_inputs import GenerationInputError
+        from .integrations.minimax import (
+            MiniMaxRateLimitError,
+            MiniMaxTimeoutError,
+        )
+        from .integrations.minimax.client import MiniMaxError
+        from .web_generation import GenerationBusyError
+
+        try:
+            draft = self.generation.generate(payload)
+        except GenerationInputError as exc:
+            raise WebError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
+        except GenerationBusyError as exc:
+            raise WebError(HTTPStatus.CONFLICT, str(exc)) from exc
+        except InvalidGeneratedProgramError as exc:
+            self._json(HTTPStatus.UNPROCESSABLE_ENTITY, _invalid_generation(exc))
+            return
+        except MiniMaxRateLimitError as exc:
+            raise WebError(HTTPStatus.TOO_MANY_REQUESTS, str(exc)) from exc
+        except MiniMaxTimeoutError as exc:
+            raise WebError(HTTPStatus.GATEWAY_TIMEOUT, str(exc)) from exc
+        except MiniMaxError as exc:
+            raise WebError(
+                HTTPStatus.SERVICE_UNAVAILABLE, "Program generation is unavailable"
+            ) from exc
+        self._json(HTTPStatus.OK, _generation_draft(draft))
 
     def _upload_program(self, payload: dict[str, Any]) -> None:
         user = self.registry.get(payload.get("userId"))
@@ -160,6 +196,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/users":
             self._json(HTTPStatus.OK, {"users": self.registry.list()})
+            return
+        if parsed.path == "/api/program-generation/status":
+            self._json(HTTPStatus.OK, {"configured": self.generation.configured})
             return
         user_parts = self._api_user_parts(required=False)
         if len(user_parts) == 2 and user_parts[1] == "settings":
@@ -291,6 +330,7 @@ def make_handler(
     sync_service: WebSyncService | None = None,
     users: UserRegistry | None = None,
     authenticator: WebAuthenticator | None = None,
+    generation_service: WebProgramGenerationService | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     """Bind an HTTP adapter subclass to the supplied application services."""
     if sync_service is None:
@@ -298,10 +338,52 @@ def make_handler(
 
         sync_service = WebSyncService(store, users=users)
     registry = users or sync_service.users
+    if generation_service is None:
+        from .integrations.minimax import MiniMaxClient
+        from .web_generation import WebProgramGenerationService
+
+        generation_service = WebProgramGenerationService(MiniMaxClient.from_environment(), registry)
     authenticator = authenticator or WebAuthenticator.from_environment()
     auth = WebAuthHttpAdapter(authenticator)
     return type(
         "ConfiguredRunplanHandler",
         (RunplanHandler,),
-        {"sync": sync_service, "registry": registry, "auth": auth},
+        {
+            "sync": sync_service,
+            "generation": generation_service,
+            "registry": registry,
+            "auth": auth,
+        },
     )
+
+
+def _diagnostic(value: Any) -> dict[str, Any]:
+    result = {"severity": value.severity, "code": value.code, "message": value.message[:1000]}
+    if value.occurrence is not None:
+        occurrence = asdict(value.occurrence)
+        result["occurrence"] = {
+            key: item.isoformat() if isinstance(item, date) else item
+            for key, item in occurrence.items()
+            if item is not None
+        }
+    return result
+
+
+def _generation_draft(draft: Any) -> dict[str, Any]:
+    return {
+        "filename": draft.filename,
+        "content": draft.content,
+        "warnings": [_diagnostic(item) for item in draft.warnings],
+        "summary": {"weeks": draft.summary.weeks, "workouts": draft.summary.workouts},
+        "attemptCount": draft.attempt_count,
+    }
+
+
+def _invalid_generation(exc: Any) -> dict[str, Any]:
+    candidate = exc.candidate.encode("utf-8")[: 128 * 1024].decode("utf-8", errors="ignore")
+    return {
+        "error": str(exc),
+        "candidate": candidate,
+        "diagnostics": [_diagnostic(item) for item in exc.diagnostics[:100]],
+        "attemptCount": exc.attempt_count,
+    }

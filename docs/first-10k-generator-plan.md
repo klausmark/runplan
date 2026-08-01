@@ -456,7 +456,7 @@ failure, empty and oversized output, naming, and the no-persistence boundary.
 
 Commit: `Generate validated 10K program drafts`
 
-### [ ] Bid 6: Expose the program generation API
+### [x] Bid 6: Expose the program generation API
 
 Add authenticated status and generation routes, parse requests into typed
 input, inject generation separately from Garmin sync, serialize results, map

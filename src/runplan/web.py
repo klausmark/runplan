@@ -27,6 +27,7 @@ from .state.json_repository import JsonStateRepository
 from .state.yaml_repository import YamlStateRepository
 from .users import RunplanUser, UserRegistry, WebError, load_user_registry
 from .web_auth import WebAuthenticator
+from .web_generation import WebProgramGenerationService
 from .web_http import make_handler
 from .web_programs import ProgramStore
 
@@ -217,6 +218,7 @@ __all__ = [
     "RunplanUser",
     "UserRegistry",
     "WebError",
+    "WebProgramGenerationService",
     "WebSyncService",
     "load_user_registry",
     "make_handler",

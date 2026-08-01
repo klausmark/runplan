@@ -65,9 +65,11 @@ def test_health_and_auth_status_are_public_but_program_api_requires_cookie(tmp_p
     [
         ("GET", "/api/users"),
         ("GET", "/api/programs"),
+        ("GET", "/api/program-generation/status"),
         ("GET", "/api/programs/plan.yaml/export?format=pdf"),
         ("POST", "/api/users"),
         ("POST", "/api/programs/plan.yaml/sync"),
+        ("POST", "/api/programs/generate"),
         ("POST", "/api/users/runner/settings"),
     ],
 )
