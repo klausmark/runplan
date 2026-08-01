@@ -443,7 +443,7 @@ errors, and secret-safe diagnostics. No test contacts MiniMax.
 
 Commit: `Add MiniMax plan generator adapter`
 
-### [ ] Bid 5: Generate validated program drafts
+### [x] Bid 5: Generate validated program drafts
 
 Add the application service that builds the prompt, calls the provider, strips
 one optional YAML fence, parses and validates the candidate, and performs at

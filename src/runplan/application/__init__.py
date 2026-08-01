@@ -1,6 +1,13 @@
 """Runplan application use cases."""
 
-from .ports import GarminClient, StateRepository
+from .generate_first_10k import (
+    First10KProgramDraft,
+    GeneratedProgramSummary,
+    GenerateFirst10KProgram,
+    GenerationDiagnostic,
+    InvalidGeneratedProgramError,
+)
+from .ports import GarminClient, PlanGenerator, StateRepository
 from .results import SyncAction, SyncPlan, SyncResult
 from .sync import (
     delete_all_managed,
@@ -13,6 +20,12 @@ from .sync import (
 
 __all__ = [
     "GarminClient",
+    "First10KProgramDraft",
+    "GenerateFirst10KProgram",
+    "GeneratedProgramSummary",
+    "GenerationDiagnostic",
+    "InvalidGeneratedProgramError",
+    "PlanGenerator",
     "StateRepository",
     "SyncAction",
     "SyncPlan",
