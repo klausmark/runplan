@@ -416,7 +416,7 @@ B races, conflicts, taper, and a final test run without a race date.
 
 Commit: `Build first 10K generation outlines`
 
-### [ ] Bid 3: Validate generated 10K programs
+### [x] Bid 3: Validate generated 10K programs
 
 Validate model output with the existing parser and map occurrences back to the
 outline. Calculate load with existing estimates and enforce schedule, first
