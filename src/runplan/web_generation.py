@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import math
+import secrets
 import threading
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
@@ -28,9 +32,53 @@ from .domain.generation_inputs import (
 from .parsing.values import parse_pace
 from .users import UserRegistry
 
+logger = logging.getLogger("runplan.web")
+GENERATION_JOB_TTL_SECONDS = 15 * 60.0
+GENERATION_PHASE_MESSAGES = {
+    "queued": "Generation is queued.",
+    "preparing": "Preparing the program outline.",
+    "generating": "MiniMax is creating the workout details. This can take several minutes.",
+    "validating": "Validating the generated program.",
+    "repairing": "MiniMax is repairing the draft after validation.",
+    "complete": "Program ready.",
+    "failed": "Program generation failed.",
+}
+
 
 class GenerationBusyError(RuntimeError):
     """Raised when the same user already has an active generation request."""
+
+
+class GenerationJobNotFoundError(LookupError):
+    """Raised when a generation job is absent, expired, or belongs to another user."""
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationJobSnapshot:
+    id: str
+    user_id: str
+    status: str
+    phase: str
+    message: str
+    elapsed_seconds: int
+    draft: First10KProgramDraft | None = None
+    error: Exception | None = None
+
+
+@dataclass(slots=True)
+class _GenerationJob:
+    id: str
+    user_id: str
+    status: str
+    phase: str
+    created_at: float
+    finished_at: float | None = None
+    draft: First10KProgramDraft | None = None
+    error: Exception | None = None
+
+
+def _start_daemon_worker(operation: Callable[[], None]) -> None:
+    threading.Thread(target=operation, name="runplan-program-generation", daemon=True).start()
 
 
 def _object(value: object, field: str, allowed: set[str]) -> dict[str, Any]:
@@ -273,15 +321,25 @@ class WebProgramGenerationService:
         *,
         today: Callable[[], date] = date.today,
         configured: bool | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        start_worker: Callable[[Callable[[], None]], None] = _start_daemon_worker,
+        job_ttl_seconds: float = GENERATION_JOB_TTL_SECONDS,
     ) -> None:
+        if job_ttl_seconds <= 0:
+            raise ValueError("generation job TTL must be greater than zero")
         self.users = users
         self.today = today
         self._use_case = GenerateFirst10KProgram(generator)
         self._configured = (
             bool(getattr(generator, "configured", True)) if configured is None else configured
         )
+        self._clock = clock
+        self._start_worker = start_worker
+        self._job_ttl_seconds = job_ttl_seconds
         self._locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
+        self._jobs: dict[str, _GenerationJob] = {}
+        self._jobs_guard = threading.Lock()
 
     @property
     def configured(self) -> bool:
@@ -289,19 +347,136 @@ class WebProgramGenerationService:
 
     def generate(self, payload: dict[str, Any]) -> First10KProgramDraft:
         user = self.users.get(payload.get("userId"))
-        with self._locks_guard:
-            lock = self._locks.setdefault(user.id, threading.Lock())
-        if not lock.acquire(blocking=False):
-            raise GenerationBusyError("Program generation is already running for this user")
+        request = parse_first_10k_generation_request(payload)
+        lock = self._acquire_user_lock(user.id)
         try:
-            request = parse_first_10k_generation_request(payload)
             return self._use_case.generate(request, today=self.today())
         finally:
             lock.release()
 
+    def start(self, payload: dict[str, Any]) -> GenerationJobSnapshot:
+        user = self.users.get(payload.get("userId"))
+        request = parse_first_10k_generation_request(payload)
+        lock = self._acquire_user_lock(user.id)
+        now = self._clock()
+        job = _GenerationJob(
+            id=secrets.token_urlsafe(24),
+            user_id=user.id,
+            status="running",
+            phase="queued",
+            created_at=now,
+        )
+        with self._jobs_guard:
+            self._prune_jobs(now)
+            self._jobs[job.id] = job
+        logger.info("Program generation started user=%s job=%s", user.id, job.id)
+        try:
+            self._start_worker(lambda: self._run_job(job.id, request, lock))
+        except BaseException:
+            with self._jobs_guard:
+                self._jobs.pop(job.id, None)
+            lock.release()
+            raise
+        return self.get(job.id, user.id)
+
+    def get(self, job_id: object, user_id: object) -> GenerationJobSnapshot:
+        user = self.users.get(user_id)
+        now = self._clock()
+        with self._jobs_guard:
+            self._prune_jobs(now)
+            job = self._jobs.get(job_id) if isinstance(job_id, str) else None
+            if job is None or job.user_id != user.id:
+                raise GenerationJobNotFoundError("Program generation job not found")
+            return self._snapshot(job, now)
+
+    def _acquire_user_lock(self, user_id: str) -> threading.Lock:
+        with self._locks_guard:
+            lock = self._locks.setdefault(user_id, threading.Lock())
+        if not lock.acquire(blocking=False):
+            raise GenerationBusyError("Program generation is already running for this user")
+        return lock
+
+    def _run_job(
+        self,
+        job_id: str,
+        request: First10KGenerationInput,
+        lock: threading.Lock,
+    ) -> None:
+        try:
+            draft = self._use_case.generate(
+                request,
+                today=self.today(),
+                progress=lambda phase: self._update_phase(job_id, phase),
+            )
+        except Exception as exc:
+            now = self._clock()
+            with self._jobs_guard:
+                job = self._jobs[job_id]
+                job.status = "failed"
+                job.phase = "failed"
+                job.finished_at = now
+                job.error = exc
+            logger.error(
+                "Program generation failed user=%s job=%s exception=%s",
+                job.user_id,
+                job.id,
+                type(exc).__name__,
+            )
+        else:
+            now = self._clock()
+            with self._jobs_guard:
+                job = self._jobs[job_id]
+                job.status = "complete"
+                job.phase = "complete"
+                job.finished_at = now
+                job.draft = draft
+            logger.info(
+                "Program generation completed user=%s job=%s elapsed_seconds=%d attempts=%d",
+                job.user_id,
+                job.id,
+                max(0, int(now - job.created_at)),
+                draft.attempt_count,
+            )
+        finally:
+            lock.release()
+
+    def _update_phase(self, job_id: str, phase: str) -> None:
+        if phase not in GENERATION_PHASE_MESSAGES:
+            raise ValueError("unknown program generation phase")
+        with self._jobs_guard:
+            job = self._jobs[job_id]
+            job.phase = phase
+        logger.info(
+            "Program generation progress user=%s job=%s phase=%s", job.user_id, job.id, phase
+        )
+
+    def _prune_jobs(self, now: float) -> None:
+        expired = [
+            job_id
+            for job_id, job in self._jobs.items()
+            if job.finished_at is not None and now - job.finished_at >= self._job_ttl_seconds
+        ]
+        for job_id in expired:
+            del self._jobs[job_id]
+
+    @staticmethod
+    def _snapshot(job: _GenerationJob, now: float) -> GenerationJobSnapshot:
+        return GenerationJobSnapshot(
+            id=job.id,
+            user_id=job.user_id,
+            status=job.status,
+            phase=job.phase,
+            message=GENERATION_PHASE_MESSAGES[job.phase],
+            elapsed_seconds=max(0, int(now - job.created_at)),
+            draft=job.draft,
+            error=job.error,
+        )
+
 
 __all__ = [
     "GenerationBusyError",
+    "GenerationJobNotFoundError",
+    "GenerationJobSnapshot",
     "WebProgramGenerationService",
     "parse_first_10k_generation_request",
 ]

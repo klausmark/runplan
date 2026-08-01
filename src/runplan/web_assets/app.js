@@ -1088,6 +1088,17 @@ function showGenerationMessage(selector, message = "") {
   element.classList.toggle("hidden", !message);
 }
 
+function showGenerationProgress(job = null) {
+  const progress = $("#generation-progress");
+  progress.classList.toggle("hidden", !job);
+  if (!job) return;
+  $("#generation-progress-message").textContent = job.message || "Generating your program.";
+  const elapsed = Number(job.elapsedSeconds || 0);
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+  $("#generation-progress-time").textContent = `Elapsed: ${minutes ? `${minutes}m ` : ""}${seconds}s`;
+}
+
 function resetGenerationDialog() {
   $("#generation-form").reset();
   $("#generation-advanced").open = false;
@@ -1101,6 +1112,7 @@ function resetGenerationDialog() {
   $("#generation-yaml").disabled = true;
   showGenerationMessage("#generation-error");
   showGenerationMessage("#generation-save-error");
+  showGenerationProgress();
   updateGenerationRaceDate();
   updateGenerationLongRunDays();
 }
@@ -1202,7 +1214,29 @@ function showGenerationReview(draft, invalid = false) {
   $("#generation-filename").value = draft.filename || "first-10k-draft.yaml";
   $("#generation-yaml").value = draft.content ?? draft.candidate ?? "";
   showGenerationMessage("#generation-save-error");
+  showGenerationProgress();
   $("#generation-filename").focus();
+}
+
+function generationFailure(job) {
+  const failure = job.error || {};
+  const error = new Error(failure.error || "Program generation failed");
+  error.status = failure.httpStatus || 500;
+  error.body = failure;
+  return error;
+}
+
+async function waitForGenerationJob(job) {
+  showGenerationProgress(job);
+  while (job.status === "running") {
+    await new Promise(resolve => window.setTimeout(resolve, 2000));
+    job = await request(
+      `/api/program-generation/jobs/${encodeURIComponent(job.jobId)}?${userQuery()}`,
+    );
+    showGenerationProgress(job);
+  }
+  if (job.status === "complete" && job.draft) return job.draft;
+  throw generationFailure(job);
 }
 
 async function generateProgram(event) {
@@ -1222,16 +1256,18 @@ async function generateProgram(event) {
   button.textContent = "Generating…";
   showGenerationMessage("#generation-error");
   try {
-    const draft = await request("/api/programs/generate", {
+    const job = await request("/api/program-generation/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(standardGenerationRequest()),
     });
+    const draft = await waitForGenerationJob(job);
     showGenerationReview(draft);
   } catch (error) {
     if (error.status === 422 && error.body && "candidate" in error.body) {
       showGenerationReview(error.body, true);
     } else {
+      showGenerationProgress();
       showGenerationMessage("#generation-error", error.message);
     }
   } finally {

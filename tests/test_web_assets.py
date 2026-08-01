@@ -115,6 +115,8 @@ class TestWebAsset:
         assert 'id="generation-long-run-day"' in html
         assert 'id="generation-yaml"' in html
         assert 'id="generation-filename"' in html
+        assert 'id="generation-progress"' in html
+        assert 'aria-live="polite"' in html
         assert '<details id="generation-advanced"' in html
 
         request_start = script.index("function standardGenerationRequest()")
@@ -132,7 +134,10 @@ class TestWebAsset:
         )
         assert "if (startWeek) generationRequest.startWeek = startWeek" in standard_request
         assert "if (durationWeeks !== null)" in standard_request
-        assert 'request("/api/programs/generate", {' in script
+        assert 'request("/api/program-generation/jobs", {' in script
+        assert "/api/program-generation/jobs/" in script
+        assert "waitForGenerationJob" in script
+        assert "elapsedSeconds" in script
         assert 'request("/api/programs", {' in script
         assert "await loadPrograms(savedFilename)" in script
         assert "/active-program" in script

@@ -190,6 +190,12 @@ dialog label.choice { display: flex; grid-auto-flow: column; align-items: center
 .weekday-options label:has(input:checked) { border-color: var(--green); color: var(--green-dark); background: var(--day-start); }
 .generation-error { margin: 0; padding: 11px 12px; border-radius: 9px; background: #fde3df; color: #7b241a; font-size: 13px; }
 [data-theme="dark"] .generation-error { background: #442824; color: #f0b5ab; }
+.generation-progress { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.generation-progress span:last-child { display: grid; gap: 3px; }
+.generation-progress small { color: var(--muted); }
+.generation-spinner { width: 18px; height: 18px; flex: 0 0 auto; border: 2px solid var(--line); border-top-color: var(--green); border-radius: 50%; animation: generation-spin .8s linear infinite; }
+@keyframes generation-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .generation-spinner { animation: none; } }
 .draft-summary { margin: 0; padding: 13px 15px; border-left: 4px solid var(--green); border-radius: 8px; background: var(--paper); font-weight: 700; }
 .draft-messages { padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .draft-messages h3, .draft-messages p { margin: 0 0 8px; }

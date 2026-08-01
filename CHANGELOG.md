@@ -14,6 +14,9 @@ changes may be released in a new minor version.
   requiring the redundant `min/km` suffix.
 - Increased the MiniMax generation timeout to five minutes, made it configurable,
   and handled disconnected generation clients without noisy server tracebacks.
+- Moved Studio generation to short-lived background jobs with polling, elapsed
+  time, and real preparation, MiniMax, validation, and repair status messages,
+  avoiding reverse-proxy timeouts during long generations.
 - Added an optional systemd-driven Docker host deployment that polls Git,
   retains commit-tagged images, waits for health, and restores the previous
   image and checkout when deployment fails.

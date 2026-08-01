@@ -174,6 +174,17 @@ def test_invalid_candidate_is_repaired_exactly_once() -> None:
     assert invalid in repair
 
 
+def test_generation_reports_real_progress_phases_in_order() -> None:
+    invalid = candidate_yaml(remove_first_workout=True)
+    phases: list[str] = []
+
+    GenerateFirst10KProgram(FakeGenerator(invalid, candidate_yaml())).generate(
+        request(), today=TODAY, progress=phases.append
+    )
+
+    assert phases == ["preparing", "generating", "validating", "repairing", "validating"]
+
+
 def test_repeated_invalid_candidate_raises_editable_bounded_error() -> None:
     invalid = candidate_yaml(remove_first_workout=True)
     generator = FakeGenerator(invalid, invalid)

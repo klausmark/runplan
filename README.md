@@ -68,10 +68,10 @@ program.
 
 Complete programs can take several minutes to generate. MiniMax requests time
 out after 300 seconds by default; set `RUNPLAN_MINIMAX_TIMEOUT_SECONDS` to a
-value from 30 through 900 when needed. A reverse proxy in front of Runplan must
-allow more than twice this value because validation can trigger one additional
-MiniMax repair request. Otherwise the proxy can close the browser connection
-while Runplan is still waiting for MiniMax.
+value from 30 through 900 when needed. The Studio starts generation as a
+background job and polls it with short requests, so a reverse proxy does not
+need to keep one connection open while MiniMax runs. Validation can trigger one
+additional MiniMax repair request.
 
 Select **Generate program**, enter the current weekly training, longest recent
 run, available weekdays, long-run day, and optional race date, then generate the
@@ -79,6 +79,12 @@ draft. Runplan recommends a period and builds a fixed calendar outline before
 MiniMax fills in the workout details. The collapsed **Advanced** section covers
 custom periods, running-club sessions, B races, progression, weekly and long-run
 limits, optional quality sessions, known pace data, and extra guidance.
+
+While generation runs, the dialog shows elapsed time and the current real phase:
+outline preparation, waiting for MiniMax, validation, or an optional repair.
+Runplan does not display an estimated percentage because MiniMax does not expose
+measurable completion progress. Finished jobs and drafts remain in server memory
+for 15 minutes and are lost when the server restarts.
 
 The result opens as validated, editable YAML. Review the warnings and complete
 program, make any needed edits, and select **Save program** only when it is

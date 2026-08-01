@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -27,6 +28,7 @@ from ..parsing.yaml_loader import load_program_model
 from .ports import PlanGenerator
 
 MAX_GENERATED_YAML_BYTES = 128 * 1024
+GenerationProgress = Callable[[str], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,13 +315,23 @@ class GenerateFirst10KProgram:
     def __init__(self, generator: PlanGenerator) -> None:
         self._generator = generator
 
-    def generate(self, request: First10KGenerationInput, *, today: date) -> First10KProgramDraft:
+    def generate(
+        self,
+        request: First10KGenerationInput,
+        *,
+        today: date,
+        progress: GenerationProgress | None = None,
+    ) -> First10KProgramDraft:
+        report = progress or (lambda _phase: None)
+        report("preparing")
         inputs = normalize_first_10k_input(request, today=today)
         outline = build_first_10k_outline(inputs)
         prompt = _generation_prompt(inputs, outline)
 
+        report("generating")
         candidate = self._generator.generate(prompt)
         for attempt_count in (1, 2):
+            report("validating")
             bounded_candidate, size_issue = _bounded_text(candidate)
             if size_issue is not None:
                 diagnostics = (size_issue,)
@@ -358,6 +370,7 @@ class GenerateFirst10KProgram:
                 raise InvalidGeneratedProgramError(
                     content, diagnostics, attempt_count=attempt_count
                 )
+            report("repairing")
             candidate = self._generator.generate(_repair_prompt(prompt, content, diagnostics))
 
         raise AssertionError("unreachable")
@@ -374,6 +387,7 @@ __all__ = [
     "MAX_GENERATED_YAML_BYTES",
     "First10KProgramDraft",
     "GenerateFirst10KProgram",
+    "GenerationProgress",
     "GeneratedProgramSummary",
     "GenerationDiagnostic",
     "InvalidGeneratedProgramError",

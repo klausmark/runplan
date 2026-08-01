@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock
@@ -57,9 +58,12 @@ def request_handler(
     path: str,
     *,
     body: dict | None = None,
+    generation_service: WebProgramGenerationService | None = None,
 ):
     users = registry(tmp_path)
-    generation = WebProgramGenerationService(generator, users, today=lambda: TODAY)
+    generation = generation_service or WebProgramGenerationService(
+        generator, users, today=lambda: TODAY
+    )
     handler_type = make_handler(
         ProgramStore(tmp_path),
         users=users,
@@ -117,6 +121,95 @@ def test_generate_route_precedes_filename_route_and_does_not_persist(tmp_path: P
     assert response["attemptCount"] == 1
     assert response["warnings"] == []
     assert list(tmp_path.iterdir()) == []
+
+
+def test_background_generation_job_starts_and_polls_to_completion(tmp_path: Path) -> None:
+    workers: list[Callable[[], None]] = []
+    users = registry(tmp_path)
+    generation = WebProgramGenerationService(
+        FakeGenerator(candidate_yaml()),
+        users,
+        today=lambda: TODAY,
+        start_worker=workers.append,
+    )
+    start = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        "/api/program-generation/jobs",
+        body=generation_payload(),
+        generation_service=generation,
+    )
+
+    start.do_POST()
+
+    started = response_json(start)
+    assert start.send_response.call_args.args == (202,)
+    assert started["status"] == "running"
+    assert started["phase"] == "queued"
+    workers.pop()()
+
+    poll = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        f"/api/program-generation/jobs/{started['jobId']}?user=runner",
+        generation_service=generation,
+    )
+    poll.do_GET()
+
+    completed = response_json(poll)
+    assert poll.send_response.call_args.args == (200,)
+    assert completed["status"] == "complete"
+    assert completed["draft"]["summary"] == {"weeks": 4, "workouts": 12}
+
+
+def test_unknown_background_generation_job_returns_404(tmp_path: Path) -> None:
+    handler = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        "/api/program-generation/jobs/missing?user=runner",
+    )
+
+    handler.do_GET()
+
+    assert handler.send_response.call_args.args == (404,)
+    assert response_json(handler) == {"error": "Program generation job not found"}
+
+
+def test_background_generation_job_returns_safe_provider_failure(tmp_path: Path) -> None:
+    workers: list[Callable[[], None]] = []
+    users = registry(tmp_path)
+    generation = WebProgramGenerationService(
+        FakeGenerator(MiniMaxTimeoutError("private detail")),
+        users,
+        today=lambda: TODAY,
+        start_worker=workers.append,
+    )
+    start = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        "/api/program-generation/jobs",
+        body=generation_payload(),
+        generation_service=generation,
+    )
+    start.do_POST()
+    started = response_json(start)
+    workers.pop()()
+    poll = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        f"/api/program-generation/jobs/{started['jobId']}?user=runner",
+        generation_service=generation,
+    )
+
+    poll.do_GET()
+
+    result = response_json(poll)
+    assert result["status"] == "failed"
+    assert result["error"] == {
+        "httpStatus": 504,
+        "error": "Program generation timed out",
+    }
+    assert "private detail" not in poll.wfile.getvalue().decode()
 
 
 def test_invalid_input_returns_400(tmp_path: Path) -> None:

@@ -88,8 +88,11 @@ port. The first implementation supports one versioned **Complete your first
 key. The domain normalizes runner constraints and creates an immutable workout
 outline before the provider is called; generated YAML then passes structural
 and coaching validation with at most one repair attempt. Generation returns an
-in-memory draft. The existing upload/save path is the only persistence boundary,
-and Garmin preview and confirmed sync remain separate later actions.
+in-memory draft. Studio runs generation as a per-user background job and polls
+short status requests so provider latency does not require a long-lived reverse
+proxy connection. Jobs and drafts expire from memory after a short period and
+do not survive restart. The existing upload/save path is the only persistence
+boundary, and Garmin preview and confirmed sync remain separate later actions.
 
 The generation privacy boundary sends only the runner, schedule, race, club,
 pace, and free-text guidance needed for the requested program. It never sends

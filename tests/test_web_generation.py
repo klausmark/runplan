@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import threading
+import time
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -17,9 +19,11 @@ from runplan.domain.generation_inputs import (
 from runplan.users import RunplanUser, UserRegistry
 from runplan.web_generation import (
     GenerationBusyError,
+    GenerationJobNotFoundError,
     WebProgramGenerationService,
     parse_first_10k_generation_request,
 )
+from tests.test_generate_first_10k import candidate_yaml
 
 TODAY = date(2026, 8, 1)
 
@@ -244,3 +248,91 @@ def test_service_configuration_reflects_injected_generator(tmp_path: Path) -> No
 
     assert configured.configured is True
     assert unconfigured.configured is False
+
+
+def test_background_job_returns_immediately_and_completes_without_persistence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workers: list[Callable[[], None]] = []
+    service = WebProgramGenerationService(
+        FakeGenerator(candidate_yaml()),
+        registry(tmp_path),
+        today=lambda: TODAY,
+        start_worker=workers.append,
+    )
+
+    def reject_write(*args: object, **kwargs: object) -> int:
+        raise AssertionError("generation jobs must not persist")
+
+    monkeypatch.setattr(Path, "write_text", reject_write)
+    started = service.start(generation_payload())
+
+    assert started.status == "running"
+    assert started.phase == "queued"
+    assert len(workers) == 1
+
+    workers.pop()()
+    completed = service.get(started.id, "runner")
+
+    assert completed.status == "complete"
+    assert completed.phase == "complete"
+    assert completed.draft is not None
+    assert completed.draft.summary.weeks == 4
+
+
+def test_background_job_exposes_waiting_phase_and_keeps_per_user_exclusion(
+    tmp_path: Path,
+) -> None:
+    generator = BlockingGenerator()
+    service = WebProgramGenerationService(generator, registry(tmp_path), today=lambda: TODAY)
+
+    started = service.start(generation_payload())
+    assert generator.started.wait(timeout=1)
+
+    running = service.get(started.id, "runner")
+    assert running.status == "running"
+    assert running.phase == "generating"
+    assert "several minutes" in running.message
+    with pytest.raises(GenerationBusyError):
+        service.start(generation_payload())
+
+    generator.release.set()
+    for _ in range(100):
+        if service.get(started.id, "runner").status == "failed":
+            break
+        time.sleep(0.01)
+    assert service.get(started.id, "runner").status == "failed"
+
+
+def test_completed_background_job_expires_and_is_user_bound(tmp_path: Path) -> None:
+    workers: list[Callable[[], None]] = []
+    now = [100.0]
+    users = UserRegistry(
+        [
+            RunplanUser(
+                user_id,
+                name,
+                tmp_path / user_id / "credentials.toml",
+                tmp_path / user_id / "tokens",
+                tmp_path / user_id / "state",
+            )
+            for user_id, name in (("runner", "Runner"), ("other-runner", "Other Runner"))
+        ]
+    )
+    service = WebProgramGenerationService(
+        FakeGenerator(candidate_yaml()),
+        users,
+        today=lambda: TODAY,
+        clock=lambda: now[0],
+        start_worker=workers.append,
+        job_ttl_seconds=60,
+    )
+    started = service.start(generation_payload())
+    workers.pop()()
+
+    with pytest.raises(GenerationJobNotFoundError):
+        service.get(started.id, "other-runner")
+
+    now[0] += 60
+    with pytest.raises(GenerationJobNotFoundError):
+        service.get(started.id, "runner")

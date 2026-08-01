@@ -125,6 +125,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 {"user": self.registry.create(payload.get("username"), payload.get("fullName"))},
             )
             return
+        if path == "/api/program-generation/jobs":
+            self._start_generation_job(payload)
+            return
         if path == "/api/programs/generate":
             self._generate_program(payload)
             return
@@ -231,6 +234,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/program-generation/status":
             self._json(HTTPStatus.OK, {"configured": self.generation.configured})
             return
+        if parsed.path.startswith("/api/program-generation/jobs/"):
+            self._get_generation_job(parsed.path, query)
+            return
         user_parts = self._api_user_parts(required=False)
         if len(user_parts) == 2 and user_parts[1] == "settings":
             self._json(HTTPStatus.OK, self.registry.settings(user_parts[0]))
@@ -243,6 +249,31 @@ class RunplanHandler(BaseHTTPRequestHandler):
             self._get_program(query)
             return
         self._asset(parsed.path)
+
+    def _start_generation_job(self, payload: dict[str, Any]) -> None:
+        from .domain.generation_inputs import GenerationInputError
+        from .web_generation import GenerationBusyError
+
+        try:
+            job = self.generation.start(payload)
+        except GenerationInputError as exc:
+            raise WebError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
+        except GenerationBusyError as exc:
+            raise WebError(HTTPStatus.CONFLICT, str(exc)) from exc
+        self._json(HTTPStatus.ACCEPTED, _generation_job(job))
+
+    def _get_generation_job(self, path: str, query: dict[str, list[str]]) -> None:
+        from .web_generation import GenerationJobNotFoundError
+
+        prefix = "/api/program-generation/jobs/"
+        job_id = unquote(path.removeprefix(prefix))
+        if not job_id or "/" in job_id:
+            raise WebError(HTTPStatus.NOT_FOUND, "Program generation job not found")
+        try:
+            job = self.generation.get(job_id, query.get("user", [None])[0])
+        except GenerationJobNotFoundError as exc:
+            raise WebError(HTTPStatus.NOT_FOUND, str(exc)) from exc
+        self._json(HTTPStatus.OK, _generation_job(job))
 
     def _get_program(self, query: dict[str, list[str]]) -> None:
         parts = self._api_program_parts()
@@ -407,6 +438,49 @@ def _generation_draft(draft: Any) -> dict[str, Any]:
         "warnings": [_diagnostic(item) for item in draft.warnings],
         "summary": {"weeks": draft.summary.weeks, "workouts": draft.summary.workouts},
         "attemptCount": draft.attempt_count,
+    }
+
+
+def _generation_job(job: Any) -> dict[str, Any]:
+    result = {
+        "jobId": job.id,
+        "status": job.status,
+        "phase": job.phase,
+        "message": job.message,
+        "elapsedSeconds": job.elapsed_seconds,
+    }
+    if job.draft is not None:
+        result["draft"] = _generation_draft(job.draft)
+    if job.error is not None:
+        result["error"] = _generation_job_error(job.error)
+    return result
+
+
+def _generation_job_error(exc: Exception) -> dict[str, Any]:
+    from .application.generate_first_10k import InvalidGeneratedProgramError
+    from .integrations.minimax import MiniMaxRateLimitError, MiniMaxTimeoutError
+    from .integrations.minimax.client import MiniMaxError
+
+    if isinstance(exc, InvalidGeneratedProgramError):
+        return {"httpStatus": HTTPStatus.UNPROCESSABLE_ENTITY, **_invalid_generation(exc)}
+    if isinstance(exc, MiniMaxRateLimitError):
+        return {
+            "httpStatus": HTTPStatus.TOO_MANY_REQUESTS,
+            "error": "Program generation quota or rate limit reached",
+        }
+    if isinstance(exc, MiniMaxTimeoutError):
+        return {
+            "httpStatus": HTTPStatus.GATEWAY_TIMEOUT,
+            "error": "Program generation timed out",
+        }
+    if isinstance(exc, MiniMaxError):
+        return {
+            "httpStatus": HTTPStatus.SERVICE_UNAVAILABLE,
+            "error": "Program generation is unavailable",
+        }
+    return {
+        "httpStatus": HTTPStatus.INTERNAL_SERVER_ERROR,
+        "error": "Program generation failed",
     }
 
 
