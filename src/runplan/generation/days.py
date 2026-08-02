@@ -1,9 +1,10 @@
 """Day assignment for the first 10K generator.
 
 The generator picks one weekday per role from the user's pool of possible
-days. The long-run day is stable inside a four-week block, while the
-quality day rotates to avoid repeating the same weekday week-over-week. Easy
-days fill the remaining slots.
+days. The long-run day prefers a weekend slot so the user can run after work
+on Saturday or Sunday. The quality day rotates to avoid repeating the same
+weekday week-over-week when quality sessions are enabled. Easy days fill the
+remaining slots.
 """
 
 from __future__ import annotations
@@ -12,6 +13,11 @@ from dataclasses import dataclass
 
 from .errors import GenerationError
 from .inputs import TrainingDays
+
+WEEKEND_DAYS = (6, 7)
+
+MIN_SESSIONS_PER_WEEK = 2
+MAX_SESSIONS_PER_WEEK = 7
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,11 +45,15 @@ def pick_long_run_day(
     """Return the weekday for the long run.
 
     The preferred day is honoured when it is in the pool. Otherwise the
-    generator defaults to the latest day in the pool, which usually gives the
-    longest recovery into the next week.
+    generator prefers Sunday, then Saturday, then the latest day in the pool.
+    The weekend preference gives the runner a daylight slot to fit a longer
+    session around family and work.
     """
     if preferred is not None and preferred in pool:
         return preferred
+    for day in WEEKEND_DAYS[::-1]:
+        if day in pool:
+            return day
     return pool[-1]
 
 
@@ -78,13 +88,17 @@ def assign_week(
     long_run_day: int,
     prev_quality_day: int | None,
     week_index: int,
+    quality_per_week: int = 0,
 ) -> WeekAssignment:
     """Return the day assignment for one week.
 
     The ``week_index`` parameter (0-based) is used to rotate the long-run day
     every four weeks so the program does not always demand the same weekday.
+    The ``quality_per_week`` parameter controls whether the quality slot is
+    reserved. Without it, the empty quality slot would silently drop the
+    session count below the requested total.
     """
-    if sessions_per_week >= 3:
+    if sessions_per_week >= 3 and quality_per_week >= 1:
         quality_day = pick_quality_day(pool, long_run_day, prev_quality_day)
     else:
         quality_day = None
@@ -108,6 +122,7 @@ def assign_program(
     duration_weeks: int,
     preferred_long_run_day: int | None = None,
     long_run_rotation: int = 4,
+    quality_per_week: int = 0,
 ) -> tuple[WeekAssignment, ...]:
     """Return the day assignment for every program week."""
     pool = training_days.possible_days
@@ -129,6 +144,7 @@ def assign_program(
             long_run_day=long_run_day,
             prev_quality_day=prev_quality_day,
             week_index=week_index,
+            quality_per_week=quality_per_week,
         )
         assignments.append(assignment)
         prev_quality_day = assignment.quality_day
@@ -143,10 +159,23 @@ def _rotate_long_run(pool: tuple[int, ...], current: int) -> int | None:
     return sorted(candidates)[0]
 
 
+def pick_last_day(pool: tuple[int, ...]) -> int:
+    """Return the day used for the final-week 10K test run.
+
+    The test run lands on the latest possible day in the pool so the runner
+    has the rest of the week to taper.
+    """
+    return pool[-1]
+
+
 __all__ = [
+    "MAX_SESSIONS_PER_WEEK",
+    "MIN_SESSIONS_PER_WEEK",
+    "WEEKEND_DAYS",
     "WeekAssignment",
     "assign_program",
     "assign_week",
+    "pick_last_day",
     "pick_long_run_day",
     "pick_quality_day",
 ]

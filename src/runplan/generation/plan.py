@@ -94,6 +94,7 @@ def compose_program(
         request.training_days,
         request.duration_weeks,
         preferred_long_run_day=request.preferred_long_run_day,
+        quality_per_week=request.quality_sessions_per_week,
     )
     phases = phase_plan(request.duration_weeks)
     volume_plan = build_volume_plan(
@@ -122,6 +123,8 @@ def compose_program(
         delta = (request.goal_race.date - start_monday).days
         if 0 <= delta < request.duration_weeks * 7:
             goal_race_day_in_program = (delta % 7) + 1
+    pool = request.training_days.possible_days
+    test_run_day = pool[-1] if request.goal_race.date is None else None
     for week_index in range(request.duration_weeks):
         week_number = week_index + 1
         week_start = start_monday + timedelta(days=week_index * 7)
@@ -138,6 +141,7 @@ def compose_program(
             request.goal_race.date is not None
             and week_start <= request.goal_race.date <= week_start + timedelta(days=6)
         )
+        is_final_week = week_index == request.duration_weeks - 1
         slots = place_week(
             week_number=week_number,
             week_start=week_start,
@@ -154,6 +158,7 @@ def compose_program(
             b_races=b_races_in_window,
             goal_race=request.goal_race,
             goal_race_day=goal_race_day_in_program if is_race_week else None,
+            test_run_day=test_run_day if (is_final_week and not is_race_week) else None,
         )
 
         workouts = tuple(_to_workout(slot, week_number) for slot in slots)

@@ -158,7 +158,8 @@ class GeneratorRequest:
     current_longest_km: float | None = None
     training_days: TrainingDays = field(
         default_factory=lambda: TrainingDays(
-            possible_days=(1, 3, 5), sessions_per_week=DEFAULT_SESSIONS_PER_WEEK
+            possible_days=(1, 2, 3, 4, 5, 6, 7),
+            sessions_per_week=DEFAULT_SESSIONS_PER_WEEK,
         )
     )
     preferred_long_run_day: int | None = None

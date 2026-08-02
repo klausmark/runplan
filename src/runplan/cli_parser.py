@@ -131,7 +131,7 @@ def _add_generate_command(commands: Any) -> None:
         "--sessions-per-week",
         type=int,
         default=3,
-        help="Number of sessions per week selected from --training-days (2-7)",
+        help="Sessions per week chosen from --training-days (2-7). Default 3.",
     )
     first_10k.add_argument(
         "--long-run-day",

@@ -23,7 +23,19 @@ def test_default_request_is_valid() -> None:
     assert request.duration_weeks == 12
     assert request.progression == "balanced"
     assert request.training_days.sessions_per_week == 3
-    assert request.training_days.possible_days == (1, 3, 5)
+    assert request.training_days.possible_days == (1, 2, 3, 4, 5, 6, 7)
+
+
+def test_default_starting_long_run_is_five_km() -> None:
+    from runplan.generation.progression import starting_long_run_km
+
+    assert starting_long_run_km(0.0, None) == 5.0
+
+
+def test_default_starting_weekly_km_is_twelve() -> None:
+    from runplan.generation.progression import starting_weekly_km
+
+    assert starting_weekly_km(0.0, sessions_per_week=3) == 12.0
 
 
 def test_invalid_duration_is_rejected() -> None:

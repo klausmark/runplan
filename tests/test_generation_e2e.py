@@ -211,6 +211,51 @@ def test_goal_race_in_final_week_replaces_long_run() -> None:
     assert any(w.id.endswith("-race-7") for w in last_week.workouts)
 
 
+def test_default_request_produces_three_workouts_per_week() -> None:
+    """The default request must generate three workouts per week (4 in the final test-run week)."""
+    result = compose_program(GeneratorRequest(), today=date(2026, 7, 1))
+    weeks = result.program.weeks
+    for index, week in enumerate(weeks):
+        if index == len(weeks) - 1:
+            assert len(week.workouts) == 4, (
+                f"final week {week.number} has {len(week.workouts)} workouts"
+            )
+        else:
+            assert len(week.workouts) == 3, f"week {week.number} has {len(week.workouts)} workouts"
+
+
+def test_final_week_contains_10k_test_run_without_race_date() -> None:
+    result = compose_program(_request(), today=date(2026, 7, 1))
+    last_week = result.program.weeks[-1]
+    race_workouts = [w for w in last_week.workouts if "race" in w.id]
+    assert race_workouts
+    assert all("long" not in w.id for w in last_week.workouts if w.id.endswith("-race-7"))
+
+
+def test_test_run_lands_on_latest_pool_day() -> None:
+    result = compose_program(_request(), today=date(2026, 7, 1))
+    last_week = result.program.weeks[-1]
+    race_workouts = [w for w in last_week.workouts if w.id.endswith("-race-7")]
+    assert len(race_workouts) == 1
+    assert race_workouts[0].day == 7
+
+
+def test_test_run_skipped_when_goal_race_present() -> None:
+    """When the user declares a race date, the goal race IS the 10K."""
+    request = _request(goal_race=GoalRace(date=date(2026, 10, 25)))
+    result = compose_program(request, today=date(2026, 7, 1))
+    race_workouts = [w for week in result.program.weeks for w in week.workouts if "race" in w.id]
+    assert len(race_workouts) == 1
+
+
+def test_default_long_run_day_is_sunday_in_early_weeks() -> None:
+    result = compose_program(_request(), today=date(2026, 7, 1))
+    sunday_long = [
+        w for week in result.program.weeks for w in week.workouts if w.id.endswith("-long-7")
+    ]
+    assert len(sunday_long) >= 4
+
+
 def test_full_yaml_has_english_only_keys() -> None:
     import re
 

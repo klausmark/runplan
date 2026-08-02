@@ -18,7 +18,18 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 69m
+        time: 20m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-01-easy-2
+    day: 2
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 30m
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
@@ -29,7 +40,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 6km
+        distance: 3.4km
     - cooldown:
         time: 10m
 - week: 2
@@ -42,7 +53,25 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 73m
+        time: 20m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-02-easy-2
+    day: 2
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 34m
     - repeat:
         count: 4
         steps:
@@ -60,7 +89,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 6.5km
+        distance: 3.8km
     - repeat:
         count: 4
         steps:
@@ -80,7 +109,18 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 76m
+        time: 20m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-03-easy-2
+    day: 2
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 38m
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
@@ -91,7 +131,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 7km
+        distance: 4.3km
     - repeat:
         count: 3
         steps:
@@ -111,7 +151,25 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 57m
+        time: 20m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-04-easy-2
+    day: 2
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 30m
     - repeat:
         count: 4
         steps:
@@ -129,7 +187,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 6km
+        distance: 3.3km
     - cooldown:
         time: 10m
 - week: 5
@@ -142,7 +200,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 6.8km
+        distance: 3.9km
     - repeat:
         count: 4
         steps:
@@ -152,6 +210,17 @@ weeks:
             time: 1m30s
     - cooldown:
         time: 10m
+  - id: week-05-easy-2
+    day: 2
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 20m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
   - id: week-05-easy-3
     day: 3
     name: Easy run
@@ -159,7 +228,7 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 61m
+        time: 35m
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
@@ -173,7 +242,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 7.4km
+        distance: 4.5km
     - repeat:
         count: 3
         steps:
@@ -183,14 +252,32 @@ weeks:
             time: 2m
     - cooldown:
         time: 10m
-  - id: week-06-easy-5
-    day: 5
+  - id: week-06-easy-2
+    day: 2
     name: Easy run
     steps:
     - warmup:
         time: 5m
     - run:
-        time: 66m
+        time: 20m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-06-easy-3
+    day: 3
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 41m
     - repeat:
         count: 4
         steps:
@@ -211,9 +298,20 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 8km
+        distance: 5.1km
     - cooldown:
         time: 10m
+  - id: week-07-easy-2
+    day: 2
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 23m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
   - id: week-07-easy-3
     day: 3
     name: Easy run
@@ -221,7 +319,7 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 72m
+        time: 46m
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
@@ -235,7 +333,7 @@ weeks:
     - warmup:
         time: 10m
     - run:
-        distance: 6.2km
+        distance: 4km
     - repeat:
         count: 4
         steps:
@@ -245,14 +343,32 @@ weeks:
             time: 1m30s
     - cooldown:
         time: 10m
-  - id: week-08-easy-5
-    day: 5
+  - id: week-08-easy-2
+    day: 2
     name: Easy run
     steps:
     - warmup:
         time: 5m
     - run:
-        time: 56m
+        time: 20m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-08-easy-3
+    day: 3
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 36m
     - repeat:
         count: 4
         steps:
@@ -266,14 +382,25 @@ weeks:
 - week: 9
   focus: 'Peak: race-specific intensity and the longest run.'
   workouts:
-  - id: week-09-long-3
-    day: 3
+  - id: week-09-easy-1
+    day: 1
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 21m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-09-long-2
+    day: 2
     name: Long run
     steps:
     - warmup:
         time: 10m
     - run:
-        distance: 6.8km
+        distance: 4.6km
     - repeat:
         count: 3
         steps:
@@ -283,14 +410,14 @@ weeks:
             time: 2m
     - cooldown:
         time: 10m
-  - id: week-09-easy-5
-    day: 5
+  - id: week-09-easy-3
+    day: 3
     name: Easy run
     steps:
     - warmup:
         time: 5m
     - run:
-        time: 61m
+        time: 41m
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
@@ -304,7 +431,7 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 67m
+        time: 23m
     - repeat:
         count: 4
         steps:
@@ -315,27 +442,56 @@ weeks:
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
-  - id: week-10-long-3
-    day: 3
+  - id: week-10-long-2
+    day: 2
     name: Long run
     steps:
     - warmup:
         time: 10m
     - run:
-        distance: 7.4km
+        distance: 5.2km
     - cooldown:
         time: 10m
+  - id: week-10-easy-3
+    day: 3
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 47m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
 - week: 11
   focus: 'Taper: reduce volume and keep one sharp session.'
   workouts:
-  - id: week-11-long-3
-    day: 3
+  - id: week-11-easy-1
+    day: 1
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 20m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-11-long-2
+    day: 2
     name: Long run
     steps:
     - warmup:
         time: 10m
     - run:
-        distance: 4.4km
+        distance: 2.9km
     - repeat:
         count: 4
         steps:
@@ -345,14 +501,14 @@ weeks:
             time: 1m30s
     - cooldown:
         time: 10m
-  - id: week-11-easy-5
-    day: 5
+  - id: week-11-easy-3
+    day: 3
     name: Easy run
     steps:
     - warmup:
         time: 5m
     - run:
-        time: 39m
+        time: 26m
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
@@ -366,7 +522,7 @@ weeks:
     - warmup:
         time: 5m
     - run:
-        time: 39m
+        time: 20m
     - repeat:
         count: 4
         steps:
@@ -377,14 +533,14 @@ weeks:
     - cooldown:
         time: 5m
     description: Run at an easy, conversational pace. Walk recoveries are fine.
-  - id: week-12-long-3
-    day: 3
+  - id: week-12-long-2
+    day: 2
     name: Long run
     steps:
     - warmup:
         time: 10m
     - run:
-        distance: 4.4km
+        distance: 2.9km
     - repeat:
         count: 3
         steps:
@@ -394,3 +550,28 @@ weeks:
             time: 2m
     - cooldown:
         time: 10m
+  - id: week-12-easy-3
+    day: 3
+    name: Easy run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 26m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Run at an easy, conversational pace. Walk recoveries are fine.
+  - id: week-12-race-7
+    day: 7
+    name: Race
+    steps:
+    - run:
+        distance: 10km
+    description: Hold an even effort from start to finish. Walk breaks are allowed.

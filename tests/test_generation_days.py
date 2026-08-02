@@ -82,3 +82,76 @@ def test_variety_summary_reflects_history() -> None:
     history = board.quality_used
     assert len(history) == 6
     assert len(set(history)) >= 3
+
+
+def test_pick_long_run_day_prefers_sunday_in_full_week() -> None:
+    assert pick_long_run_day((1, 2, 3, 4, 5, 6, 7), None) == 7
+
+
+def test_pick_long_run_day_prefers_saturday_when_sunday_missing() -> None:
+    assert pick_long_run_day((1, 2, 3, 4, 5, 6), None) == 6
+
+
+def test_pick_long_run_day_falls_back_when_pool_has_no_weekend() -> None:
+    assert pick_long_run_day((1, 3, 5), None) == 5
+
+
+def test_pick_long_run_day_respects_explicit_preference() -> None:
+    assert pick_long_run_day((1, 2, 3, 4, 5, 6, 7), 3) == 3
+
+
+def test_three_sessions_with_zero_quality_produces_three_workouts() -> None:
+    """Regression test: off-by-one bug dropped the quality slot silently."""
+    assignment = assign_week(
+        pool=(1, 2, 3, 4, 5, 6, 7),
+        sessions_per_week=3,
+        long_run_day=7,
+        prev_quality_day=None,
+        week_index=0,
+        quality_per_week=0,
+    )
+    assert assignment.quality_day is None
+    assert len(assignment.easy_days) == 2
+    assert len(assignment.all_days()) == 3
+
+
+def test_three_sessions_with_quality_produces_three_workouts() -> None:
+    assignment = assign_week(
+        pool=(1, 2, 3, 4, 5, 6, 7),
+        sessions_per_week=3,
+        long_run_day=7,
+        prev_quality_day=None,
+        week_index=0,
+        quality_per_week=1,
+    )
+    assert assignment.quality_day is not None
+    assert len(assignment.easy_days) == 1
+    assert len(assignment.all_days()) == 3
+
+
+def test_four_sessions_with_quality_produces_four_workouts() -> None:
+    assignment = assign_week(
+        pool=(1, 2, 3, 4, 5, 6, 7),
+        sessions_per_week=4,
+        long_run_day=7,
+        prev_quality_day=None,
+        week_index=0,
+        quality_per_week=1,
+    )
+    assert assignment.quality_day is not None
+    assert len(assignment.easy_days) == 2
+    assert len(assignment.all_days()) == 4
+
+
+def test_two_sessions_with_no_quality_produces_two_workouts() -> None:
+    assignment = assign_week(
+        pool=(1, 2, 3, 4, 5, 6, 7),
+        sessions_per_week=2,
+        long_run_day=7,
+        prev_quality_day=None,
+        week_index=0,
+        quality_per_week=0,
+    )
+    assert assignment.quality_day is None
+    assert len(assignment.easy_days) == 1
+    assert len(assignment.all_days()) == 2

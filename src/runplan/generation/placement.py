@@ -197,8 +197,14 @@ def place_week(
     b_races: tuple[BRace, ...],
     goal_race: GoalRace,
     goal_race_day: int | None = None,
+    test_run_day: int | None = None,
 ) -> tuple[Slot, ...]:
-    """Return the slots for one program week."""
+    """Return the slots for one program week.
+
+    When ``test_run_day`` is set, a 10K test run replaces the long run on
+    that day. The test run takes priority over a normal long run but yields
+    to a registered goal race, club session, or B race on the same date.
+    """
     slots: list[Slot] = []
     consumed_days: set[int] = set()
     consumed_kinds: set[str] = set()
@@ -207,6 +213,12 @@ def place_week(
         slots.append(_place_race(week_number, goal_race_day, 10.0, "goal"))
         consumed_days.add(goal_race_day)
         if goal_race_day == assignment.long_run_day:
+            consumed_kinds.add("long")
+
+    if test_run_day is not None and test_run_day not in consumed_days:
+        slots.append(_place_race(week_number, test_run_day, 10.0, "test"))
+        consumed_days.add(test_run_day)
+        if test_run_day == assignment.long_run_day:
             consumed_kinds.add("long")
 
     for race in b_races:
