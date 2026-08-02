@@ -67,11 +67,13 @@ key is passed to the container and is never sent to the browser or written to a
 program.
 
 Complete programs can take several minutes to generate. MiniMax requests time
-out after 300 seconds by default; set `RUNPLAN_MINIMAX_TIMEOUT_SECONDS` to a
+out after 600 seconds by default; set `RUNPLAN_MINIMAX_TIMEOUT_SECONDS` to a
 value from 30 through 900 when needed. The Studio starts generation as a
 background job and polls it with short requests, so a reverse proxy does not
 need to keep one connection open while MiniMax runs. Validation can trigger one
-additional MiniMax repair request.
+additional MiniMax repair request. Adaptive MiniMax reasoning remains enabled;
+the completion budget follows MiniMax M3's recommended 131,072 tokens so
+reasoning and the complete YAML draft share a sufficient bound.
 
 Select **Generate program**, enter the current weekly training, longest recent
 run, available weekdays, long-run day, and optional race date, then generate the

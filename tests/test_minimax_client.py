@@ -52,7 +52,7 @@ def test_generate_sends_fixed_nonstreaming_request() -> None:
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    assert call["timeout"] == TIMEOUT_SECONDS == 300.0
+    assert call["timeout"] == TIMEOUT_SECONDS == 600.0
     assert call["max_response_bytes"] == MAX_RESPONSE_BYTES
     assert json.loads(call["body"]) == {
         "model": MODEL,
@@ -63,6 +63,7 @@ def test_generate_sends_fixed_nonstreaming_request() -> None:
         "tools": [],
         "max_completion_tokens": MAX_COMPLETION_TOKENS,
     }
+    assert MAX_COMPLETION_TOKENS == 131_072
 
 
 def test_generate_ignores_separate_reasoning() -> None:
@@ -73,10 +74,11 @@ def test_generate_ignores_separate_reasoning() -> None:
                 {
                     "choices": [
                         {
+                            "finish_reason": "stop",
                             "message": {
                                 "content": "safe output",
                                 "reasoning_details": "private reasoning",
-                            }
+                            },
                         }
                     ]
                 }
@@ -85,6 +87,60 @@ def test_generate_ignores_separate_reasoning() -> None:
     )
 
     assert MiniMaxClient("key", transport=transport).generate("prompt") == "safe output"
+
+
+@pytest.mark.parametrize(
+    ("finish_reason", "reason", "message"),
+    [
+        ("length", "output_limit", "completion token limit"),
+        ("content_filter", "content_filtered", "filtered"),
+        ("tool_calls", "unexpected_tool_call", "unsupported response"),
+        ("future_reason", "invalid_finish_reason", "invalid response"),
+    ],
+)
+def test_generate_classifies_unsuccessful_finish_reasons(
+    finish_reason: str, reason: str, message: str
+) -> None:
+    body = json.dumps(
+        {
+            "choices": [
+                {
+                    "finish_reason": finish_reason,
+                    "message": {"content": "private partial output"},
+                }
+            ]
+        }
+    ).encode()
+    client = MiniMaxClient("key", transport=FakeTransport(TransportResponse(200, body)))
+
+    with pytest.raises(MiniMaxProtocolError, match=message) as raised:
+        client.generate("private prompt")
+
+    assert raised.value.reason == reason
+    assert "private partial output" not in str(raised.value)
+
+
+def test_generate_classifies_missing_content_without_exposing_reasoning() -> None:
+    body = json.dumps(
+        {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {
+                        "content": None,
+                        "reasoning_details": "private reasoning",
+                    },
+                }
+            ]
+        }
+    ).encode()
+    client = MiniMaxClient("key", transport=FakeTransport(TransportResponse(200, body)))
+
+    with pytest.raises(MiniMaxProtocolError, match="invalid response") as raised:
+        client.generate("private prompt")
+
+    assert raised.value.reason == "missing_content"
+    assert "private reasoning" not in str(raised.value)
 
 
 def test_environment_configuration_is_optional(monkeypatch) -> None:

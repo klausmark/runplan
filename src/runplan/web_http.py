@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict
-from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING, Any
@@ -14,6 +12,12 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from .users import UserRegistry, WebError
 from .web_auth import WebAuthenticator
 from .web_auth_http import AuthResponse, WebAuthHttpAdapter
+from .web_generation_http import (
+    generation_draft,
+    generation_job,
+    invalid_generation,
+    minimax_protocol_message,
+)
 
 if TYPE_CHECKING:
     from .web import ProgramStore, WebSyncService
@@ -164,7 +168,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
             MiniMaxRateLimitError,
             MiniMaxTimeoutError,
         )
-        from .integrations.minimax.client import MiniMaxError
+        from .integrations.minimax.client import MiniMaxError, MiniMaxProtocolError
         from .web_generation import GenerationBusyError
 
         try:
@@ -174,7 +178,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
         except GenerationBusyError as exc:
             raise WebError(HTTPStatus.CONFLICT, str(exc)) from exc
         except InvalidGeneratedProgramError as exc:
-            self._json(HTTPStatus.UNPROCESSABLE_ENTITY, _invalid_generation(exc))
+            self._json(HTTPStatus.UNPROCESSABLE_ENTITY, invalid_generation(exc))
             return
         except MiniMaxRateLimitError as exc:
             raise WebError(
@@ -182,11 +186,13 @@ class RunplanHandler(BaseHTTPRequestHandler):
             ) from exc
         except MiniMaxTimeoutError as exc:
             raise WebError(HTTPStatus.GATEWAY_TIMEOUT, "Program generation timed out") from exc
+        except MiniMaxProtocolError as exc:
+            raise WebError(HTTPStatus.SERVICE_UNAVAILABLE, minimax_protocol_message(exc)) from exc
         except MiniMaxError as exc:
             raise WebError(
                 HTTPStatus.SERVICE_UNAVAILABLE, "Program generation is unavailable"
             ) from exc
-        self._json(HTTPStatus.OK, _generation_draft(draft))
+        self._json(HTTPStatus.OK, generation_draft(draft))
 
     def _upload_program(self, payload: dict[str, Any]) -> None:
         user = self.registry.get(payload.get("userId"))
@@ -260,7 +266,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
             raise WebError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
         except GenerationBusyError as exc:
             raise WebError(HTTPStatus.CONFLICT, str(exc)) from exc
-        self._json(HTTPStatus.ACCEPTED, _generation_job(job))
+        self._json(HTTPStatus.ACCEPTED, generation_job(job))
 
     def _get_generation_job(self, path: str, query: dict[str, list[str]]) -> None:
         from .web_generation import GenerationJobNotFoundError
@@ -273,7 +279,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
             job = self.generation.get(job_id, query.get("user", [None])[0])
         except GenerationJobNotFoundError as exc:
             raise WebError(HTTPStatus.NOT_FOUND, str(exc)) from exc
-        self._json(HTTPStatus.OK, _generation_job(job))
+        self._json(HTTPStatus.OK, generation_job(job))
 
     def _get_program(self, query: dict[str, list[str]]) -> None:
         parts = self._api_program_parts()
@@ -417,78 +423,3 @@ def make_handler(
             "auth": auth,
         },
     )
-
-
-def _diagnostic(value: Any) -> dict[str, Any]:
-    result = {"severity": value.severity, "code": value.code, "message": value.message[:1000]}
-    if value.occurrence is not None:
-        occurrence = asdict(value.occurrence)
-        result["occurrence"] = {
-            key: item.isoformat() if isinstance(item, date) else item
-            for key, item in occurrence.items()
-            if item is not None
-        }
-    return result
-
-
-def _generation_draft(draft: Any) -> dict[str, Any]:
-    return {
-        "filename": draft.filename,
-        "content": draft.content,
-        "warnings": [_diagnostic(item) for item in draft.warnings],
-        "summary": {"weeks": draft.summary.weeks, "workouts": draft.summary.workouts},
-        "attemptCount": draft.attempt_count,
-    }
-
-
-def _generation_job(job: Any) -> dict[str, Any]:
-    result = {
-        "jobId": job.id,
-        "status": job.status,
-        "phase": job.phase,
-        "message": job.message,
-        "elapsedSeconds": job.elapsed_seconds,
-    }
-    if job.draft is not None:
-        result["draft"] = _generation_draft(job.draft)
-    if job.error is not None:
-        result["error"] = _generation_job_error(job.error)
-    return result
-
-
-def _generation_job_error(exc: Exception) -> dict[str, Any]:
-    from .application.generate_first_10k import InvalidGeneratedProgramError
-    from .integrations.minimax import MiniMaxRateLimitError, MiniMaxTimeoutError
-    from .integrations.minimax.client import MiniMaxError
-
-    if isinstance(exc, InvalidGeneratedProgramError):
-        return {"httpStatus": HTTPStatus.UNPROCESSABLE_ENTITY, **_invalid_generation(exc)}
-    if isinstance(exc, MiniMaxRateLimitError):
-        return {
-            "httpStatus": HTTPStatus.TOO_MANY_REQUESTS,
-            "error": "Program generation quota or rate limit reached",
-        }
-    if isinstance(exc, MiniMaxTimeoutError):
-        return {
-            "httpStatus": HTTPStatus.GATEWAY_TIMEOUT,
-            "error": "Program generation timed out",
-        }
-    if isinstance(exc, MiniMaxError):
-        return {
-            "httpStatus": HTTPStatus.SERVICE_UNAVAILABLE,
-            "error": "Program generation is unavailable",
-        }
-    return {
-        "httpStatus": HTTPStatus.INTERNAL_SERVER_ERROR,
-        "error": "Program generation failed",
-    }
-
-
-def _invalid_generation(exc: Any) -> dict[str, Any]:
-    candidate = exc.candidate.encode("utf-8")[: 128 * 1024].decode("utf-8", errors="ignore")
-    return {
-        "error": str(exc),
-        "candidate": candidate,
-        "diagnostics": [_diagnostic(item) for item in exc.diagnostics[:100]],
-        "attemptCount": exc.attempt_count,
-    }

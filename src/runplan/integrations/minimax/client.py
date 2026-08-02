@@ -14,10 +14,10 @@ from urllib.request import Request, urlopen
 
 ENDPOINT = "https://api.minimax.io/v1/chat/completions"
 MODEL = "MiniMax-M3"
-TIMEOUT_SECONDS = 300.0
+TIMEOUT_SECONDS = 600.0
 MIN_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 900.0
-MAX_COMPLETION_TOKENS = 16_384
+MAX_COMPLETION_TOKENS = 131_072
 MAX_PROMPT_BYTES = 256 * 1024
 MAX_REQUEST_BYTES = 300 * 1024
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -49,6 +49,10 @@ class MiniMaxUpstreamError(MiniMaxError):
 
 class MiniMaxProtocolError(MiniMaxError):
     """Raised for bounded-input or invalid-response failures."""
+
+    def __init__(self, message: str, *, reason: str = "invalid_response") -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 @dataclass(frozen=True)
@@ -108,6 +112,96 @@ def _read_bounded(response: HTTPResponse, maximum: int) -> bytes:
     return body
 
 
+def _transport_response(response: object) -> tuple[int, bytes]:
+    try:
+        status, body = response.status, response.body  # type: ignore[attr-defined]
+    except (AttributeError, TypeError):
+        raise MiniMaxProtocolError(
+            "MiniMax returned an invalid response", reason="invalid_transport_response"
+        ) from None
+    if not isinstance(status, int) or isinstance(status, bool) or not isinstance(body, bytes):
+        raise MiniMaxProtocolError(
+            "MiniMax returned an invalid response", reason="invalid_transport_response"
+        )
+    if len(body) > MAX_RESPONSE_BYTES:
+        raise MiniMaxProtocolError(
+            "MiniMax response exceeds the supported size", reason="response_too_large"
+        )
+    return status, body
+
+
+def _successful_payload(body: bytes) -> Mapping[str, object]:
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise MiniMaxProtocolError(
+            "MiniMax returned an invalid response", reason="invalid_json"
+        ) from None
+    if not isinstance(payload, Mapping):
+        raise MiniMaxProtocolError(
+            "MiniMax returned an invalid response", reason="invalid_response_root"
+        )
+    base_response = payload.get("base_resp", {})
+    if not isinstance(base_response, Mapping):
+        raise MiniMaxProtocolError(
+            "MiniMax returned an invalid response", reason="invalid_base_response"
+        )
+    base_status = base_response.get("status_code", 0)
+    if base_status in (1004,):
+        raise MiniMaxAuthenticationError("MiniMax authentication failed")
+    if base_status in (1002, 1008):
+        raise MiniMaxRateLimitError("MiniMax quota or rate limit reached")
+    if base_status in (1001,):
+        raise MiniMaxTimeoutError("MiniMax request timed out")
+    if base_status:
+        raise MiniMaxUpstreamError("MiniMax returned an unsuccessful response")
+    return payload
+
+
+def _completion_content(payload: Mapping[str, object]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
+        raise MiniMaxProtocolError("MiniMax returned an invalid response", reason="missing_choices")
+    choice = choices[0]
+    finish_reason = choice.get("finish_reason")
+    if finish_reason == "length":
+        raise MiniMaxProtocolError(
+            "MiniMax reached the completion token limit", reason="output_limit"
+        )
+    if finish_reason == "content_filter":
+        raise MiniMaxProtocolError(
+            "MiniMax filtered the generated response", reason="content_filtered"
+        )
+    if finish_reason == "tool_calls":
+        raise MiniMaxProtocolError(
+            "MiniMax returned an unsupported response", reason="unexpected_tool_call"
+        )
+    if finish_reason not in (None, "stop"):
+        raise MiniMaxProtocolError(
+            "MiniMax returned an invalid response", reason="invalid_finish_reason"
+        )
+    message = choice.get("message")
+    if not isinstance(message, Mapping):
+        raise MiniMaxProtocolError("MiniMax returned an invalid response", reason="missing_message")
+    content = message.get("content")
+    if not isinstance(content, str):
+        raise MiniMaxProtocolError("MiniMax returned an invalid response", reason="missing_content")
+    return content
+
+
+def _response_content(response: object) -> str:
+    status, body = _transport_response(response)
+    if status in (401, 403):
+        raise MiniMaxAuthenticationError("MiniMax authentication failed")
+    if status == 429:
+        raise MiniMaxRateLimitError("MiniMax quota or rate limit reached")
+    if status in (408, 504):
+        raise MiniMaxTimeoutError("MiniMax request timed out")
+    if status < 200 or status >= 300:
+        raise MiniMaxUpstreamError("MiniMax returned an unsuccessful response")
+    return _completion_content(_successful_payload(body))
+
+
 class MiniMaxClient:
     """Generate text with the fixed MiniMax MVP configuration."""
 
@@ -159,7 +253,9 @@ class MiniMaxClient:
         if self._api_key is None:
             raise MiniMaxUnconfiguredError("MiniMax plan generation is not configured")
         if not isinstance(prompt, str) or len(prompt.encode("utf-8")) > MAX_PROMPT_BYTES:
-            raise MiniMaxProtocolError("MiniMax prompt exceeds the supported size")
+            raise MiniMaxProtocolError(
+                "MiniMax prompt exceeds the supported size", reason="prompt_too_large"
+            )
 
         body = json.dumps(
             {
@@ -175,7 +271,9 @@ class MiniMaxClient:
             separators=(",", ":"),
         ).encode("utf-8")
         if len(body) > MAX_REQUEST_BYTES:
-            raise MiniMaxProtocolError("MiniMax request exceeds the supported size")
+            raise MiniMaxProtocolError(
+                "MiniMax request exceeds the supported size", reason="request_too_large"
+            )
 
         try:
             response = self._transport.send(
@@ -196,7 +294,9 @@ class MiniMaxClient:
                 raise MiniMaxTimeoutError("MiniMax request timed out") from None
             raise MiniMaxUpstreamError("MiniMax request failed") from None
         except _ResponseTooLargeError:
-            raise MiniMaxProtocolError("MiniMax response exceeds the supported size") from None
+            raise MiniMaxProtocolError(
+                "MiniMax response exceeds the supported size", reason="response_too_large"
+            ) from None
         except OSError:
             raise MiniMaxUpstreamError("MiniMax request failed") from None
         except MiniMaxError:
@@ -204,55 +304,7 @@ class MiniMaxClient:
         except Exception:
             raise MiniMaxUpstreamError("MiniMax request failed") from None
 
-        try:
-            status, response_body = response.status, response.body
-        except (AttributeError, TypeError):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response") from None
-        if (
-            not isinstance(status, int)
-            or isinstance(status, bool)
-            or not isinstance(response_body, bytes)
-        ):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response")
-        if len(response_body) > MAX_RESPONSE_BYTES:
-            raise MiniMaxProtocolError("MiniMax response exceeds the supported size")
-        if status in (401, 403):
-            raise MiniMaxAuthenticationError("MiniMax authentication failed")
-        if status == 429:
-            raise MiniMaxRateLimitError("MiniMax quota or rate limit reached")
-        if status in (408, 504):
-            raise MiniMaxTimeoutError("MiniMax request timed out")
-        if status < 200 or status >= 300:
-            raise MiniMaxUpstreamError("MiniMax returned an unsuccessful response")
-
-        try:
-            payload = json.loads(response_body)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response") from None
-        if not isinstance(payload, Mapping):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response")
-        base_response = payload.get("base_resp", {})
-        if not isinstance(base_response, Mapping):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response")
-        base_status = base_response.get("status_code", 0)
-        if base_status in (1004,):
-            raise MiniMaxAuthenticationError("MiniMax authentication failed")
-        if base_status in (1002, 1008):
-            raise MiniMaxRateLimitError("MiniMax quota or rate limit reached")
-        if base_status in (1001,):
-            raise MiniMaxTimeoutError("MiniMax request timed out")
-        if base_status:
-            raise MiniMaxUpstreamError("MiniMax returned an unsuccessful response")
-        choices = payload.get("choices")
-        if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response")
-        message = choices[0].get("message")
-        if not isinstance(message, Mapping):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response")
-        content = message.get("content")
-        if not isinstance(content, str):
-            raise MiniMaxProtocolError("MiniMax returned an invalid response")
-        return content
+        return _response_content(response)
 
 
 __all__ = [

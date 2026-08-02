@@ -56,5 +56,5 @@ def test_compose_forwards_optional_minimax_configuration() -> None:
 
     assert 'RUNPLAN_MINIMAX_API_KEY: "${RUNPLAN_MINIMAX_API_KEY:-}"' in compose
     assert "# RUNPLAN_MINIMAX_API_KEY=" in environment_example
-    assert 'RUNPLAN_MINIMAX_TIMEOUT_SECONDS: "${RUNPLAN_MINIMAX_TIMEOUT_SECONDS:-300}"' in compose
-    assert "RUNPLAN_MINIMAX_TIMEOUT_SECONDS=300" in environment_example
+    assert 'RUNPLAN_MINIMAX_TIMEOUT_SECONDS: "${RUNPLAN_MINIMAX_TIMEOUT_SECONDS:-600}"' in compose
+    assert "RUNPLAN_MINIMAX_TIMEOUT_SECONDS=600" in environment_example

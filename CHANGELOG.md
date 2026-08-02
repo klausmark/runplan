@@ -12,8 +12,9 @@ changes may be released in a new minor version.
   attempt, explicit saving, and no automatic Garmin synchronization.
 - Fixed first 10K generation to accept an easy pace such as `6:15` without
   requiring the redundant `min/km` suffix.
-- Increased the MiniMax generation timeout to five minutes, made it configurable,
-  and handled disconnected generation clients without noisy server tracebacks.
+- Increased the configurable MiniMax generation timeout to ten minutes, raised
+  the completion budget for adaptive reasoning and complete YAML output, and
+  added safe diagnostics for incomplete or filtered provider responses.
 - Moved Studio generation to short-lived background jobs with polling, elapsed
   time, and real preparation, MiniMax, validation, and repair status messages,
   avoiding reverse-proxy timeouts during long generations.

@@ -212,6 +212,55 @@ def test_background_generation_job_returns_safe_provider_failure(tmp_path: Path)
     assert "private detail" not in poll.wfile.getvalue().decode()
 
 
+@pytest.mark.parametrize(
+    ("reason", "message"),
+    [
+        ("output_limit", "MiniMax reached its output limit before completing the program"),
+        ("content_filtered", "MiniMax filtered the generated program"),
+        ("missing_content", "MiniMax returned an incomplete response; try generating again"),
+    ],
+)
+def test_background_generation_job_reports_safe_protocol_reason(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    reason: str,
+    message: str,
+) -> None:
+    workers: list[Callable[[], None]] = []
+    users = registry(tmp_path)
+    generation = WebProgramGenerationService(
+        FakeGenerator(MiniMaxProtocolError("private detail", reason=reason)),
+        users,
+        today=lambda: TODAY,
+        start_worker=workers.append,
+    )
+    start = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        "/api/program-generation/jobs",
+        body=generation_payload(),
+        generation_service=generation,
+    )
+    start.do_POST()
+    started = response_json(start)
+
+    with caplog.at_level(logging.ERROR, logger="runplan.web"):
+        workers.pop()()
+
+    poll = request_handler(
+        tmp_path,
+        FakeGenerator(),
+        f"/api/program-generation/jobs/{started['jobId']}?user=runner",
+        generation_service=generation,
+    )
+    poll.do_GET()
+
+    result = response_json(poll)
+    assert result["error"] == {"httpStatus": 503, "error": message}
+    assert f"reason={reason}" in caplog.text
+    assert "private detail" not in poll.wfile.getvalue().decode() + caplog.text
+
+
 def test_invalid_input_returns_400(tmp_path: Path) -> None:
     payload = generation_payload()
     payload["durationWeeks"] = True

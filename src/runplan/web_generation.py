@@ -29,6 +29,7 @@ from .domain.generation_inputs import (
     TrainingAmount,
     Weekday,
 )
+from .integrations.minimax.client import MiniMaxProtocolError
 from .parsing.values import parse_pace
 from .users import UserRegistry
 
@@ -37,7 +38,7 @@ GENERATION_JOB_TTL_SECONDS = 15 * 60.0
 GENERATION_PHASE_MESSAGES = {
     "queued": "Generation is queued.",
     "preparing": "Preparing the program outline.",
-    "generating": "MiniMax is creating the workout details. This can take several minutes.",
+    "generating": "MiniMax is reasoning about the plan and creating workout details. This can take several minutes.",
     "validating": "Validating the generated program.",
     "repairing": "MiniMax is repairing the draft after validation.",
     "complete": "Program ready.",
@@ -416,11 +417,13 @@ class WebProgramGenerationService:
                 job.phase = "failed"
                 job.finished_at = now
                 job.error = exc
+            protocol_reason = exc.reason if isinstance(exc, MiniMaxProtocolError) else "none"
             logger.error(
-                "Program generation failed user=%s job=%s exception=%s",
+                "Program generation failed user=%s job=%s exception=%s reason=%s",
                 job.user_id,
                 job.id,
                 type(exc).__name__,
+                protocol_reason,
             )
         else:
             now = self._clock()
