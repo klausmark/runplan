@@ -20,7 +20,12 @@ from .inputs import (
     suggest_start_week,
 )
 from .plan import compose_program
-from .serialize import GeneratorResult, plan_to_yaml
+from .serialize import (
+    GeneratorResult,
+    plan_to_yaml,
+    suggested_filename,
+    validate_yaml,
+)
 
 __all__ = [
     "BRace",
@@ -38,4 +43,6 @@ __all__ = [
     "plan_to_yaml",
     "race_date_window",
     "suggest_start_week",
+    "suggested_filename",
+    "validate_yaml",
 ]

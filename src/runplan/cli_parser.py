@@ -41,6 +41,7 @@ def build_parser(program_directory: Path) -> argparse.ArgumentParser:
     )
     _add_serve_command(commands, program_directory)
     _add_reconcile_command(commands)
+    _add_generate_command(commands)
     return parser
 
 
@@ -108,3 +109,74 @@ def _add_reconcile_command(commands: Any) -> None:
         "reconcile", help="Refresh completed and missed workouts from Garmin"
     )
     reconcile_parser.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
+
+
+def _add_generate_command(commands: Any) -> None:
+    generate_parser = commands.add_parser(
+        "generate",
+        help="Generate a deterministic running program",
+    )
+    generate_subcommands = generate_parser.add_subparsers(dest="generate_command", required=True)
+    first_10k = generate_subcommands.add_parser(
+        "first-10k", help="Generate a first 10K program from a typed request"
+    )
+    first_10k.add_argument("--start-week", help="ISO week label (YYYY-Www); default: next Monday")
+    first_10k.add_argument("--duration-weeks", type=int, default=12, help="Program length (8-16)")
+    first_10k.add_argument("--race-date", help="Goal race date (YYYY-MM-DD)")
+    first_10k.add_argument(
+        "--training-days",
+        help="Comma-separated weekdays (1-7) the runner CAN train on",
+    )
+    first_10k.add_argument(
+        "--sessions-per-week",
+        type=int,
+        default=3,
+        help="Number of sessions per week selected from --training-days (2-7)",
+    )
+    first_10k.add_argument(
+        "--long-run-day",
+        type=int,
+        help="Preferred weekday (1-7) for the long run",
+    )
+    first_10k.add_argument(
+        "--current-weekly-km",
+        type=float,
+        default=0.0,
+        help="Average weekly distance over the last four weeks",
+    )
+    first_10k.add_argument(
+        "--current-longest-km",
+        type=float,
+        help="Longest recent run in kilometres",
+    )
+    first_10k.add_argument(
+        "--progression",
+        choices=("cautious", "balanced", "ambitious"),
+        default="balanced",
+        help="Progression profile",
+    )
+    first_10k.add_argument(
+        "--quality-per-week",
+        type=int,
+        default=0,
+        help="Quality sessions per week (0-1)",
+    )
+    first_10k.add_argument(
+        "--known-easy-pace",
+        help="Known easy pace range, e.g. '5:45-6:00 min/km'",
+    )
+    first_10k.add_argument(
+        "--max-weekly-km",
+        type=float,
+        help="Hard cap on weekly distance",
+    )
+    first_10k.add_argument(
+        "--max-long-run-km",
+        type=float,
+        help="Hard cap on long-run distance",
+    )
+    first_10k.add_argument(
+        "--output",
+        type=Path,
+        help="Output file (default: stdout)",
+    )

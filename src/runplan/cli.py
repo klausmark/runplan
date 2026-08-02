@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import re
 import sys
 from argparse import Namespace
 from collections.abc import Sequence
@@ -27,6 +28,14 @@ from .domain.errors import WorkoutDefinitionError
 from .exporters.html import export_html
 from .exporters.markdown import export_markdown
 from .exporters.pdf import export_pdf
+from .generation import (
+    GeneratorRequest,
+    GoalRace,
+    TrainingDays,
+    compose_program,
+    plan_to_yaml,
+)
+from .generation.errors import GenerationError
 from .integrations.garmin.client import login_to_garmin
 from .logging_config import LOG_LEVELS
 from .parsing.values import parse_pace
@@ -170,6 +179,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     if arguments.command == "reconcile":
         return run_reconcile(arguments)
+    if arguments.command == "generate":
+        return run_generate(arguments)
     return 2
 
 
@@ -297,6 +308,92 @@ def run_reconcile(arguments: Namespace) -> int:
     return 0
 
 
+def _parse_weekdays(raw: str | None) -> tuple[int, ...]:
+    """Parse a comma-separated weekday list into a stable tuple."""
+    if not raw:
+        return (1, 3, 5)
+    cleaned = [int(part.strip()) for part in raw.split(",") if part.strip()]
+    return tuple(sorted(set(cleaned)))
+
+
+def _parse_pace_range(raw: str | None) -> tuple[int, int] | None:
+    """Parse a 'M:SS-M:SS' or 'M:SS min/km' pace string into seconds."""
+    if not raw:
+        return None
+    text = raw.replace("min/km", "").strip()
+    parts = re.split(r"\s*-\s*", text)
+    if len(parts) == 1:
+        minutes, seconds = parts[0].split(":")
+        pace = int(minutes) * 60 + int(seconds)
+        return (pace, pace)
+    if len(parts) == 2:
+        fast_min, fast_sec = parts[0].split(":")
+        slow_min, slow_sec = parts[1].split(":")
+        fast = int(fast_min) * 60 + int(fast_sec)
+        slow = int(slow_min) * 60 + int(slow_sec)
+        return (min(fast, slow), max(fast, slow))
+    raise ValueError(f"could not parse pace {raw!r}")
+
+
+def run_generate(arguments: Namespace) -> int:
+    """Generate a deterministic running program from CLI arguments."""
+    from .generation.inputs import (
+        DEFAULT_DURATION_WEEKS,
+        DEFAULT_SESSIONS_PER_WEEK,
+        MAX_DURATION_WEEKS,
+        MIN_DURATION_WEEKS,
+    )
+
+    generate_command = getattr(arguments, "generate_command", None)
+    if generate_command != "first-10k":
+        print("Unsupported generate subcommand. Use 'first-10k'.", file=sys.stderr)
+        return 2
+    try:
+        possible_days = _parse_weekdays(getattr(arguments, "training_days", None))
+        sessions_per_week = getattr(arguments, "sessions_per_week", DEFAULT_SESSIONS_PER_WEEK)
+        if not (
+            MIN_DURATION_WEEKS
+            <= getattr(arguments, "duration_weeks", DEFAULT_DURATION_WEEKS)
+            <= MAX_DURATION_WEEKS
+        ):
+            raise ValueError(f"--duration-weeks must be {MIN_DURATION_WEEKS}-{MAX_DURATION_WEEKS}")
+        start_week = getattr(arguments, "start_week", None) or "next"
+        race_date = getattr(arguments, "race_date", None)
+        goal_race = GoalRace(date=date.fromisoformat(race_date) if race_date else None)
+        pace = _parse_pace_range(getattr(arguments, "known_easy_pace", None))
+        training_days = TrainingDays(
+            possible_days=possible_days,
+            sessions_per_week=sessions_per_week,
+        )
+        request = GeneratorRequest(
+            start_week=start_week,
+            duration_weeks=getattr(arguments, "duration_weeks", DEFAULT_DURATION_WEEKS),
+            goal_race=goal_race,
+            current_weekly_km=getattr(arguments, "current_weekly_km", 0.0),
+            current_longest_km=getattr(arguments, "current_longest_km", None),
+            training_days=training_days,
+            preferred_long_run_day=getattr(arguments, "long_run_day", None),
+            progression=getattr(arguments, "progression", "balanced"),
+            quality_sessions_per_week=getattr(arguments, "quality_per_week", 0),
+            known_easy_pace_sec=pace,
+            max_weekly_km=getattr(arguments, "max_weekly_km", None),
+            max_long_run_km=getattr(arguments, "max_long_run_km", None),
+        )
+        result = compose_program(request)
+        payload = plan_to_yaml(result)
+    except (GenerationError, ValueError) as exc:
+        print(f"Generate failed: {exc}", file=sys.stderr)
+        return 2
+    output = getattr(arguments, "output", None)
+    if output is None:
+        sys.stdout.write(payload)
+        return 0
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(payload, encoding="utf-8")
+    print(f"Generated program written to {output}", file=sys.stderr)
+    return 0
+
+
 __all__ = [
     "build_parser",
     "add_week_selectors",
@@ -304,6 +401,7 @@ __all__ = [
     "parse_arguments",
     "prepare_sync_selections",
     "run_export",
+    "run_generate",
     "run_hash_password",
     "run_multi_week_sync",
     "run_preview",

@@ -11,6 +11,15 @@ from .domain.selectors import WeekSelection, WeekSelectionError
 from .exporters.html import export_html, format_program_html
 from .exporters.markdown import export_markdown, format_program_markdown
 from .exporters.pdf import export_pdf
+from .generation import (
+    BRace,
+    GeneratorRequest,
+    GoalRace,
+    TrainingDays,
+    compose_program,
+    plan_to_yaml,
+    suggested_filename,
+)
 from .integrations.garmin.mapper import build_workout, compile_steps
 from .parsing.values import (
     parse_distance,
@@ -35,18 +44,23 @@ from .state.json_repository import load_state, save_state, state_path
 logging.getLogger("runplan").addHandler(logging.NullHandler())
 
 __all__ = [
-    "WorkoutDefinitionError",
+    "BRace",
+    "GeneratorRequest",
+    "GoalRace",
     "Program",
     "ProgramExport",
     "Step",
+    "TrainingDays",
     "Week",
     "WeekSelection",
     "WeekSelectionError",
     "Workout",
+    "WorkoutDefinitionError",
     "WorkoutStatus",
     "build_workout",
     "build_program_export",
     "compile_steps",
+    "compose_program",
     "delete_all_managed",
     "estimate_duration",
     "estimate_totals",
@@ -65,10 +79,12 @@ __all__ = [
     "parse_duration",
     "parse_pace",
     "parse_step_end",
+    "plan_to_yaml",
     "reconcile_program",
+    "run_sync",
     "save_state",
     "state_path",
     "step_summary",
+    "suggested_filename",
     "sync_program_week",
-    "run_sync",
 ]
