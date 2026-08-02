@@ -14,12 +14,21 @@ These features are sufficiently defined to be implemented next, in order.
 3. Add browser-level coverage for the critical calendar, touch movement,
    theme, validation, and confirmed sync flows.
 
+## Shipped
+
+- Deterministic first 10K program generator. The `runplan generation`
+  module encodes the coaching rules from
+  `docs/generation-first-10k-evidence.md` into pure functions and ships
+  a `runplan generate first-10k` CLI command. The implementation lives
+  in `src/runplan/generation/` and is exercised by the
+  `tests/test_generation_*.py` suite.
+
 ## Wishing well
 
 Ideas in this section are intentionally not implementation-ready. Promote an
 idea to the section above only after its scope and product decisions are clear.
 
-- Add validated generic 5K, 10K, half-marathon, and marathon programs that
+- Add validated generic 5K, half-marathon, and marathon programs that
   users can browse and copy before editing.
 - Expose prompts and generic programs consistently through the CLI.
 - Add revision history and restore with readable change summaries.

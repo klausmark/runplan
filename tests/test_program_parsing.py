@@ -133,7 +133,7 @@ def test_every_bundled_program_loads_and_builds_every_week() -> None:
     paths = sorted(PROGRAM_FIXTURES.glob("*.yaml")) + sorted(
         (PROJECT_DIR / "docs" / "examples").glob("*.yaml")
     )
-    assert len(paths) >= 4
+    assert len(paths) >= 5
 
     for path in paths:
         first = load_definition(path)

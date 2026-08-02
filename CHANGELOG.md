@@ -7,6 +7,12 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Added a deterministic first 10K program generator. The `runplan
+  generation` module accepts a typed request and returns a validated Runplan
+  program that round-trips through the existing parser. The `runplan
+  generate first-10k` command writes the produced YAML to stdout or to a
+  file. The coaching rules are encoded in code and cite the peer-reviewed
+  evidence collected in `docs/generation-first-10k-evidence.md`.
 - Added an optional systemd-driven Docker host deployment that polls Git,
   retains commit-tagged images, waits for health, and restores the previous
   image and checkout when deployment fails.

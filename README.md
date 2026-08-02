@@ -516,4 +516,51 @@ Runplan accepts complete program files containing `program` and `weeks`. The
 format and the maintained generation prompt are documented in
 `docs/program-prompt.md`.
 
+## Generate a first 10K program
+
+The `runplan generate first-10k` command builds a deterministic 10K program
+from a typed request. The output is a regular Runplan YAML file that can be
+uploaded into the Studio, exported, and synced with Garmin Connect:
+
+```bash
+uv run runplan generate first-10k \
+    --start-week 2026-W32 \
+    --duration-weeks 12 \
+    --training-days 1,3,5,7 \
+    --sessions-per-week 3 \
+    --current-weekly-km 25 \
+    --current-longest-km 6 \
+    --progression balanced \
+    --known-easy-pace "5:45-6:00 min/km" \
+    --output ~/.local/share/runplan/programs/first-10k-2026-w32.yaml
+```
+
+The generator follows the peer-reviewed rules collected in
+`docs/generation-first-10k-evidence.md`. It uses a four-week microcycle with a
+forced recovery week, a soft pyramidal intensity distribution, and varies
+workout type and weekday across the program. Quality sessions are off by
+default; add `--quality-per-week 1` to include one focused session per week.
+
+The generator never saves or syncs automatically. It writes the YAML to
+stdout or to `--output`, and the existing upload flow remains the only save
+boundary.
+
+The same module is available as a Python API:
+
+```python
+from datetime import date
+from runplan.generation import (
+    GeneratorRequest, TrainingDays, compose_program, plan_to_yaml,
+)
+
+request = GeneratorRequest(
+    start_week="2026-W32",
+    duration_weeks=12,
+    current_weekly_km=25,
+    training_days=TrainingDays(possible_days=(1, 3, 5, 7), sessions_per_week=3),
+)
+result = compose_program(request, today=date(2026, 7, 1))
+print(plan_to_yaml(result))
+```
+
 Note: the Garmin API is unofficial and may change without notice.
