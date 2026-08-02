@@ -82,26 +82,19 @@ saving the plan. It uses the CLI's selection and synchronization use cases,
 shows a structured diff before confirmation, and reports progress, results,
 and actionable errors. Credentials remain on the server.
 
-Program generation is an application use case behind a provider-independent
-port. The first implementation supports one versioned **Complete your first
-10K** blueprint and a MiniMax M3 adapter configured by a server-side environment
-key. The domain normalizes runner constraints and creates an immutable workout
-outline before the provider is called; generated YAML then passes structural
-and coaching validation with at most one repair attempt. MiniMax retains adaptive
-reasoning for coaching choices, with a provider-recommended completion budget,
-bounded response size, and finite request timeout. Generation returns an in-memory
-draft. Studio runs generation as a per-user background job and polls short status
-requests so provider latency does not require a long-lived reverse proxy connection.
-Jobs and drafts expire from memory after a short period and do not survive restart.
-The existing upload/save path is the only persistence boundary, and Garmin preview
-and confirmed sync remain separate later actions.
+Program generation is a local application use case. The first implementation
+supports one versioned **Complete your first 10K** blueprint. The domain
+normalizes typed runner constraints, creates an immutable workout outline,
+calculates feasible weekly and per-workout loads, and renders deterministic
+workout recipes. The completed domain model then passes an independent structural
+and coaching validator before it is serialized as editable YAML. Generation is
+synchronous, requires no provider configuration, and does not send training data
+outside the Runplan server.
 
-The generation privacy boundary sends only the runner, schedule, race, club,
-pace, and free-text guidance needed for the requested program. It never sends
-Garmin credentials or tokens, web authentication secrets, profile identity,
-activity history, or unrelated programs. Provider credentials stay in the
-server adapter, while HTTP errors and operational logs use fixed messages rather
-than model output, prompt content, or user-entered details.
+The generated draft exists only in the HTTP response. The existing upload/save
+path is the only persistence boundary, and Garmin preview and confirmed sync
+remain separate later actions. HTTP errors and operational logs omit request
+bodies, generated YAML, and user-entered details.
 
 The calendar may manually link a missed workout to an existing Garmin running
 activity without mutating Garmin. Discovery is limited to the planned date. Activities
@@ -160,7 +153,7 @@ src/runplan/
   application/     generation, preview, selection, sync, results, and ports
   parsing/         YAML and human-readable value parsing
   exporters/       presentation-file exporters
-  integrations/    Garmin and generation-provider adapters
+  integrations/    Garmin adapters
   presentation/    human-readable and machine-readable formatters
   state/           state repository implementations
   web_*.py          authenticated HTTP and web use-case orchestration

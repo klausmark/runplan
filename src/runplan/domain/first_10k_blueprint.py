@@ -11,6 +11,7 @@ from .generation_inputs import (
     ClubSession,
     ClubSessionKind,
     NormalizedFirst10KGenerationInput,
+    QualityPreference,
     RaceIntensity,
     Weekday,
 )
@@ -57,7 +58,7 @@ class First10KBlueprint:
 
 FIRST_10K_BLUEPRINT = First10KBlueprint(
     blueprint_id="complete-first-10k",
-    version=1,
+    version=2,
     goal="Complete 10 kilometers",
     intended_runner="A runner preparing to complete their first 10K",
     minimum_duration_weeks=4,
@@ -203,6 +204,19 @@ def _assign_stable_ids(
     return tuple(result)
 
 
+def _uses_quality(inputs: NormalizedFirst10KGenerationInput) -> bool:
+    if inputs.quality_preference is QualityPreference.NONE:
+        return False
+    if inputs.quality_preference is QualityPreference.BUILD:
+        return True
+    return (
+        inputs.period.duration_weeks >= 8
+        and inputs.current_training.average_weekly_km >= 10
+        and inputs.current_training.run_days_per_week >= 3
+        and len(inputs.weekdays) >= 3
+    )
+
+
 def build_first_10k_outline(
     inputs: NormalizedFirst10KGenerationInput,
 ) -> First10KOutline:
@@ -299,8 +313,10 @@ def build_first_10k_outline(
     quality_dates = {
         slot.date for slots in week_slots for slot in slots if slot.consumes_quality_capacity
     }
-    if inputs.quality_sessions_per_week == 1:
-        for slots in week_slots:
+    if _uses_quality(inputs):
+        for week_index, slots in enumerate(week_slots):
+            if _phase_for_week(week_index + 1, duration) is not TrainingPhase.BUILD:
+                continue
             if any(slot.consumes_quality_capacity for slot in slots):
                 continue
             candidates = (

@@ -78,7 +78,7 @@ def test_log_formatter_redacts_secrets_in_messages_and_tracebacks() -> None:
         raise RuntimeError(
             "email runner@example.com password=hunter2 token=abc123 "
             "path=/srv/users/klaus/credentials.toml "
-            "Authorization: Bearer minimax-secret RUNPLAN_MINIMAX_API_KEY=other-secret"
+            "Authorization: Bearer provider-secret RUNPLAN_API_KEY=other-secret"
         )
     except RuntimeError:
         logger.exception("Authentication failed for runner@example.com")
@@ -89,7 +89,7 @@ def test_log_formatter_redacts_secrets_in_messages_and_tracebacks() -> None:
         "hunter2",
         "abc123",
         "credentials.toml",
-        "minimax-secret",
+        "provider-secret",
         "other-secret",
     ):
         assert secret not in rendered

@@ -30,12 +30,6 @@ class GarminClient(Protocol):
     def delete_workout(self, workout_id: int) -> Any: ...
 
 
-class PlanGenerator(Protocol):
-    """Generate plan text from a complete provider-independent prompt."""
-
-    def generate(self, prompt: str) -> str: ...
-
-
 class StateRepository(Protocol):
     """Persistence contract for program synchronization state."""
 
@@ -46,4 +40,4 @@ class StateRepository(Protocol):
     def delete(self, program_id: str) -> None: ...
 
 
-__all__ = ["GarminClient", "PlanGenerator", "StateRepository"]
+__all__ = ["GarminClient", "StateRepository"]

@@ -7,17 +7,13 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
-- Added optional MiniMax M3 generation of validated, editable **Complete your
-  first 10K** YAML drafts, with standard and advanced constraints, one repair
-  attempt, explicit saving, and no automatic Garmin synchronization.
-- Fixed first 10K generation to accept an easy pace such as `6:15` without
-  requiring the redundant `min/km` suffix.
-- Increased the configurable MiniMax generation timeout to ten minutes, raised
-  the completion budget for adaptive reasoning and complete YAML output, and
-  added safe diagnostics for incomplete or filtered provider responses.
-- Moved Studio generation to short-lived background jobs with polling, elapsed
-  time, and real preparation, MiniMax, validation, and repair status messages,
-  avoiding reverse-proxy timeouts during long generations.
+- Added local deterministic generation of validated, editable **Complete your
+  first 10K** YAML drafts. Typed controls cover training style and automatic
+  build-phase quality selection; fixed commitments, progression, consolidation,
+  taper, long runs, and workout recipes are calculated without an AI provider.
+  Generation remains separate from explicit saving and Garmin synchronization.
+- Accepted an easy pace such as `6:15` without requiring the redundant `min/km`
+  suffix.
 - Added an optional systemd-driven Docker host deployment that polls Git,
   retains commit-tagged images, waits for health, and restores the previous
   image and checkout when deployment fails.

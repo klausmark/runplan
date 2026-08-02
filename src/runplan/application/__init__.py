@@ -7,7 +7,7 @@ from .generate_first_10k import (
     GenerationDiagnostic,
     InvalidGeneratedProgramError,
 )
-from .ports import GarminClient, PlanGenerator, StateRepository
+from .ports import GarminClient, StateRepository
 from .results import SyncAction, SyncPlan, SyncResult
 from .sync import (
     delete_all_managed,
@@ -25,7 +25,6 @@ __all__ = [
     "GeneratedProgramSummary",
     "GenerationDiagnostic",
     "InvalidGeneratedProgramError",
-    "PlanGenerator",
     "StateRepository",
     "SyncAction",
     "SyncPlan",

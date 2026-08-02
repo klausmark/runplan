@@ -84,7 +84,6 @@
         <p class="eyebrow">No programs yet</p>
         <h2>Create your first running program</h2>
         <p>Generate a first 10K program or upload a valid Runplan YAML file. It will be stored only for the selected user.</p>
-        <p id="generation-configuration-help" class="configuration-help hidden">Program generation is not configured. Add <code>RUNPLAN_MINIMAX_API_KEY</code> to the server environment to enable it.</p>
         <div class="empty-actions"><button id="empty-generate-program-button" class="button primary" type="button">Generate program</button><button id="empty-upload-program-button" class="button secondary" type="button">Upload program</button></div>
       </section>
       <section id="calendar" class="calendar" aria-label="Training weeks"></section>
@@ -153,7 +152,8 @@
                 <label>Maximum weekly distance <span class="optional">optional, km</span><input id="generation-maximum-weekly-km" type="number" min="0.1" step="0.1"></label>
                 <label>Maximum long-run distance <span class="optional">optional, km</span><input id="generation-maximum-long-run-km" type="number" min="0.1" step="0.1"></label>
                 <label>Progression<select id="generation-progression"><option value="cautious">Cautious</option><option value="balanced" selected>Balanced</option><option value="ambitious">Ambitious</option></select></label>
-                <label>Quality sessions per week<select id="generation-quality-sessions"><option value="0" selected>0</option><option value="1">1</option></select></label>
+                <label>Training style<select id="generation-training-style"><option value="auto" selected>Automatic</option><option value="run-walk">Run/walk</option><option value="continuous">Continuous running</option></select></label>
+                <label>Quality training<select id="generation-quality-preference"><option value="auto" selected>Automatic</option><option value="none">None</option><option value="build">Build weeks</option></select></label>
               </div>
               <section class="repeated-section" aria-labelledby="generation-club-title">
                 <div class="repeated-heading"><div><h3 id="generation-club-title">Recurring club sessions</h3><p>Club days must be selected training days.</p></div><button id="generation-add-club" type="button" class="button secondary" aria-label="Add recurring club session">Add club session</button></div>
@@ -163,13 +163,11 @@
                 <div class="repeated-heading"><div><h3 id="generation-b-races-title">B races</h3><p>Preparation races must fall within the program period.</p></div><button id="generation-add-b-race" type="button" class="button secondary" aria-label="Add B race">Add B race</button></div>
                 <div id="generation-b-race-rows" class="repeated-rows"></div>
               </section>
-              <label>Additional instructions <span class="optional">optional</span><textarea id="generation-additional-instructions" maxlength="1000" rows="4" placeholder="For example, prefer trails or avoid steep hills."></textarea><small>Maximum 1000 characters. The full generation prompt cannot be edited.</small></label>
             </div>
           </details>
-          <aside class="generation-privacy" aria-label="MiniMax privacy notice"><strong>Privacy</strong><p>Your training information and any health information you type here is sent to MiniMax to generate this program. Runplan does not send credentials or activity history.</p></aside>
+          <aside class="generation-privacy" aria-label="Local generation notice"><strong>Local calculation</strong><p>Runplan calculates the program locally from these structured inputs. No training information is sent to an AI provider.</p></aside>
           <section id="generation-client-warnings" class="generation-client-warnings hidden" aria-labelledby="generation-client-warnings-title" aria-live="polite"><h3 id="generation-client-warnings-title">Before you generate</h3><ul></ul></section>
           <p id="generation-error" class="generation-error hidden" role="alert"></p>
-          <div id="generation-progress" class="generation-progress hidden" role="status" aria-live="polite"><span class="generation-spinner" aria-hidden="true"></span><span><strong id="generation-progress-message">Preparing the program outline.</strong><small id="generation-progress-time">Elapsed: 0s</small></span></div>
           <footer><button type="button" class="button secondary generation-close">Cancel</button><button id="generation-submit" class="button primary">Generate program</button></footer>
         </div>
         <div id="generation-review-view" class="generation-view hidden">

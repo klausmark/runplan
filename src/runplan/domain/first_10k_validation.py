@@ -402,6 +402,7 @@ def _validate_long_runs(
     weekly_loads: tuple[float, ...],
     inputs: NormalizedFirst10KGenerationInput,
     week_count: int,
+    pace_seconds_per_km: float,
 ) -> list[CandidateValidationIssue]:
     issues: list[CandidateValidationIssue] = []
     long_by_week: list[_MappedWorkout | None] = [None] * week_count
@@ -438,13 +439,19 @@ def _validate_long_runs(
                 _slot_occurrence(item.slot),
             )
         )
-    for previous, current in zip(long_by_week, long_by_week[1:], strict=False):
-        if previous is None or current is None:
+    recent = inputs.current_training.longest_recent_run
+    previous_distance = (
+        recent.value * 1000
+        if recent.kind is AmountKind.DISTANCE_KM
+        else recent.value * 60 / pace_seconds_per_km * 1000
+    )
+    for current in long_by_week:
+        if current is None:
             continue
-        allowance = max(previous.estimate.distance_meters * 0.10, 1_000.0)
+        allowance = max(previous_distance * 0.10, 1_000.0)
         if (
             current.estimate.distance_meters
-            > previous.estimate.distance_meters + allowance + DISTANCE_EPSILON_METERS
+            > previous_distance + allowance + DISTANCE_EPSILON_METERS
         ):
             issues.append(
                 _issue(
@@ -454,6 +461,7 @@ def _validate_long_runs(
                     _slot_occurrence(current.slot),
                 )
             )
+        previous_distance = current.estimate.distance_meters
     return issues
 
 
@@ -650,7 +658,7 @@ def validate_first_10k_candidate(
                     _week_occurrence(index),
                 )
             )
-    issues.extend(_validate_long_runs(mapped, weekly_loads, inputs, len(outline.weeks)))
+    issues.extend(_validate_long_runs(mapped, weekly_loads, inputs, len(outline.weeks), pace))
     issues.extend(_validate_quality(outline, inputs))
     issues.extend(_validate_club_and_races(mapped))
     issues.extend(_validate_pace_policy(program, mapped, inputs))

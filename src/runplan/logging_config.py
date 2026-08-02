@@ -16,7 +16,7 @@ _REDACTIONS = (
     (
         re.compile(
             r"(?i)\b(password|token|authorization|confirmation[_-]?token|"
-            r"(?:runplan[_-]?)?minimax[_-]?api[_-]?key)\b"
+            r"(?:runplan[_-]?)?api[_-]?key)\b"
             r"(\s*[:=]\s*|\s+)([^\s,;]+)"
         ),
         r"\1\2<redacted>",

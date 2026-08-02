@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import threading
-import time
-from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -13,42 +10,15 @@ from runplan.domain.generation_inputs import (
     ClubSessionKind,
     GenerationInputError,
     ProgressionProfile,
+    QualityPreference,
     RaceIntensity,
+    TrainingStyle,
     Weekday,
 )
 from runplan.users import RunplanUser, UserRegistry
-from runplan.web_generation import (
-    GenerationBusyError,
-    GenerationJobNotFoundError,
-    WebProgramGenerationService,
-    parse_first_10k_generation_request,
-)
-from tests.test_generate_first_10k import candidate_yaml
+from runplan.web_generation import WebProgramGenerationService, parse_first_10k_generation_request
 
 TODAY = date(2026, 8, 1)
-
-
-class FakeGenerator:
-    configured = True
-
-    def __init__(self, *responses: str) -> None:
-        self.responses = list(responses)
-
-    def generate(self, prompt: str) -> str:
-        return self.responses.pop(0)
-
-
-class BlockingGenerator:
-    configured = True
-
-    def __init__(self) -> None:
-        self.started = threading.Event()
-        self.release = threading.Event()
-
-    def generate(self, prompt: str) -> str:
-        self.started.set()
-        assert self.release.wait(timeout=2)
-        return "invalid"
 
 
 def registry(tmp_path: Path) -> UserRegistry:
@@ -110,8 +80,8 @@ def test_request_parser_covers_standard_and_advanced_typed_fields() -> None:
         "maximumWeeklyKm": 38,
         "maximumLongRunKm": 13,
         "progression": "cautious",
-        "qualitySessionsPerWeek": 1,
-        "additionalInstructions": "Prefer shaded routes.",
+        "trainingStyle": "continuous",
+        "qualityPreference": "build",
     }
 
     request = parse_first_10k_generation_request(payload)
@@ -123,8 +93,9 @@ def test_request_parser_covers_standard_and_advanced_typed_fields() -> None:
     assert request.club_sessions[0].kind is ClubSessionKind.QUALITY
     assert request.b_races[0].intensity is RaceIntensity.CONTROLLED
     assert request.progression is ProgressionProfile.CAUTIOUS
+    assert request.training_style is TrainingStyle.CONTINUOUS
+    assert request.quality_preference is QualityPreference.BUILD
     assert request.maximum_weekly_km == 38
-    assert request.additional_instructions == "Prefer shaded routes."
 
 
 @pytest.mark.parametrize(
@@ -216,123 +187,16 @@ def test_request_parser_rejects_invalid_typed_values(change: dict) -> None:
         parse_first_10k_generation_request(generation_payload() | change)
 
 
-def test_service_uses_nonblocking_per_user_lock(tmp_path: Path) -> None:
-    generator = BlockingGenerator()
-    service = WebProgramGenerationService(generator, registry(tmp_path), today=lambda: TODAY)
-    first_error: list[BaseException] = []
-
-    def run_first() -> None:
-        try:
-            service.generate(generation_payload())
-        except BaseException as exc:
-            first_error.append(exc)
-
-    worker = threading.Thread(target=run_first)
-    worker.start()
-    assert generator.started.wait(timeout=1)
-
-    with pytest.raises(GenerationBusyError):
-        service.generate(generation_payload())
-
-    generator.release.set()
-    worker.join(timeout=2)
-    assert not worker.is_alive()
-    assert first_error
-
-
-def test_service_configuration_reflects_injected_generator(tmp_path: Path) -> None:
-    configured = WebProgramGenerationService(FakeGenerator(), registry(tmp_path))
-    unconfigured = WebProgramGenerationService(
-        FakeGenerator(), registry(tmp_path), configured=False
-    )
-
-    assert configured.configured is True
-    assert unconfigured.configured is False
-
-
-def test_background_job_returns_immediately_and_completes_without_persistence(
+def test_service_generates_local_draft_without_persistence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    workers: list[Callable[[], None]] = []
-    service = WebProgramGenerationService(
-        FakeGenerator(candidate_yaml()),
-        registry(tmp_path),
-        today=lambda: TODAY,
-        start_worker=workers.append,
-    )
+    service = WebProgramGenerationService(registry(tmp_path), today=lambda: TODAY)
 
     def reject_write(*args: object, **kwargs: object) -> int:
-        raise AssertionError("generation jobs must not persist")
+        raise AssertionError("generation must not persist")
 
     monkeypatch.setattr(Path, "write_text", reject_write)
-    started = service.start(generation_payload())
+    draft = service.generate(generation_payload())
 
-    assert started.status == "running"
-    assert started.phase == "queued"
-    assert len(workers) == 1
-
-    workers.pop()()
-    completed = service.get(started.id, "runner")
-
-    assert completed.status == "complete"
-    assert completed.phase == "complete"
-    assert completed.draft is not None
-    assert completed.draft.summary.weeks == 4
-
-
-def test_background_job_exposes_waiting_phase_and_keeps_per_user_exclusion(
-    tmp_path: Path,
-) -> None:
-    generator = BlockingGenerator()
-    service = WebProgramGenerationService(generator, registry(tmp_path), today=lambda: TODAY)
-
-    started = service.start(generation_payload())
-    assert generator.started.wait(timeout=1)
-
-    running = service.get(started.id, "runner")
-    assert running.status == "running"
-    assert running.phase == "generating"
-    assert "several minutes" in running.message
-    with pytest.raises(GenerationBusyError):
-        service.start(generation_payload())
-
-    generator.release.set()
-    for _ in range(100):
-        if service.get(started.id, "runner").status == "failed":
-            break
-        time.sleep(0.01)
-    assert service.get(started.id, "runner").status == "failed"
-
-
-def test_completed_background_job_expires_and_is_user_bound(tmp_path: Path) -> None:
-    workers: list[Callable[[], None]] = []
-    now = [100.0]
-    users = UserRegistry(
-        [
-            RunplanUser(
-                user_id,
-                name,
-                tmp_path / user_id / "credentials.toml",
-                tmp_path / user_id / "tokens",
-                tmp_path / user_id / "state",
-            )
-            for user_id, name in (("runner", "Runner"), ("other-runner", "Other Runner"))
-        ]
-    )
-    service = WebProgramGenerationService(
-        FakeGenerator(candidate_yaml()),
-        users,
-        today=lambda: TODAY,
-        clock=lambda: now[0],
-        start_worker=workers.append,
-        job_ttl_seconds=60,
-    )
-    started = service.start(generation_payload())
-    workers.pop()()
-
-    with pytest.raises(GenerationJobNotFoundError):
-        service.get(started.id, "other-runner")
-
-    now[0] += 60
-    with pytest.raises(GenerationJobNotFoundError):
-        service.get(started.id, "runner")
+    assert draft.summary.weeks == 4
+    assert draft.attempt_count == 1

@@ -115,7 +115,6 @@ class TestWebAsset:
         assert 'id="generation-long-run-day"' in html
         assert 'id="generation-yaml"' in html
         assert 'id="generation-filename"' in html
-        assert 'id="generation-progress"' in html
         assert 'aria-live="polite"' in html
         assert '<details id="generation-advanced"' in html
 
@@ -128,16 +127,11 @@ class TestWebAsset:
         assert "recent5KDurationMinutes" in standard_request
         assert "easyPace" in standard_request
         assert 'progression: $("#generation-progression").value' in standard_request
-        assert (
-            'qualitySessionsPerWeek: Number($("#generation-quality-sessions").value)'
-            in standard_request
-        )
+        assert 'trainingStyle: $("#generation-training-style").value' in standard_request
+        assert 'qualityPreference: $("#generation-quality-preference").value' in standard_request
         assert "if (startWeek) generationRequest.startWeek = startWeek" in standard_request
         assert "if (durationWeeks !== null)" in standard_request
-        assert 'request("/api/program-generation/jobs", {' in script
-        assert "/api/program-generation/jobs/" in script
-        assert "waitForGenerationJob" in script
-        assert "elapsedSeconds" in script
+        assert 'request("/api/programs/generate", {' in script
         assert 'request("/api/programs", {' in script
         assert "await loadPrograms(savedFilename)" in script
         assert "/active-program" in script
@@ -146,13 +140,8 @@ class TestWebAsset:
             not in script[request_start : script.index("function fillUserSelects", request_start)]
         )
 
-        assert 'request("/api/program-generation/status")' in script
-        assert "button.disabled = !configured" in script
-        assert "Program generation is not configured on this server" in script
-        assert (
-            "catch (_)"
-            in script[script.index("async function loadGenerationStatus") : request_start]
-        )
+        assert "/api/program-generation/status" not in script
+        assert "/api/program-generation/jobs" not in script
         assert "state.generation.submitting" in script
         assert 'button.textContent = "Generating…"' in script
         assert "error.status === 422" in script
@@ -178,26 +167,27 @@ class TestWebAsset:
         assert 'id="generation-maximum-weekly-km" type="number" min="0.1"' in advanced
         assert 'id="generation-maximum-long-run-km" type="number" min="0.1"' in advanced
         assert '<option value="balanced" selected>Balanced</option>' in advanced
-        assert '<option value="0" selected>0</option>' in advanced
+        assert 'id="generation-training-style"' in advanced
+        assert 'id="generation-quality-preference"' in advanced
+        assert '<option value="auto" selected>Automatic</option>' in advanced
         assert 'id="generation-club-rows"' in advanced
         assert 'id="generation-b-race-rows"' in advanced
-        assert 'maxlength="1000"' in advanced
+        assert "Additional instructions" not in advanced
         generation_dialog = html[
             html.index('id="generation-dialog"') : html.index(
                 "</dialog>", html.index('id="generation-dialog"')
             )
         ]
-        assert "sent to MiniMax" in generation_dialog
-        assert "sent to MiniMax" not in advanced
-        assert "does not send credentials or activity history" in generation_dialog
-        assert "system prompt" not in advanced.lower()
+        assert "calculates the program locally" in generation_dialog
+        assert "No training information is sent to an AI provider" in generation_dialog
+        assert "MiniMax" not in generation_dialog
 
         assert "function isoWeekMonday(value)" in script
         assert "Date.UTC(year, 0, 4)" in script
         assert "generationRequest.startWeek = startWeek" in script
         assert "generationRequest.maximumWeeklyKm = maximumWeeklyKm" in script
         assert "generationRequest.maximumLongRunKm = maximumLongRunKm" in script
-        assert "generationRequest.additionalInstructions = additionalInstructions" in script
+        assert "additionalInstructions" not in script
         assert "generationRequest.clubSessions = clubSessions" in script
         assert "generationRequest.bRaces = bRaces" in script
         assert "amount: { [amountKind]:" in script

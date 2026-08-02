@@ -50,11 +50,9 @@ def test_runtime_data_is_excluded_from_the_docker_build_context() -> None:
     assert "/runplan-data" in dockerignore.splitlines()
 
 
-def test_compose_forwards_optional_minimax_configuration() -> None:
+def test_deployment_does_not_require_external_generation_configuration() -> None:
     compose = (PROJECT_ROOT / "compose.yaml").read_text(encoding="utf-8")
     environment_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 
-    assert 'RUNPLAN_MINIMAX_API_KEY: "${RUNPLAN_MINIMAX_API_KEY:-}"' in compose
-    assert "# RUNPLAN_MINIMAX_API_KEY=" in environment_example
-    assert 'RUNPLAN_MINIMAX_TIMEOUT_SECONDS: "${RUNPLAN_MINIMAX_TIMEOUT_SECONDS:-600}"' in compose
-    assert "RUNPLAN_MINIMAX_TIMEOUT_SECONDS=600" in environment_example
+    assert "MINIMAX" not in compose
+    assert "MINIMAX" not in environment_example

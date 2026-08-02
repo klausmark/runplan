@@ -355,18 +355,25 @@ def test_long_run_share_has_advisory_and_extreme_policies(long_km: float, severi
 
 
 def test_multiple_quality_consumers_in_one_week_are_rejected_via_outline() -> None:
-    races = (
-        BRace(date(2026, 8, 4), 3, RaceIntensity.CONTROLLED),
-        BRace(date(2026, 8, 6), 3, RaceIntensity.ALL_OUT),
+    inputs, outline = generation_context()
+    first_week = outline.weeks[0]
+    quality_slots = tuple(
+        replace(slot, intent=WorkoutIntent.QUALITY, consumes_quality_capacity=True)
+        if index < 2
+        else slot
+        for index, slot in enumerate(first_week.workouts)
     )
-    inputs, outline = generation_context(b_races=races)
+    outline = replace(
+        outline,
+        weeks=(replace(first_week, workouts=quality_slots), *outline.weeks[1:]),
+    )
     program = candidate(outline)
 
     assert "quality_capacity_exceeded" in issue_codes(program, inputs, outline)
 
 
 def test_optional_quality_must_not_exceed_requested_capacity() -> None:
-    inputs, outline = generation_context()
+    inputs, outline = generation_context(quality_sessions_per_week=0)
     first_week = outline.weeks[0]
     quality_slot = replace(
         first_week.workouts[0],
@@ -386,11 +393,20 @@ def test_optional_quality_must_not_exceed_requested_capacity() -> None:
 
 
 def test_adjacent_quality_consumers_are_rejected_via_outline() -> None:
-    races = (
-        BRace(date(2026, 8, 5), 3, RaceIntensity.CONTROLLED),
-        BRace(date(2026, 8, 6), 3, RaceIntensity.ALL_OUT),
+    inputs, outline = generation_context(
+        weekdays=(Weekday.TUESDAY, Weekday.WEDNESDAY, Weekday.SUNDAY)
     )
-    inputs, outline = generation_context(b_races=races)
+    first_week = outline.weeks[0]
+    quality_slots = tuple(
+        replace(slot, intent=WorkoutIntent.QUALITY, consumes_quality_capacity=True)
+        if index < 2
+        else slot
+        for index, slot in enumerate(first_week.workouts)
+    )
+    outline = replace(
+        outline,
+        weeks=(replace(first_week, workouts=quality_slots), *outline.weeks[1:]),
+    )
     program = candidate(outline)
 
     assert "quality_workouts_adjacent" in issue_codes(program, inputs, outline)
@@ -570,7 +586,7 @@ def test_non_work_steps_must_not_receive_pace_targets_recursively(action: str) -
     inputs, outline = generation_context(current_training=training, quality_sessions_per_week=1)
     program = replace_workout(
         candidate(outline),
-        "w01-tue-quality",
+        "w02-tue-quality",
         steps=(
             Step(
                 action="repeat",
@@ -594,7 +610,7 @@ def test_structured_pace_requires_a_runner_pace_source() -> None:
     inputs, outline = generation_context(quality_sessions_per_week=1)
     program = replace_workout(
         candidate(outline),
-        "w01-tue-quality",
+        "w02-tue-quality",
         steps=(Step(action="run", end_kind="distance", end_value=5_000, pace=(360, 390)),),
     )
 
@@ -623,7 +639,7 @@ def test_quality_run_work_may_use_pace_with_a_source() -> None:
     inputs, outline = generation_context(current_training=training, quality_sessions_per_week=1)
     program = replace_workout(
         candidate(outline),
-        "w01-tue-quality",
+        "w02-tue-quality",
         steps=(Step(action="run", end_kind="distance", end_value=5_000, pace=(360, 390)),),
     )
 

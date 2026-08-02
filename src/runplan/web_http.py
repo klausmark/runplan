@@ -14,9 +14,7 @@ from .web_auth import WebAuthenticator
 from .web_auth_http import AuthResponse, WebAuthHttpAdapter
 from .web_generation_http import (
     generation_draft,
-    generation_job,
     invalid_generation,
-    minimax_protocol_message,
 )
 
 if TYPE_CHECKING:
@@ -129,9 +127,6 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 {"user": self.registry.create(payload.get("username"), payload.get("fullName"))},
             )
             return
-        if path == "/api/program-generation/jobs":
-            self._start_generation_job(payload)
-            return
         if path == "/api/programs/generate":
             self._generate_program(payload)
             return
@@ -163,35 +158,18 @@ class RunplanHandler(BaseHTTPRequestHandler):
 
     def _generate_program(self, payload: dict[str, Any]) -> None:
         from .application.generate_first_10k import InvalidGeneratedProgramError
+        from .domain.first_10k_loads import First10KPlanInfeasibleError
         from .domain.generation_inputs import GenerationInputError
-        from .integrations.minimax import (
-            MiniMaxRateLimitError,
-            MiniMaxTimeoutError,
-        )
-        from .integrations.minimax.client import MiniMaxError, MiniMaxProtocolError
-        from .web_generation import GenerationBusyError
 
         try:
             draft = self.generation.generate(payload)
         except GenerationInputError as exc:
             raise WebError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
-        except GenerationBusyError as exc:
-            raise WebError(HTTPStatus.CONFLICT, str(exc)) from exc
+        except First10KPlanInfeasibleError as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
         except InvalidGeneratedProgramError as exc:
             self._json(HTTPStatus.UNPROCESSABLE_ENTITY, invalid_generation(exc))
             return
-        except MiniMaxRateLimitError as exc:
-            raise WebError(
-                HTTPStatus.TOO_MANY_REQUESTS, "Program generation quota or rate limit reached"
-            ) from exc
-        except MiniMaxTimeoutError as exc:
-            raise WebError(HTTPStatus.GATEWAY_TIMEOUT, "Program generation timed out") from exc
-        except MiniMaxProtocolError as exc:
-            raise WebError(HTTPStatus.SERVICE_UNAVAILABLE, minimax_protocol_message(exc)) from exc
-        except MiniMaxError as exc:
-            raise WebError(
-                HTTPStatus.SERVICE_UNAVAILABLE, "Program generation is unavailable"
-            ) from exc
         self._json(HTTPStatus.OK, generation_draft(draft))
 
     def _upload_program(self, payload: dict[str, Any]) -> None:
@@ -237,12 +215,6 @@ class RunplanHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/users":
             self._json(HTTPStatus.OK, {"users": self.registry.list()})
             return
-        if parsed.path == "/api/program-generation/status":
-            self._json(HTTPStatus.OK, {"configured": self.generation.configured})
-            return
-        if parsed.path.startswith("/api/program-generation/jobs/"):
-            self._get_generation_job(parsed.path, query)
-            return
         user_parts = self._api_user_parts(required=False)
         if len(user_parts) == 2 and user_parts[1] == "settings":
             self._json(HTTPStatus.OK, self.registry.settings(user_parts[0]))
@@ -255,31 +227,6 @@ class RunplanHandler(BaseHTTPRequestHandler):
             self._get_program(query)
             return
         self._asset(parsed.path)
-
-    def _start_generation_job(self, payload: dict[str, Any]) -> None:
-        from .domain.generation_inputs import GenerationInputError
-        from .web_generation import GenerationBusyError
-
-        try:
-            job = self.generation.start(payload)
-        except GenerationInputError as exc:
-            raise WebError(HTTPStatus.BAD_REQUEST, str(exc)) from exc
-        except GenerationBusyError as exc:
-            raise WebError(HTTPStatus.CONFLICT, str(exc)) from exc
-        self._json(HTTPStatus.ACCEPTED, generation_job(job))
-
-    def _get_generation_job(self, path: str, query: dict[str, list[str]]) -> None:
-        from .web_generation import GenerationJobNotFoundError
-
-        prefix = "/api/program-generation/jobs/"
-        job_id = unquote(path.removeprefix(prefix))
-        if not job_id or "/" in job_id:
-            raise WebError(HTTPStatus.NOT_FOUND, "Program generation job not found")
-        try:
-            job = self.generation.get(job_id, query.get("user", [None])[0])
-        except GenerationJobNotFoundError as exc:
-            raise WebError(HTTPStatus.NOT_FOUND, str(exc)) from exc
-        self._json(HTTPStatus.OK, generation_job(job))
 
     def _get_program(self, query: dict[str, list[str]]) -> None:
         parts = self._api_program_parts()
@@ -407,10 +354,9 @@ def make_handler(
         sync_service = WebSyncService(store, users=users)
     registry = users or sync_service.users
     if generation_service is None:
-        from .integrations.minimax import MiniMaxClient
         from .web_generation import WebProgramGenerationService
 
-        generation_service = WebProgramGenerationService(MiniMaxClient.from_environment(), registry)
+        generation_service = WebProgramGenerationService(registry)
     authenticator = authenticator or WebAuthenticator.from_environment()
     auth = WebAuthHttpAdapter(authenticator)
     return type(

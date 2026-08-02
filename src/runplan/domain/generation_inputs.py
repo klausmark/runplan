@@ -46,6 +46,18 @@ class ProgressionProfile(Enum):
     AMBITIOUS = "ambitious"
 
 
+class TrainingStyle(Enum):
+    AUTO = "auto"
+    RUN_WALK = "run-walk"
+    CONTINUOUS = "continuous"
+
+
+class QualityPreference(Enum):
+    AUTO = "auto"
+    NONE = "none"
+    BUILD = "build"
+
+
 def _require_finite_positive(value: float, field: str) -> None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise GenerationInputError(f"{field} must be a number greater than 0")
@@ -189,7 +201,9 @@ class First10KGenerationInput:
     maximum_weekly_km: float | None = None
     maximum_long_run_km: float | None = None
     progression: ProgressionProfile = ProgressionProfile.BALANCED
-    quality_sessions_per_week: int = 0
+    training_style: TrainingStyle = TrainingStyle.AUTO
+    quality_preference: QualityPreference = QualityPreference.AUTO
+    quality_sessions_per_week: int | None = None
     additional_instructions: str | None = None
 
 
@@ -227,6 +241,8 @@ class NormalizedFirst10KGenerationInput:
     maximum_weekly_km: float | None
     maximum_long_run_km: float | None
     progression: ProgressionProfile
+    training_style: TrainingStyle
+    quality_preference: QualityPreference
     quality_sessions_per_week: int
     additional_instructions: str | None
     warnings: tuple[str, ...]
@@ -385,6 +401,23 @@ def normalize_first_10k_input(
                 f"but only {len(weekdays)} selected training weekdays"
             )
 
+    quality_race_dates_by_week: dict[date, set[date]] = {}
+    for race in races:
+        if race.date == request.main_race_date:
+            continue
+        if race.intensity in (RaceIntensity.ALL_OUT, RaceIntensity.CONTROLLED):
+            quality_race_dates_by_week.setdefault(_iso_monday(race.date), set()).add(race.date)
+    if request.main_race_date is not None:
+        quality_race_dates_by_week.setdefault(_iso_monday(request.main_race_date), set()).add(
+            request.main_race_date
+        )
+    for week_start, quality_dates in sorted(quality_race_dates_by_week.items()):
+        if len(quality_dates) > 1:
+            year, week, _ = week_start.isocalendar()
+            raise GenerationInputError(
+                f"race week {year}-W{week:02d} contains more than one quality race"
+            )
+
     for value, field in (
         (request.maximum_weekly_km, "maximum weekly distance"),
         (request.maximum_long_run_km, "maximum long-run distance"),
@@ -393,11 +426,26 @@ def normalize_first_10k_input(
             _require_finite_positive(value, field)
     if not isinstance(request.progression, ProgressionProfile):
         raise GenerationInputError("progression profile is invalid")
-    if request.quality_sessions_per_week not in (0, 1) or isinstance(
-        request.quality_sessions_per_week, bool
-    ):
-        raise GenerationInputError("quality sessions per week must be 0 or 1")
+    if not isinstance(request.training_style, TrainingStyle):
+        raise GenerationInputError("training style is invalid")
+    if not isinstance(request.quality_preference, QualityPreference):
+        raise GenerationInputError("quality preference is invalid")
+    quality_preference = request.quality_preference
+    if request.quality_sessions_per_week is not None:
+        if request.quality_sessions_per_week not in (0, 1) or isinstance(
+            request.quality_sessions_per_week, bool
+        ):
+            raise GenerationInputError("quality sessions per week must be 0 or 1")
+        quality_preference = (
+            QualityPreference.BUILD
+            if request.quality_sessions_per_week == 1
+            else QualityPreference.NONE
+        )
     instructions = _normalize_text(request.additional_instructions, "additional instructions", 1000)
+    if instructions is not None:
+        raise GenerationInputError(
+            "additional instructions are no longer supported; use the structured controls"
+        )
 
     warnings = list(period.warnings)
     if len(weekdays) not in (3, 4):
@@ -405,14 +453,28 @@ def normalize_first_10k_input(
     if _has_consecutive_days(weekdays):
         warnings.append("The selected schedule contains consecutive training days.")
     club_weekdays = set(club_days)
+    quality_club_days = {
+        session.weekday
+        for session in request.club_sessions
+        if session.kind in (ClubSessionKind.QUALITY, ClubSessionKind.UNKNOWN)
+    }
     for race in races:
         if request.main_race_date == race.date:
             warnings.append(
                 f"The main race takes precedence over the B race on {race.date.isoformat()}."
             )
+            continue
         if Weekday(race.date.isoweekday()) in club_weekdays:
             warnings.append(
                 f"The B race on {race.date.isoformat()} replaces that day's club session."
+            )
+        if race.intensity in (
+            RaceIntensity.ALL_OUT,
+            RaceIntensity.CONTROLLED,
+        ) and quality_club_days - {Weekday(race.date.isoweekday())}:
+            warnings.append(
+                f"The B race on {race.date.isoformat()} replaces other quality club sessions "
+                "that week."
             )
     if (
         request.main_race_date is not None
@@ -421,6 +483,10 @@ def normalize_first_10k_input(
         warnings.append(
             f"The main race on {request.main_race_date.isoformat()} replaces that day's club session."
         )
+    if request.main_race_date is not None and quality_club_days - {
+        Weekday(request.main_race_date.isoweekday())
+    }:
+        warnings.append("The main race replaces other quality club sessions that week.")
 
     return NormalizedFirst10KGenerationInput(
         current_training=request.current_training,
@@ -434,8 +500,10 @@ def normalize_first_10k_input(
         maximum_weekly_km=request.maximum_weekly_km,
         maximum_long_run_km=request.maximum_long_run_km,
         progression=request.progression,
-        quality_sessions_per_week=request.quality_sessions_per_week,
-        additional_instructions=instructions,
+        training_style=request.training_style,
+        quality_preference=quality_preference,
+        quality_sessions_per_week=0 if quality_preference is QualityPreference.NONE else 1,
+        additional_instructions=None,
         warnings=tuple(warnings),
     )
 
@@ -453,8 +521,10 @@ __all__ = [
     "Pace",
     "PeriodSuggestion",
     "ProgressionProfile",
+    "QualityPreference",
     "RaceIntensity",
     "TrainingAmount",
+    "TrainingStyle",
     "Weekday",
     "normalize_first_10k_input",
     "suggest_first_10k_period",

@@ -56,7 +56,7 @@ def test_blueprint_and_outline_values_are_versioned_and_immutable() -> None:
 
     assert program_outline.blueprint is FIRST_10K_BLUEPRINT
     assert program_outline.blueprint.blueprint_id == "complete-first-10k"
-    assert program_outline.blueprint.version == 1
+    assert program_outline.blueprint.version == 2
     with pytest.raises(FrozenInstanceError):
         program_outline.weeks[0].number = 2  # type: ignore[misc]
 
@@ -228,10 +228,12 @@ def test_optional_quality_has_stable_semantic_ids_and_dates() -> None:
 
     first_week = program_outline.weeks[0]
     assert [(slot.stable_id, slot.date, slot.intent) for slot in first_week.workouts] == [
-        ("w01-tue-quality", date(2026, 8, 4), WorkoutIntent.QUALITY),
+        ("w01-tue-easy", date(2026, 8, 4), WorkoutIntent.EASY),
         ("w01-thu-easy", date(2026, 8, 6), WorkoutIntent.EASY),
         ("w01-sun-long", date(2026, 8, 9), WorkoutIntent.LONG),
     ]
+    assert program_outline.weeks[1].workouts[0].stable_id == "w02-tue-quality"
+    assert program_outline.weeks[1].workouts[0].intent is WorkoutIntent.QUALITY
     assert len({slot.stable_id for slot in first_week.workouts}) == len(first_week.workouts)
     assert all(slot.week_number == 1 for slot in first_week.workouts)
     assert first_week.start_date == START

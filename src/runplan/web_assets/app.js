@@ -146,26 +146,6 @@ function showProgramControls() {
   }
 }
 
-function setGenerationAvailability(configured) {
-  const title = configured ? "Generate a Complete your first 10K program" : "Program generation is not configured on this server";
-  for (const selector of ["#generate-program-button", "#empty-generate-program-button"]) {
-    const button = $(selector);
-    button.disabled = !configured;
-    button.title = title;
-    button.setAttribute("aria-disabled", String(!configured));
-  }
-  $("#generation-configuration-help").classList.toggle("hidden", configured);
-}
-
-async function loadGenerationStatus() {
-  try {
-    const status = await request("/api/program-generation/status");
-    setGenerationAvailability(status.configured !== false);
-  } catch (_) {
-    // Generation capability must not prevent the rest of Studio from loading.
-  }
-}
-
 function showError(message) {
   const notice = $("#notice");
   notice.textContent = message;
@@ -1088,17 +1068,6 @@ function showGenerationMessage(selector, message = "") {
   element.classList.toggle("hidden", !message);
 }
 
-function showGenerationProgress(job = null) {
-  const progress = $("#generation-progress");
-  progress.classList.toggle("hidden", !job);
-  if (!job) return;
-  $("#generation-progress-message").textContent = job.message || "Generating your program.";
-  const elapsed = Number(job.elapsedSeconds || 0);
-  const minutes = Math.floor(elapsed / 60);
-  const seconds = elapsed % 60;
-  $("#generation-progress-time").textContent = `Elapsed: ${minutes ? `${minutes}m ` : ""}${seconds}s`;
-}
-
 function resetGenerationDialog() {
   $("#generation-form").reset();
   $("#generation-advanced").open = false;
@@ -1112,7 +1081,6 @@ function resetGenerationDialog() {
   $("#generation-yaml").disabled = true;
   showGenerationMessage("#generation-error");
   showGenerationMessage("#generation-save-error");
-  showGenerationProgress();
   updateGenerationRaceDate();
   updateGenerationLongRunDays();
 }
@@ -1152,18 +1120,17 @@ function standardGenerationRequest() {
     weekdays,
     longRunDay: $("#generation-long-run-day").value,
     progression: $("#generation-progression").value,
-    qualitySessionsPerWeek: Number($("#generation-quality-sessions").value),
+    trainingStyle: $("#generation-training-style").value,
+    qualityPreference: $("#generation-quality-preference").value,
   };
   const startWeek = isoWeekMonday($("#generation-start-week").value);
   const durationWeeks = optionalNumber("#generation-duration");
   const maximumWeeklyKm = optionalNumber("#generation-maximum-weekly-km");
   const maximumLongRunKm = optionalNumber("#generation-maximum-long-run-km");
-  const additionalInstructions = $("#generation-additional-instructions").value.trim();
   if (startWeek) generationRequest.startWeek = startWeek;
   if (durationWeeks !== null) generationRequest.durationWeeks = durationWeeks;
   if (maximumWeeklyKm !== null) generationRequest.maximumWeeklyKm = maximumWeeklyKm;
   if (maximumLongRunKm !== null) generationRequest.maximumLongRunKm = maximumLongRunKm;
-  if (additionalInstructions) generationRequest.additionalInstructions = additionalInstructions;
   const clubSessions = Array.from(document.querySelectorAll(".generation-club-row"), row => {
     const amountKind = row.querySelector(".generation-club-amount-kind").value;
     const session = {
@@ -1205,7 +1172,7 @@ function showGenerationReview(draft, invalid = false) {
   $("#generation-review-view").classList.remove("hidden");
   $("#generation-dialog-title").textContent = invalid ? "Review the generated draft" : "Review your first 10K program";
   $("#generation-summary").textContent = invalid
-    ? "The model returned an editable draft that still needs correction. Nothing has been saved."
+    ? "The calculated draft still needs correction. Nothing has been saved."
     : `${draft.summary.weeks} weeks · ${draft.summary.workouts} workouts · Nothing is saved until you add it.`;
   fillDraftMessages("#generation-warnings", "#generation-warnings-section", draft.warnings || []);
   fillDraftMessages("#generation-diagnostics", "#generation-diagnostics-section", draft.diagnostics || []);
@@ -1214,29 +1181,7 @@ function showGenerationReview(draft, invalid = false) {
   $("#generation-filename").value = draft.filename || "first-10k-draft.yaml";
   $("#generation-yaml").value = draft.content ?? draft.candidate ?? "";
   showGenerationMessage("#generation-save-error");
-  showGenerationProgress();
   $("#generation-filename").focus();
-}
-
-function generationFailure(job) {
-  const failure = job.error || {};
-  const error = new Error(failure.error || "Program generation failed");
-  error.status = failure.httpStatus || 500;
-  error.body = failure;
-  return error;
-}
-
-async function waitForGenerationJob(job) {
-  showGenerationProgress(job);
-  while (job.status === "running") {
-    await new Promise(resolve => window.setTimeout(resolve, 2000));
-    job = await request(
-      `/api/program-generation/jobs/${encodeURIComponent(job.jobId)}?${userQuery()}`,
-    );
-    showGenerationProgress(job);
-  }
-  if (job.status === "complete" && job.draft) return job.draft;
-  throw generationFailure(job);
 }
 
 async function generateProgram(event) {
@@ -1256,18 +1201,16 @@ async function generateProgram(event) {
   button.textContent = "Generating…";
   showGenerationMessage("#generation-error");
   try {
-    const job = await request("/api/program-generation/jobs", {
+    const draft = await request("/api/programs/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(standardGenerationRequest()),
     });
-    const draft = await waitForGenerationJob(job);
     showGenerationReview(draft);
   } catch (error) {
     if (error.status === 422 && error.body && "candidate" in error.body) {
       showGenerationReview(error.body, true);
     } else {
-      showGenerationProgress();
       showGenerationMessage("#generation-error", error.message);
     }
   } finally {
@@ -1345,13 +1288,11 @@ async function selectUser(userId, persist = true) {
   state.program = null;
   $("#user-select").value = user.id;
   if (persist) storeValue(USER_STORAGE_KEY, user.id);
-  loadGenerationStatus();
   await loadPrograms();
 }
 
 async function initialize() {
   try {
-    loadGenerationStatus();
     const result = await request("/api/users");
     state.users = result.users || [];
     fillUserSelects();

@@ -267,6 +267,36 @@ def test_races_are_sorted_and_main_race_precedence_is_explicit() -> None:
     assert "The main race takes precedence over the B race on 2026-10-18." in normalized.warnings
     assert "The B race on 2026-09-13 replaces that day's club session." in normalized.warnings
     assert "The main race on 2026-10-18 replaces that day's club session." in normalized.warnings
+    assert "The B race on 2026-10-18 replaces that day's club session." not in normalized.warnings
+
+
+def test_quality_race_warns_when_it_replaces_another_days_quality_club() -> None:
+    race = BRace(date(2026, 9, 12), 5, RaceIntensity.CONTROLLED)
+    session = ClubSession(
+        Weekday.THURSDAY, ClubSessionKind.QUALITY, TrainingAmount.duration_minutes(60)
+    )
+
+    normalized = normalize_first_10k_input(
+        request(b_races=(race,), club_sessions=(session,)),
+        today=date(2026, 8, 1),
+    )
+
+    assert (
+        "The B race on 2026-09-12 replaces other quality club sessions that week."
+        in normalized.warnings
+    )
+
+
+def test_multiple_quality_races_in_one_week_are_rejected() -> None:
+    races = (
+        BRace(date(2026, 9, 12), 3, RaceIntensity.CONTROLLED),
+        BRace(date(2026, 9, 13), 5, RaceIntensity.ALL_OUT),
+    )
+
+    with pytest.raises(
+        GenerationInputError, match="race week 2026-W37 contains more than one quality race"
+    ):
+        normalize_first_10k_input(request(b_races=races), today=date(2026, 8, 1))
 
 
 def test_b_race_outside_period_has_precise_error() -> None:
@@ -386,13 +416,23 @@ def test_zero_current_distance_and_advanced_values_are_valid() -> None:
             maximum_long_run_km=12,
             progression=ProgressionProfile.CAUTIOUS,
             quality_sessions_per_week=1,
-            additional_instructions="  Prefer run/walk intervals.  ",
         ),
         today=date(2026, 8, 1),
     )
 
     assert normalized.current_training.average_weekly_km == 0
-    assert normalized.additional_instructions == "Prefer run/walk intervals."
+    assert normalized.additional_instructions is None
+
+
+def test_additional_instructions_are_rejected() -> None:
+    with pytest.raises(
+        GenerationInputError,
+        match="additional instructions are no longer supported; use the structured controls",
+    ):
+        normalize_first_10k_input(
+            request(additional_instructions="Prefer run/walk intervals."),
+            today=date(2026, 8, 1),
+        )
 
 
 def test_additional_instructions_are_bounded() -> None:

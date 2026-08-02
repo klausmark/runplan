@@ -52,41 +52,15 @@ completed history entry genuinely needs correction.
 
 ### Generate a first 10K program
 
-Runplan Studio can use MiniMax M3 to generate a **Complete your first 10K**
-program. Generation is optional: the server starts normally without a key, but
-the generation action remains unavailable. To enable it for a local server, set
-the MiniMax Subscription Key only in the server environment:
-
-```bash
-export RUNPLAN_MINIMAX_API_KEY='your-subscription-key'
-uv run runplan serve
-```
-
-For Docker Compose, set `RUNPLAN_MINIMAX_API_KEY` in the local `.env` file. The
-key is passed to the container and is never sent to the browser or written to a
-program.
-
-Complete programs can take several minutes to generate. MiniMax requests time
-out after 600 seconds by default; set `RUNPLAN_MINIMAX_TIMEOUT_SECONDS` to a
-value from 30 through 900 when needed. The Studio starts generation as a
-background job and polls it with short requests, so a reverse proxy does not
-need to keep one connection open while MiniMax runs. Validation can trigger one
-additional MiniMax repair request. Adaptive MiniMax reasoning remains enabled;
-the completion budget follows MiniMax M3's recommended 131,072 tokens so
-reasoning and the complete YAML draft share a sufficient bound.
-
 Select **Generate program**, enter the current weekly training, longest recent
 run, available weekdays, long-run day, and optional race date, then generate the
-draft. Runplan recommends a period and builds a fixed calendar outline before
-MiniMax fills in the workout details. The collapsed **Advanced** section covers
-custom periods, running-club sessions, B races, progression, weekly and long-run
-limits, optional quality sessions, known pace data, and extra guidance.
-
-While generation runs, the dialog shows elapsed time and the current real phase:
-outline preparation, waiting for MiniMax, validation, or an optional repair.
-Runplan does not display an estimated percentage because MiniMax does not expose
-measurable completion progress. Finished jobs and drafts remain in server memory
-for 15 minutes and are lost when the server restarts.
+draft. Runplan calculates the program locally from a versioned first-10K
+blueprint. It applies deterministic weekly progression, consolidation and taper
+weeks, long-run limits, and workout recipes. The collapsed **Advanced** section
+covers custom periods, running-club sessions, B races, progression, weekly and
+long-run limits, continuous or run/walk training, automatic quality selection,
+and known pace data. Fixed commitments that cannot fit safely produce an
+explicit constraint error instead of an invalid program.
 
 The result opens as validated, editable YAML. Review the warnings and complete
 program, make any needed edits, and select **Save program** only when it is
@@ -95,13 +69,9 @@ adds the program to the existing calendar; Garmin changes still require the
 normal preview and explicit sync confirmation. Generated training is not a
 substitute for individual medical or coaching advice.
 
-Only the supplied training details, dates, constraints, club sessions, races,
-pace data, and additional guidance needed to create the program are sent to
-MiniMax. Health information included in additional guidance is therefore also
-sent to MiniMax. Runplan does not send Garmin credentials or tokens, Studio
-authentication secrets, names, email addresses, previous Garmin activities, or
-unrelated program files. The server keeps the MiniMax key private, omits request
-bodies and generated YAML from logs, and returns fixed provider error messages.
+Generation does not contact an AI provider or send training information outside
+the Runplan server. The calculated program passes the same independent structural
+and coaching validation boundary used to diagnose generated drafts.
 
 `runplan serve` writes operational logs to stdout for container and service
 log collectors. `INFO` is the default and includes YAML changes, user and plan
