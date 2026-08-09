@@ -1,7 +1,6 @@
-const state = { users: [], user: null, program: null, dragged: null, touchDrag: null, workout: null, move: null, undoMove: null };
+const state = { users: [], user: null, program: null, pointerDrag: null, workout: null, undoMove: null };
 const $ = (selector) => document.querySelector(selector);
-const TOUCH_DRAG_DELAY = 350;
-const TOUCH_CANCEL_DISTANCE = 10;
+const MOVE_THRESHOLD = 6;
 const USER_STORAGE_KEY = "runplan-user";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let studioInitialized = false;
@@ -317,7 +316,7 @@ async function syncGarmin() {
 }
 
 function render(program) {
-  cancelTouchDrag();
+  cancelPointerDrag();
   state.program = program;
   showProgramControls();
   $("#program-name").textContent = program.program.name;
@@ -371,13 +370,6 @@ function render(program) {
         add.addEventListener("click", () => openAddWorkout(week.week, day));
         cell.append(add);
       }
-      cell.addEventListener("dragover", (event) => {
-        if (cell.dataset.moveLocked === "true") return;
-        event.preventDefault();
-        cell.classList.add("drag-over");
-      });
-      cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
-      cell.addEventListener("drop", () => moveWorkout(week.week, day, cell));
       days.append(cell);
     }
     section.append(heading, days);
@@ -395,8 +387,11 @@ function render(program) {
 function workoutCard(week, workout) {
   const card = document.createElement("article");
   card.className = "workout";
-  card.draggable = workout.can_move;
   card.classList.toggle("workout-locked", !workout.can_move);
+  card.dataset.moveable = String(workout.can_move);
+  card.setAttribute("role", "button");
+  card.tabIndex = 0;
+  card.setAttribute("aria-label", `${workout.name}. Click to edit, press and drag to move.`);
   const title = document.createElement("h3");
   title.textContent = workout.name.replace(/^Week \d+\s*-\s*/, "");
   const status = document.createElement("span");
@@ -410,33 +405,25 @@ function workoutCard(week, workout) {
   const shownDuration = workout.totals_are_actual ? workout.actual_duration_seconds : workout.estimated_duration_seconds;
   const totalsKind = workout.totals_are_actual ? "Actual" : "Planned";
   summary.textContent = `${totalsKind} · ${distanceLabel(shownDistance, workout.totals_are_actual ? false : workout.distance_is_approximate)} · ${durationLabel(shownDuration, workout.totals_are_actual ? false : workout.duration_is_approximate)}`;
-  const edit = document.createElement("button");
-  edit.className = "edit-workout";
-  edit.type = "button";
-  edit.textContent = "Edit →";
-  edit.addEventListener("click", () => openWorkout(week, workout));
-  const actions = document.createElement("div");
-  actions.className = "workout-actions";
   if (workout.can_move) {
-    const move = document.createElement("button");
-    move.className = "move-workout";
-    move.type = "button";
-    move.textContent = "↕ Move";
-    move.title = "Hold and drag the card, or tap to choose a day";
-    move.setAttribute("aria-label", `Move ${workout.name}`);
-    move.addEventListener("click", () => openMove(week, workout));
-    actions.append(move);
+    card.addEventListener("pointerdown", (event) => beginPointerDrag(event, card, week, workout));
   }
-  actions.append(edit);
-  if (workout.can_move) {
-    card.addEventListener("dragstart", () => { state.dragged = { week, workoutId: workout.id }; card.style.opacity = ".45"; });
-    card.addEventListener("dragend", () => { state.dragged = null; card.style.opacity = ""; });
-    card.addEventListener("touchstart", (event) => beginTouchDrag(event, card, week, workout), { passive: true });
-    card.addEventListener("contextmenu", (event) => {
-      if (state.touchDrag?.card === card) event.preventDefault();
-    });
-  }
-  card.append(status, title, summary, description, actions);
+  card.addEventListener("click", (event) => {
+    if (event.target.closest("button")) return;
+    if (card.dataset.suppressClick === "true") {
+      delete card.dataset.suppressClick;
+      return;
+    }
+    openWorkout(week, workout);
+  });
+  card.addEventListener("keydown", (event) => {
+    if (event.target.closest("button")) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openWorkout(week, workout);
+    }
+  });
+  card.append(status, title, summary, description);
   return card;
 }
 
@@ -615,34 +602,35 @@ async function applyActivityLinks() {
   }
 }
 
-function touchById(touches, identifier) {
-  return Array.from(touches).find((touch) => touch.identifier === identifier);
+function pointerById(event, identifier) {
+  if (event.pointerId !== undefined && event.pointerId === identifier) return event;
+  return null;
 }
 
-function beginTouchDrag(event, card, week, workout) {
-  if (event.touches.length !== 1 || event.target.closest("button")) return;
-  const touch = event.changedTouches[0];
-  cancelTouchDrag();
-  state.touchDrag = {
-    identifier: touch.identifier,
+function beginPointerDrag(event, card, week, workout) {
+  if (event.button !== undefined && event.button !== 0) return;
+  if (event.target.closest("button")) return;
+  cancelPointerDrag();
+  state.pointerDrag = {
+    pointerId: event.pointerId,
     card,
     week,
     workoutId: workout.id,
     day: workout.day,
-    startX: touch.clientX,
-    startY: touch.clientY,
-    x: touch.clientX,
-    y: touch.clientY,
-    active: false,
+    startX: event.clientX,
+    startY: event.clientY,
+    x: event.clientX,
+    y: event.clientY,
+    started: false,
     target: null,
     ghost: null,
     scrollFrame: null,
-    timer: window.setTimeout(activateTouchDrag, TOUCH_DRAG_DELAY),
   };
+  try { card.setPointerCapture(event.pointerId); } catch (_) {}
 }
 
-function activateTouchDrag() {
-  const drag = state.touchDrag;
+function activatePointerDrag() {
+  const drag = state.pointerDrag;
   if (!drag) return;
   const bounds = drag.card.getBoundingClientRect();
   const ghost = drag.card.cloneNode(true);
@@ -651,25 +639,25 @@ function activateTouchDrag() {
   drag.offsetX = drag.startX - bounds.left;
   drag.offsetY = drag.startY - bounds.top;
   drag.ghost = ghost;
-  drag.active = true;
+  drag.started = true;
   drag.card.classList.add("touch-drag-source");
   document.body.classList.add("touch-dragging");
   document.body.append(ghost);
-  positionTouchGhost(drag.x, drag.y);
-  updateTouchTarget(drag.x, drag.y);
-  drag.scrollFrame = window.requestAnimationFrame(autoScrollTouchDrag);
+  positionPointerGhost(drag.x, drag.y);
+  updatePointerTarget(drag.x, drag.y);
+  drag.scrollFrame = window.requestAnimationFrame(autoScrollPointerDrag);
   navigator.vibrate?.(25);
 }
 
-function positionTouchGhost(x, y) {
-  const drag = state.touchDrag;
+function positionPointerGhost(x, y) {
+  const drag = state.pointerDrag;
   if (!drag?.ghost) return;
   drag.ghost.style.transform = `translate3d(${x - drag.offsetX}px, ${y - drag.offsetY}px, 0)`;
 }
 
-function updateTouchTarget(x, y) {
-  const drag = state.touchDrag;
-  if (!drag?.active) return;
+function updatePointerTarget(x, y) {
+  const drag = state.pointerDrag;
+  if (!drag?.started) return;
   const candidate = document.elementFromPoint(x, y)?.closest(".day") || null;
   const target = candidate?.dataset.moveLocked === "true" ? null : candidate;
   if (target === drag.target) return;
@@ -678,41 +666,39 @@ function updateTouchTarget(x, y) {
   drag.target?.classList.add("touch-drag-over");
 }
 
-function autoScrollTouchDrag() {
-  const drag = state.touchDrag;
-  if (!drag?.active) return;
+function autoScrollPointerDrag() {
+  const drag = state.pointerDrag;
+  if (!drag?.started) return;
   const edge = 72;
   const speed = drag.y < edge ? -10 : drag.y > window.innerHeight - edge ? 10 : 0;
   if (speed) {
     window.scrollBy(0, speed);
-    updateTouchTarget(drag.x, drag.y);
+    updatePointerTarget(drag.x, drag.y);
   }
-  drag.scrollFrame = window.requestAnimationFrame(autoScrollTouchDrag);
+  drag.scrollFrame = window.requestAnimationFrame(autoScrollPointerDrag);
 }
 
-function moveTouchDrag(event) {
-  const drag = state.touchDrag;
-  if (!drag) return;
-  const touch = touchById(event.touches, drag.identifier);
-  if (!touch) return;
-  drag.x = touch.clientX;
-  drag.y = touch.clientY;
-  if (!drag.active) {
-    if (Math.hypot(touch.clientX - drag.startX, touch.clientY - drag.startY) > TOUCH_CANCEL_DISTANCE) {
-      cancelTouchDrag();
+function movePointerDrag(event) {
+  const drag = state.pointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  drag.x = event.clientX;
+  drag.y = event.clientY;
+  if (!drag.started) {
+    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > MOVE_THRESHOLD) {
+      activatePointerDrag();
     }
     return;
   }
   event.preventDefault();
-  positionTouchGhost(touch.clientX, touch.clientY);
-  updateTouchTarget(touch.clientX, touch.clientY);
+  positionPointerGhost(event.clientX, event.clientY);
+  updatePointerTarget(event.clientX, event.clientY);
 }
 
-async function endTouchDrag(event) {
-  const drag = state.touchDrag;
-  if (!drag || !touchById(event.changedTouches, drag.identifier)) return;
-  if (!drag.active) {
-    cancelTouchDrag();
+async function endPointerDrag(event) {
+  const drag = state.pointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  if (!drag.started) {
+    cancelPointerDrag();
     return;
   }
   event.preventDefault();
@@ -720,7 +706,10 @@ async function endTouchDrag(event) {
   const fromWeek = drag.week;
   const workoutId = drag.workoutId;
   const sameDay = target && Number(target.dataset.week) === drag.week && Number(target.dataset.day) === drag.day;
-  cancelTouchDrag();
+  // Suppress the click event that the browser fires after pointerup so the
+  // card does not open its edit dialog when the user finishes a drag.
+  drag.card.dataset.suppressClick = "true";
+  cancelPointerDrag();
   if (!target || sameDay) return;
   try {
     await persistMove(fromWeek, workoutId, Number(target.dataset.week), Number(target.dataset.day));
@@ -730,50 +719,20 @@ async function endTouchDrag(event) {
   }
 }
 
-function cancelTouchDrag() {
-  const drag = state.touchDrag;
+function cancelPointerDrag() {
+  const drag = state.pointerDrag;
   if (!drag) return;
-  window.clearTimeout(drag.timer);
   if (drag.scrollFrame) window.cancelAnimationFrame(drag.scrollFrame);
   drag.target?.classList.remove("touch-drag-over");
   drag.card.classList.remove("touch-drag-source");
   drag.ghost?.remove();
   document.body.classList.remove("touch-dragging");
-  state.touchDrag = null;
+  state.pointerDrag = null;
 }
 
-document.addEventListener("touchmove", moveTouchDrag, { passive: false });
-document.addEventListener("touchend", endTouchDrag, { passive: false });
-document.addEventListener("touchcancel", cancelTouchDrag);
-
-function openMove(week, workout) {
-  if (!workout.can_move) return;
-  state.move = { week, workoutId: workout.id, day: workout.day };
-  $("#move-title").textContent = `Move ${workout.name.replace(/^Week \d+\s*-\s*/, "")}`;
-  $("#move-week").replaceChildren(...state.program.weeks.map((item) => {
-    const option = document.createElement("option");
-    option.value = item.week;
-    option.textContent = `Week ${item.week}`;
-    option.selected = item.week === week;
-    return option;
-  }));
-  $("#move-day").value = workout.day;
-  updateMoveDayOptions(week);
-  $("#move-dialog").showModal();
-}
-
-function updateMoveDayOptions(weekNumber) {
-  const selectedWeek = state.program.weeks.find((week) => week.week === weekNumber);
-  const daySelect = $("#move-day");
-  for (const option of daySelect.options) {
-    const occupant = selectedWeek?.workouts.find((workout) => workout.day === Number(option.value));
-    option.disabled = occupant?.can_move === false;
-  }
-  if (daySelect.selectedOptions[0]?.disabled) {
-    const available = Array.from(daySelect.options).find((option) => !option.disabled);
-    if (available) daySelect.value = available.value;
-  }
-}
+document.addEventListener("pointermove", movePointerDrag, { passive: false });
+document.addEventListener("pointerup", endPointerDrag, { passive: false });
+document.addEventListener("pointercancel", cancelPointerDrag);
 
 function canMoveRequest(fromWeek, workoutId, toWeek, toDay) {
   const source = state.program?.weeks.find((week) => week.week === fromWeek)?.workouts.find((workout) => workout.id === workoutId);
@@ -827,15 +786,6 @@ async function undoLastMove() {
     setSaveFailure(error);
     showError(error.message);
   }
-}
-
-async function moveWorkout(toWeek, toDay, cell) {
-  cell.classList.remove("drag-over");
-  if (cell.dataset.moveLocked === "true") return;
-  if (!state.dragged || (state.dragged.week === toWeek && state.program.weeks.find(w => w.week === toWeek).workouts.find(w => w.id === state.dragged.workoutId)?.day === toDay)) return;
-  try {
-    await persistMove(state.dragged.week, state.dragged.workoutId, toWeek, toDay);
-  } catch (error) { setSaveFailure(error); showError(error.message); }
 }
 
 function openWorkout(week, workout) {
@@ -1155,24 +1105,6 @@ $("#delete-workout-form").addEventListener("submit", async (event) => {
     $("#workout-dialog").close();
   } catch (error) { setSaveFailure(error); showError(error.message); }
 });
-$("#move-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!state.move) return;
-  const toWeek = Number($("#move-week").value);
-  const toDay = Number($("#move-day").value);
-  if (state.move.week === toWeek && state.move.day === toDay) {
-    $("#move-dialog").close();
-    return;
-  }
-  try {
-    await persistMove(state.move.week, state.move.workoutId, toWeek, toDay);
-    $("#move-dialog").close();
-    state.move = null;
-  } catch (error) {
-    setSaveFailure(error);
-    showError(error.message);
-  }
-});
 $("#export-button").addEventListener("click", () => $("#export-options").classList.toggle("hidden"));
 document.querySelectorAll("[data-export]").forEach(link => link.addEventListener("click", () => {
   window.location.href = `/api/programs/${encodeURIComponent(state.program.file)}/export?format=${link.dataset.export}&${userQuery()}`;
@@ -1202,9 +1134,6 @@ $("#auth-form").addEventListener("submit", async (event) => {
   } finally {
     submit.disabled = false;
   }
-});
-$("#move-week").addEventListener("change", (event) => {
-  updateMoveDayOptions(Number(event.target.value));
 });
 
 initializeAuthentication();

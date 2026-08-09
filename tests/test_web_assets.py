@@ -199,7 +199,7 @@ class TestWebAsset:
         assert "activityIds" in script
         assert "activity-links" in script
         assert 'checkbox.type = "checkbox"' in script
-        assert 'edit.textContent = "Edit →"' in script
+        assert "function openWorkout(" in script
         assert '$("#activity-apply").disabled = yamlChanged' in script
         assert '$("#save-workout-button").disabled = activitiesChanged' in script
         assert ".activity-candidate" in styles
@@ -222,13 +222,67 @@ class TestWebAsset:
     def test_completed_workouts_are_locked_out_of_every_calendar_move_path(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
-        assert "card.draggable = workout.can_move" in script
+        assert "card.draggable = workout.can_move" not in script
+        assert "card.dataset.moveable = String(workout.can_move)" in script
         assert "if (workout.can_move)" in script
         assert "cell.dataset.moveLocked = String(workout?.can_move === false)" in script
         assert 'candidate?.dataset.moveLocked === "true" ? null : candidate' in script
         assert "function canMoveRequest(" in script
         assert "Completed workouts can only be moved by editing YAML directly." in script
         assert ".workout-locked" in styles
+        assert "Beginning drag on a completed workout" not in script
+
+    def test_card_click_opens_edit_dialog(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert 'edit.textContent = "Edit →"' not in script
+        assert 'class="edit-workout"' not in script
+        assert "openWorkout(week, workout)" in script
+        assert 'card.addEventListener("click"' in script
+        assert "card.dataset.suppressClick" in script
+        assert "suppressClick" in script
+        assert "event.preventDefault()" in script
+
+    def test_card_keyboard_activation_opens_edit_dialog(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert 'card.setAttribute("role", "button")' in script
+        assert "card.tabIndex = 0" in script
+        assert 'event.key === "Enter"' in script
+        assert 'event.key === " "' in script
+
+    def test_pointer_drag_replaces_html5_and_touch_handlers(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert 'card.addEventListener("pointerdown"' in script
+        assert 'card.addEventListener("dragstart"' not in script
+        assert 'card.addEventListener("touchstart"' not in script
+        assert 'addEventListener("dragover"' not in script
+        assert 'addEventListener("drop"' not in script
+        assert 'document.addEventListener("pointermove"' in script
+        assert 'document.addEventListener("pointerup"' in script
+        assert "> MOVE_THRESHOLD" in script
+        assert "MOVE_THRESHOLD = 6" in script
+
+    def test_move_button_and_move_dialog_are_removed(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="move-dialog"' not in html
+        assert 'id="move-form"' not in html
+        assert 'class="move-workout"' not in html
+        assert "function openMove(" not in script
+        assert "function updateMoveDayOptions(" not in script
+        assert "move-workout" not in styles
+
+    def test_pointer_drag_renames_touch_helpers(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert "cancelTouchDrag" not in script
+        assert "beginTouchDrag" not in script
+        assert "moveTouchDrag" not in script
+        assert "endTouchDrag" not in script
+        assert "touchById" not in script
+        assert "function cancelPointerDrag(" in script
+        assert "function beginPointerDrag(" in script
+        assert "function movePointerDrag(" in script
+        assert "function endPointerDrag(" in script
 
     def test_workout_overview_section_is_present_in_edit_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")

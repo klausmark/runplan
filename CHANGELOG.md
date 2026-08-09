@@ -7,6 +7,11 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Made the workout card the primary interaction surface. Click or tap opens
+  the edit dialog; press and drag moves the workout. The explicit Edit and
+  Move buttons were removed, and the move dialog was retired. The card is
+  keyboard-activatable with Enter or Space and uses one pointer-event code
+  path for both mouse and touch.
 - Showed a structured, read-only overview of the workout's steps when the
   Edit dialog opens. The YAML editor remains the deliberate escape hatch and
   is unchanged. The overview is the first step toward editing workouts
