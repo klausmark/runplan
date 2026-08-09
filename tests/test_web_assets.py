@@ -212,6 +212,18 @@ class TestWebAsset:
         assert "deleteButton.disabled = onlyWorkout" in script
         assert "only workout and cannot be deleted" in script
 
+    def test_program_deletion_uses_a_named_confirmation_dialog(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="delete-program-dialog"' in html
+        assert 'id="delete-program-title"' in html
+        assert 'id="delete-program-button"' in html
+        assert "permanently removes the YAML file" in script
+        assert "state.program.program.name" in script
+        assert 'method: "DELETE"' in script
+        assert "#settings-dialog footer .danger" in styles
+
     def test_workout_activity_checklist_manages_same_day_links(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

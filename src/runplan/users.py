@@ -107,6 +107,21 @@ class UserRegistry:
         logger.info("Active program changed user=%s file=%s", user.id, filename)
         return updated_user
 
+    def clear_active_program(self, user_id: str) -> RunplanUser:
+        """Atomically drop the active program pointer for one user."""
+        user = self.get(user_id)
+        if user.active_program is None:
+            return user
+        if self.config_path is None:
+            raise WebError(HTTPStatus.CONFLICT, "This user registry is read-only")
+        with self._lock:
+            updated_user = replace(user, active_program=None)
+            updated = {**self._users, user.id: updated_user}
+            self._write(updated.values())
+            self._users = updated
+        logger.info("Active program cleared user=%s", user.id)
+        return updated_user
+
     def create(self, username: Any, full_name: Any) -> dict[str, str | None]:
         """Persist and return a new server-configured Runplan user."""
         if not isinstance(username, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", username):

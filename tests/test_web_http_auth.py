@@ -20,9 +20,12 @@ def request_handler(
     peer: str = "127.0.0.1",
     forwarded_proto: str | None = None,
     authenticator=None,
+    sync_service=None,
 ):
     auth = authenticator or fake_authenticator()
-    handler = object.__new__(make_handler(ProgramStore(tmp_path), authenticator=auth))
+    handler = object.__new__(
+        make_handler(ProgramStore(tmp_path), authenticator=auth, sync_service=sync_service)
+    )
     content = json.dumps(body).encode() if body is not None else b""
     headers = {"Content-Length": str(len(content))}
     if cookie:
@@ -69,6 +72,7 @@ def test_health_and_auth_status_are_public_but_program_api_requires_cookie(tmp_p
         ("POST", "/api/users"),
         ("POST", "/api/programs/plan.yaml/sync"),
         ("POST", "/api/users/runner/settings"),
+        ("DELETE", "/api/programs/plan.yaml"),
     ],
 )
 def test_every_application_api_is_gated_before_routing_or_body_parsing(
@@ -164,10 +168,73 @@ def test_trusted_https_proxy_sets_secure_cookie(tmp_path: Path) -> None:
         forwarded_proto="https",
         authenticator=auth,
     )
-
     login.do_POST()
 
     cookie = next(
         call.args[1] for call in login.send_header.call_args_list if call.args[0] == "Set-Cookie"
     )
     assert "; Secure" in cookie
+
+
+def _authorized_cookie(tmp_path: Path, auth) -> str:
+    challenge, _ = request_handler(tmp_path, "/api/auth/challenge", authenticator=auth)
+    challenge.do_GET()
+    challenge_payload = response_json(challenge)
+    login, _ = request_handler(
+        tmp_path,
+        "/api/auth/login",
+        method="POST",
+        body={
+            "challengeId": challenge_payload["challengeId"],
+            "proof": login_proof("secret", challenge_payload),
+        },
+        authenticator=auth,
+    )
+    login.do_POST()
+    return next(
+        call.args[1] for call in login.send_header.call_args_list if call.args[0] == "Set-Cookie"
+    ).split(";", 1)[0]
+
+
+def test_delete_program_routes_to_sync_service_and_returns_json(tmp_path: Path) -> None:
+    sync = Mock()
+    sync.delete_program.return_value = {"deleted": "plan.yaml", "activeProgramCleared": True}
+    sync.users.default_id = "local-default"
+    auth = fake_authenticator()
+    cookie = _authorized_cookie(tmp_path, auth)
+
+    handler, _ = request_handler(
+        tmp_path,
+        "/api/programs/plan.yaml?user=local-default",
+        method="DELETE",
+        cookie=cookie,
+        authenticator=auth,
+        sync_service=sync,
+    )
+
+    handler.do_DELETE()
+
+    sync.delete_program.assert_called_once_with("local-default", "plan.yaml")
+    handler.send_response.assert_called_once_with(200)
+    assert response_json(handler) == {"deleted": "plan.yaml", "activeProgramCleared": True}
+
+
+def test_delete_unknown_subpath_returns_not_found(tmp_path: Path) -> None:
+    sync = Mock()
+    sync.users.default_id = "local-default"
+    auth = fake_authenticator()
+    cookie = _authorized_cookie(tmp_path, auth)
+
+    handler, _ = request_handler(
+        tmp_path,
+        "/api/programs/plan.yaml/extra?user=local-default",
+        method="DELETE",
+        cookie=cookie,
+        authenticator=auth,
+        sync_service=sync,
+    )
+
+    handler.do_DELETE()
+
+    sync.delete_program.assert_not_called()
+    handler.send_response.assert_called_once_with(404)

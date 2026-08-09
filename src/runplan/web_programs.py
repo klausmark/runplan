@@ -195,6 +195,15 @@ class ProgramStore:
             fallback_pace_value=fallback_pace_value,
         )
 
+    def delete(self, name: str) -> None:
+        """Remove a stored YAML program file from disk."""
+        path = self.path(name)
+        try:
+            path.unlink()
+        except FileNotFoundError as exc:
+            raise WebError(HTTPStatus.NOT_FOUND, "Program not found") from exc
+        logger.info("YAML program deleted file=%s", path)
+
     def export(
         self, name: str, format_name: str, *, fallback_pace_value: str | None = None
     ) -> tuple[bytes, str, str]:

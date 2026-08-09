@@ -518,3 +518,20 @@ class TestProgramStore:
         with pytest.raises(WebError) as duplicate_id:
             uploads.upload("same-id.yaml", self.path.read_text(encoding="utf-8"))
         assert duplicate_id.value.status == 409
+
+    def test_delete_removes_program_file_and_clears_listing(self) -> None:
+        assert self.path.is_file()
+        self.store.delete("plan.yaml")
+        assert not self.path.exists()
+        assert [] == self.store.list()
+
+    def test_delete_rejects_path_traversal(self) -> None:
+        with pytest.raises(WebError) as error:
+            self.store.delete("../plan.yaml")
+        assert error.value.status == 400
+        assert self.path.is_file()
+
+    def test_delete_missing_program_raises_not_found(self) -> None:
+        with pytest.raises(WebError) as error:
+            self.store.delete("nope.yaml")
+        assert error.value.status == 404

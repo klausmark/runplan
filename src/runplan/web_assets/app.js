@@ -1027,7 +1027,6 @@ $("#program-select").addEventListener("change", (event) => {
   setMobileMenu(false, false);
   loadProgram(event.target.value).catch(error => showError(error.message));
 });
-$("#upload-program-button").addEventListener("click", () => $("#program-file-input").click());
 $("#empty-upload-program-button").addEventListener("click", () => openAddProgramDialog("upload"));
 $("#empty-browse-templates-button").addEventListener("click", () => openAddProgramDialog("templates"));
 $("#program-file-input").addEventListener("change", (event) => {
@@ -1208,6 +1207,29 @@ $("#delete-workout-form").addEventListener("submit", async (event) => {
     $("#delete-workout-dialog").close();
     $("#workout-dialog").close();
   } catch (error) { setSaveFailure(error); showError(error.message); }
+});
+
+$("#delete-program-button").addEventListener("click", () => {
+  $("#delete-program-title").textContent = `Delete ${state.program.program.name}?`;
+  $("#delete-program-message").textContent = "This permanently removes the YAML file, all local sync state, and any Garmin schedules and workouts that were created from this plan.";
+  $("#settings-dialog").close();
+  $("#delete-program-dialog").showModal();
+});
+
+$("#delete-program-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#delete-program-confirm");
+  button.disabled = true;
+  try {
+    await request(`/api/programs/${encodeURIComponent(state.program.file)}?${userQuery()}`, { method: "DELETE" });
+    $("#delete-program-dialog").close();
+    state.program = null;
+    await loadPrograms();
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    button.disabled = false;
+  }
 });
 $("#export-button").addEventListener("click", () => $("#export-options").classList.toggle("hidden"));
 document.querySelectorAll("[data-export]").forEach(link => link.addEventListener("click", () => {

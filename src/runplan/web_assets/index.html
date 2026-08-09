@@ -46,7 +46,6 @@
         <div class="top-actions">
           <div class="user-control"><label class="user-picker">User <select id="user-select" aria-label="Runplan user"></select></label><button id="add-user-button" class="add-user-button" type="button">Add user</button></div>
           <label class="program-picker">Program <select id="program-select"></select></label>
-          <button id="upload-program-button" class="button secondary" type="button">Upload program</button>
           <div class="split-button">
             <button id="add-program-button" class="button secondary" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="add-program-menu">Add program</button>
             <button id="add-program-toggle" class="button secondary split-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="add-program-menu" aria-label="More ways to add a program"><span aria-hidden="true">▾</span></button>
@@ -122,7 +121,7 @@
         <label>Description<textarea id="settings-description" rows="5"></textarea></label>
         <label>Short name<input id="settings-short-name" required minlength="2" maxlength="10" pattern="[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*" placeholder="HCA26"></label>
         <label>Start week<input id="settings-start-week" required pattern="[0-9]{4}-W[0-9]{2}" placeholder="2026-W31"></label>
-        <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save changes</button></footer>
+        <footer><button id="delete-program-button" type="button" class="button danger">Delete program</button><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save changes</button></footer>
       </form>
     </dialog>
 
@@ -180,6 +179,14 @@
         <div class="dialog-heading"><div><p class="eyebrow">Delete workout</p><h2 id="delete-workout-title">Delete workout?</h2></div><button type="button" class="icon-button close">×</button></div>
         <p id="delete-workout-message" class="editor-help"></p>
         <footer><button type="button" class="button secondary close">Cancel</button><button class="button danger">Delete workout</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="delete-program-dialog" class="confirm-dialog">
+      <form id="delete-program-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Delete program</p><h2 id="delete-program-title">Delete program?</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p id="delete-program-message" class="editor-help"></p>
+        <footer><button type="button" class="button secondary close">Cancel</button><button id="delete-program-confirm" class="button danger">Delete program</button></footer>
       </form>
     </dialog>
 

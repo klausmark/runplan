@@ -230,3 +230,31 @@ def test_active_program_round_trips_without_exposing_profile_paths(tmp_path: Pat
     assert updated.active_program == "marathon.yaml"
     assert reloaded.get("runner").active_program == "marathon.yaml"
     assert reloaded.list()[0]["activeProgram"] == "marathon.yaml"
+
+
+def test_clear_active_program_unsets_field_and_round_trips(tmp_path: Path) -> None:
+    config = tmp_path / "users.toml"
+    registry = load_user_registry(config)
+    registry.create("runner", "Runner")
+    registry.set_active_program("runner", "marathon.yaml")
+    baseline = config.read_text(encoding="utf-8")
+    assert 'active_program = "marathon.yaml"' in baseline
+
+    cleared = registry.clear_active_program("runner")
+    reloaded = load_user_registry(config)
+
+    assert cleared.active_program is None
+    assert reloaded.get("runner").active_program is None
+    assert reloaded.list()[0]["activeProgram"] is None
+    assert 'active_program = "marathon.yaml"' not in config.read_text(encoding="utf-8")
+
+
+def test_clear_active_program_is_a_noop_when_already_unset(tmp_path: Path) -> None:
+    config = tmp_path / "users.toml"
+    registry = load_user_registry(config)
+    registry.create("runner", "Runner")
+
+    cleared = registry.clear_active_program("runner")
+
+    assert cleared.active_program is None
+    assert registry.get("runner").active_program is None

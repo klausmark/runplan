@@ -14,6 +14,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from ruamel.yaml.error import YAMLError as RoundTripYAMLError
+
 from .application.ports import GarminClient, StateRepository
 from .application.sync import (
     plan_program_weeks,
@@ -29,6 +31,7 @@ from .users import RunplanUser, UserRegistry, WebError, load_user_registry
 from .web_auth import WebAuthenticator
 from .web_http import make_handler
 from .web_programs import ProgramStore
+from .web_yaml import load_editable_yaml
 
 ASSET_DIR = Path(__file__).with_name("web_assets")
 logger = logging.getLogger(__name__)
@@ -168,6 +171,63 @@ class WebSyncService:
         from .web_sync_execution import execute_confirmed_sync
 
         return execute_confirmed_sync(self, name, request, synchronize_program_weeks)
+
+    def delete_program(self, user_id: str | None, filename: str) -> dict[str, Any]:
+        """Remove a program, its local state, and any Garmin-owned workouts.
+
+        Structural rationale: Garmin-side cleanup runs before local file removal so
+        the live network error surfaces while rollback is still possible; the YAML
+        and active-program pointer are cleared only after the destructive network
+        calls succeed. Programs with no tracked Garmin workouts skip the login
+        entirely so accounts without Garmin credentials can still clean up local
+        state.
+        """
+        from .application.sync_cleanup import delete_managed_workouts
+
+        user = self.users.get(user_id or self.users.default_id)
+        store = self.store_for(user.id)
+        path = store.path(filename)
+        if not path.is_file():
+            raise WebError(HTTPStatus.NOT_FOUND, "Program not found")
+        try:
+            raw = load_editable_yaml(path.read_text(encoding="utf-8"))
+        except (OSError, RoundTripYAMLError) as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, f"Invalid YAML: {exc}") from exc
+        program_id = raw.get("program", {}).get("id") if isinstance(raw, dict) else None
+        if not isinstance(program_id, str) or not program_id:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Program is missing a program.id")
+
+        repository = self.repository_for(user.id, filename)
+        state = repository.load(program_id)
+        needs_garmin = any(
+            isinstance(record, dict) and (record.get("workout_id") or record.get("schedule_id"))
+            for record in state.get("workouts", {}).values()
+        )
+
+        if needs_garmin:
+            client = self.client_for(user.id)
+            delete_managed_workouts(client, repository, {"program_id": program_id}, [])
+
+        store.delete(filename)
+
+        cleared = False
+        if user.active_program == filename:
+            self.users.clear_active_program(user.id)
+            cleared = True
+
+        logger.info(
+            "Program deleted user=%s file=%s program_id=%s garmin_cleaned_up=%s active_program_cleared=%s",
+            user.id,
+            filename,
+            program_id,
+            needs_garmin,
+            cleared,
+        )
+        return {
+            "deleted": filename,
+            "activeProgramCleared": cleared,
+            "garminCleanedUp": needs_garmin,
+        }
 
 
 def serve(host: str, port: int, program_dir: Path, *, log_level: str = "INFO") -> int:

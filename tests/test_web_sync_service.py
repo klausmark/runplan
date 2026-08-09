@@ -127,3 +127,74 @@ class TestWebSyncService:
         assert [action["kind"] for action in alice_preview["plan"]["actions"]] != [
             action["kind"] for action in bob_preview["plan"]["actions"]
         ]
+
+    def test_delete_program_skips_garmin_login_when_state_is_empty(self) -> None:
+        self.client_factory.reset_mock()
+
+        result = self.service.delete_program(None, "plan.yaml")
+
+        self.client_factory.assert_not_called()
+        assert result == {
+            "deleted": "plan.yaml",
+            "activeProgramCleared": False,
+            "garminCleanedUp": False,
+        }
+        assert not self.path.exists()
+
+    def test_delete_program_calls_garmin_when_state_has_workout_id(self) -> None:
+        from tests.fakes import FakeGarmin
+
+        fake = FakeGarmin()
+        self.client_factory = Mock(return_value=fake)
+        self.service = WebSyncService(
+            self.store,
+            repository=self.repository,
+            client_factory=self.client_factory,
+            today=lambda: date(2026, 12, 30),
+        )
+        state = self.repository.load("characterization-plan")
+        state["workouts"]["week-01/mixed"] = {
+            "name": "Mixed",
+            "status": "scheduled",
+            "workout_id": 42,
+            "schedule_id": 43,
+            "date": "2026-12-28",
+        }
+        self.repository.save("characterization-plan", state)
+
+        result = self.service.delete_program(None, "plan.yaml")
+
+        self.client_factory.assert_called_once_with()
+        assert result["garminCleanedUp"] is True
+        assert result["deleted"] == "plan.yaml"
+        assert not self.path.exists()
+
+    def test_delete_program_logs_in_when_state_has_only_schedule_id(self) -> None:
+        from tests.fakes import FakeGarmin
+
+        fake = FakeGarmin()
+        self.client_factory = Mock(return_value=fake)
+        self.service = WebSyncService(
+            self.store,
+            repository=self.repository,
+            client_factory=self.client_factory,
+            today=lambda: date(2026, 12, 30),
+        )
+        state = self.repository.load("characterization-plan")
+        state["workouts"]["week-01/easy"] = {
+            "name": "Easy",
+            "status": "scheduled",
+            "schedule_id": 17,
+            "date": "2026-12-29",
+        }
+        self.repository.save("characterization-plan", state)
+
+        result = self.service.delete_program(None, "plan.yaml")
+
+        self.client_factory.assert_called_once_with()
+        assert result["garminCleanedUp"] is True
+
+    def test_delete_program_raises_not_found_for_missing_file(self) -> None:
+        with pytest.raises(WebError) as error:
+            self.service.delete_program(None, "missing.yaml")
+        assert error.value.status == 404

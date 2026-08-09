@@ -69,6 +69,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         self._handle(self._post)
 
+    def do_DELETE(self) -> None:  # noqa: N802
+        self._handle(self._delete)
+
     def _handle(self, operation: Any) -> None:
         try:
             self.auth.authorize(self.path, self.client_address[0], self.headers)
@@ -174,6 +177,19 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 fallback_pace_value=user.default_pace,
             ),
         )
+
+    def _delete(self) -> None:
+        parsed = urlsplit(self.path)
+        query = parse_qs(parsed.query)
+        parts = self._api_program_parts()
+        if len(parts) == 1:
+            self._delete_program(parts[0], query)
+            return
+        raise WebError(HTTPStatus.NOT_FOUND, "Not found")
+
+    def _delete_program(self, filename: str, query: dict[str, list[str]]) -> None:
+        user_id = query.get("user", [self.registry.default_id])[0]
+        self._json(HTTPStatus.OK, self.sync.delete_program(user_id, filename))
 
     def _get(self) -> None:
         parsed = urlsplit(self.path)
