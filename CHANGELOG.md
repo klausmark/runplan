@@ -7,6 +7,10 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Showed a structured, read-only overview of the workout's steps when the
+  Edit dialog opens. The YAML editor remains the deliberate escape hatch and
+  is unchanged. The overview is the first step toward editing workouts
+  directly in the UI rather than only in YAML.
 - Added an optional watch-facing `note` field to every step in YAML. The note
   replaces the default Garmin step label (`Very easy run`, `Warm up`, `Walk`,
   `Cool down`) and is also rendered in previews, PDF, HTML, and Markdown

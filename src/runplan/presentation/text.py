@@ -128,6 +128,50 @@ def format_model_steps(steps: tuple[Step, ...], indent: str = "  ") -> str:
     return "\n".join(lines)
 
 
+STEP_LABELS: dict[str, str] = {
+    "warmup": "Warmup",
+    "run": "Run",
+    "recovery": "Recovery",
+    "cooldown": "Cooldown",
+}
+
+
+def _step_view(step: Step) -> dict[str, Any]:
+    """Return the renderer-independent view of one regular step."""
+    assert step.end_kind is not None and step.end_value is not None
+    return {
+        "action": step.action,
+        "kind_label": STEP_LABELS[step.action],
+        "end_kind": step.end_kind,
+        "end_value": step.end_value,
+        "end_value_display": (
+            format_seconds_compact(step.end_value)
+            if step.end_kind == "time"
+            else format_distance_compact(step.end_value)
+        ),
+        "pace_display": format_pace(step.pace) if step.pace else None,
+        "note": step.note,
+    }
+
+
+def step_view(steps: tuple[Step, ...]) -> list[dict[str, Any]]:
+    """Return a JSON-safe structured view of typed recursive steps."""
+    result: list[dict[str, Any]] = []
+    for step in steps:
+        if step.action == "repeat":
+            result.append(
+                {
+                    "action": "repeat",
+                    "kind_label": "Repeat",
+                    "count": step.count,
+                    "steps": step_view(step.steps),
+                }
+            )
+        else:
+            result.append(_step_view(step))
+    return result
+
+
 def format_model_step_summary(steps: tuple[Step, ...]) -> str:
     """Format typed recursive steps on one compact line."""
     labels = {
@@ -212,4 +256,5 @@ __all__ = [
     "format_totals",
     "format_weekday",
     "step_summary",
+    "step_view",
 ]

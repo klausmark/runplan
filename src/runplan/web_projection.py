@@ -18,6 +18,7 @@ from .domain.errors import WorkoutDefinitionError
 from .domain.estimates import estimate_steps
 from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
+from .presentation.text import step_view
 from .state.yaml_repository import tracking_from_record
 from .users import WebError
 from .web_yaml import dump_editable_yaml
@@ -70,6 +71,7 @@ def _workout_view(
         "effective_distance_meters": distance,
         "effective_duration_seconds": duration,
         "totals_are_actual": actual,
+        "steps": step_view(workout.steps),
         "yaml": dump_editable_yaml(editable),
     }
 

@@ -452,6 +452,82 @@ function selectedActivityIds() {
   ).sort((left, right) => left - right);
 }
 
+function clearChildren(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+function appendStepLine(list, parts) {
+  const line = document.createElement("span");
+  parts.forEach(part => line.appendChild(typeof part === "string" ? document.createTextNode(part) : part));
+  const item = document.createElement("li");
+  item.className = "workout-step";
+  item.appendChild(line);
+  list.appendChild(item);
+  return item;
+}
+
+function renderStepList(steps, list) {
+  steps.forEach(step => {
+    if (step.action === "repeat") {
+      const item = document.createElement("li");
+      item.className = "workout-step-repeat";
+      const summary = document.createElement("strong");
+      summary.textContent = `Repeat ${step.count} times`;
+      item.appendChild(summary);
+      const nested = document.createElement("ol");
+      nested.className = "workout-steps";
+      item.appendChild(nested);
+      list.appendChild(item);
+      renderStepList(step.steps, nested);
+      return;
+    }
+    const parts = [
+      `${step.kind_label}: `,
+      document.createTextNode(step.end_value_display),
+    ];
+    if (step.pace_display) {
+      const pace = document.createElement("span");
+      pace.className = "workout-step-pace";
+      pace.textContent = ` @ ${step.pace_display}`;
+      parts.push(pace);
+    }
+    const item = appendStepLine(list, parts);
+    if (step.note) {
+      const note = document.createElement("p");
+      note.className = "workout-step-note";
+      note.textContent = `Note: ${step.note}`;
+      item.appendChild(note);
+    }
+  });
+}
+
+function renderWorkoutSteps(steps) {
+  const container = $("#workout-steps");
+  clearChildren(container);
+  if (!Array.isArray(steps) || steps.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "workout-step-empty";
+    empty.textContent = "No steps yet.";
+    container.appendChild(empty);
+    return;
+  }
+  renderStepList(steps, container);
+}
+
+function setWorkoutOverview(steps) {
+  const overview = $("#workout-overview");
+  const help = $("#workout-overview-help");
+  if (Array.isArray(steps) && steps.length > 0) {
+    renderWorkoutSteps(steps);
+    help.textContent = "The steps are part of the saved workout. Edit them in the YAML editor below.";
+    overview.classList.remove("hidden");
+  } else {
+    clearChildren($("#workout-steps"));
+    help.textContent = "";
+    overview.classList.add("hidden");
+  }
+}
+
 function updateWorkoutActions() {
   if (!state.workout) return;
   const yamlChanged = $("#workout-yaml").value !== state.workout.originalYaml;
@@ -531,6 +607,7 @@ async function applyActivityLinks() {
     state.workout.name = refreshed.name;
     state.workout.originalYaml = refreshed.yaml;
     $("#workout-yaml").value = refreshed.yaml;
+    setWorkoutOverview(refreshed.steps);
     await loadActivityCandidates();
   } catch (error) {
     updateWorkoutActions();
@@ -775,6 +852,7 @@ function openWorkout(week, workout) {
   $("#save-workout-button").textContent = "Validate & save";
   $("#workout-yaml").value = workout.yaml;
   $("#save-workout-button").disabled = false;
+  setWorkoutOverview(workout.steps);
   const activities = $("#workout-activities");
   activities.classList.toggle("hidden", !workout.can_manage_activities);
   $("#workout-yaml-details").open = false;
@@ -813,6 +891,7 @@ function openAddWorkout(weekNumber, day) {
   $("#workout-yaml-reference").classList.remove("hidden");
   $("#delete-workout-button").classList.add("hidden");
   $("#workout-activities").classList.add("hidden");
+  setWorkoutOverview(null);
   $("#workout-yaml-details").open = true;
   $("#save-workout-button").textContent = "Validate & add";
   $("#save-workout-button").disabled = false;

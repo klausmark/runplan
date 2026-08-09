@@ -229,3 +229,32 @@ class TestWebAsset:
         assert "function canMoveRequest(" in script
         assert "Completed workouts can only be moved by editing YAML directly." in script
         assert ".workout-locked" in styles
+
+    def test_workout_overview_section_is_present_in_edit_dialog(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="workout-overview"' in html
+        assert 'id="workout-steps"' in html
+        assert 'id="workout-overview-title"' in html
+        assert "function renderWorkoutSteps(" in script
+        assert "function setWorkoutOverview(" in script
+        assert "setWorkoutOverview(workout.steps)" in script
+        assert ".workout-overview" in styles
+        assert ".workout-step-pace" in styles
+        assert ".workout-step-note" in styles
+
+    def test_workout_overview_is_hidden_in_add_workout_mode(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        add_start = script.index("function openAddWorkout(")
+        next_function = script.index("\nfunction ", add_start + 1)
+        add_section = script[add_start:next_function]
+        assert "setWorkoutOverview(null)" in add_section
+
+    def test_workout_overview_renders_steps_without_innerHTML(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        index = script.index("function renderStepList(")
+        block = script[index : script.index("function renderWorkoutSteps(", index)]
+        assert "innerHTML" not in block
+        assert "createElement" in block
+        assert "textContent" in block
