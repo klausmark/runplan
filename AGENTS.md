@@ -17,7 +17,7 @@ The script runs Ruff format, Ruff lint, and the full pytest suite in fail-fast o
 - Prefer pure functions for calculations, typed dataclasses for domain data, and classes for stateful services, repositories, and external adapters.
 - Keep dependencies pointing inward — see [docs/project-design.md](docs/project-design.md).
 - Follow [docs/development-standards.md](docs/development-standards.md). Use [docs/code-quality-audit.md](docs/code-quality-audit.md) to scope structural refactoring; refresh its measurements with `uv run python scripts/audit_structure.py`.
-- Use a single-line subject for every commit: short, imperative, and in English. Never add a body. Detailed change notes belong in `CHANGELOG.md` under `Unreleased` and in the PR description. See [docs/development-standards.md](docs/development-standards.md) for context.
+- Use a single-line subject for every commit: short, imperative, and in English. Add a body when it helps reviewers understand the change or its motivation; bodies are free-form. Commit messages are the project's change history — release notes are derived from `git log` at milestones. See [docs/development-standards.md](docs/development-standards.md) for context.
 
 ## Tests
 
@@ -34,4 +34,4 @@ The script runs Ruff format, Ruff lint, and the full pytest suite in fail-fast o
 ## Definition of done
 
 - `uv run python scripts/check.py` passes.
-- User-visible changes are recorded under `Unreleased` in `CHANGELOG.md`.
+- User-visible changes are documented in the commit message body (or PR description), not in a tracked file.
