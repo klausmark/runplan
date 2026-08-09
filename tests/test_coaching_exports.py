@@ -54,7 +54,9 @@ def test_markdown_export_includes_coaching_guide_for_nike_5k() -> None:
     assert "Recovery Runs" in md
     assert "Rest Days" in md
     assert "Nike Run Club Pace Chart" in md
-    assert "| Mile best | 5K best / avg mile |" in md
+    assert "| Mile best | 5K best / avg km |" in md
+    assert "| 5:00 | 17:05 / 3:25 | 35:45 / 3:35 |" in md
+    assert "| 9:00 | 30:00 / 6:00 | 62:30 / 6:15 |" in md
     assert "If your last 5K was 27:00" in md
     assert "Progression Run" in md
     assert "Intervals" in md
@@ -83,7 +85,7 @@ def test_markdown_export_for_marathon_uses_six_column_pace_chart() -> None:
     assert len(lines) == 1
     header_cells = [cell.strip() for cell in lines[0].strip("|").split("|")]
     assert len(header_cells) == 6
-    assert "Recovery day pace" not in md.split("Coaching guide")[1]
+    assert "Recovery min/km" not in md.split("Coaching guide")[1]
 
 
 def test_html_export_escapes_user_content_in_coaching() -> None:

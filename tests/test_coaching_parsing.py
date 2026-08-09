@@ -136,6 +136,7 @@ def test_every_nike_template_carries_coaching_with_expected_sections() -> None:
         assert len(guide.plan_tips) >= 3, slug
         assert guide.pace_chart is not None
         assert len(guide.pace_chart.headers) == expectations["columns"], slug
+        assert guide.pace_chart.headers[1].label == "5K best / avg km", slug
         assert len(guide.pace_chart.rows) == 15, slug
         assert len(guide.glossary) == expectations["glossary"], slug
         assert len(guide.pace_types) == 6, slug

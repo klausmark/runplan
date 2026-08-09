@@ -103,44 +103,44 @@ program:
         or below these paces. They are not exact paces and you are not a robot.
       headers:
         - { label: "Mile best", description: "Your best one-mile effort." }
-        - { label: "5K best / avg mile", description: "Best 5K time and the average pace per mile you held during it." }
-        - { label: "10K best / avg mile", description: "Best 10K time and the average pace per mile you held during it." }
-        - { label: "Tempo avg mile", description: "Steady, hard-but-controlled pace you can hold for 30-60 minutes." }
-        - { label: "Half marathon best / avg mile", description: "Best half marathon time and the average pace per mile you held during it." }
-        - { label: "Marathon best / avg mile", description: "Best marathon time and the average pace per mile you held during it." }
+        - { label: "5K best / avg km", description: "Best 5K time and the average pace per kilometer you held during it." }
+        - { label: "10K best / avg km", description: "Best 10K time and the average pace per kilometer you held during it." }
+        - { label: "Tempo min/km", description: "Steady, hard-but-controlled pace per kilometer." }
+        - { label: "Half marathon best / avg km", description: "Best half marathon time and the average pace per kilometer you held during it." }
+        - { label: "Marathon best / avg km", description: "Best marathon time and the average pace per kilometer you held during it." }
       rows:
-        - ["5:00", "17:05 / 5:30", "35:45 / 5:45", "6:05", "1:18:00 / 6:00", "2:44:00 / 6:15"]
-        - ["5:30", "18:45 / 6:00", "39:00 / 6:15", "6:35", "1:25:00 / 6:30", "3:00:00 / 6:50"]
-        - ["6:00", "20:15 / 6:30", "42:00 / 6:45", "7:05", "1:35:00 / 7:15", "3:15:00 / 7:25"]
-        - ["6:30", "22:00 / 7:05", "45:45 / 7:20", "7:40", "1:40:00 / 7:35", "3:30:00 / 8:00"]
-        - ["7:00", "23:45 / 7:40", "49:00 / 7:55", "8:15", "1:50:00 / 8:20", "3:45:00 / 8:35"]
-        - ["7:30", "25:15 / 8:05", "52:30 / 8:25", "8:50", "1:55:00 / 8:45", "4:00:00 / 9:10"]
-        - ["8:00", "27:00 / 8:40", "55:50 / 9:00", "9:25", "2:05:00 / 9:30", "4:15:00 / 9:45"]
-        - ["8:30", "28:30 / 9:10", "59:00 / 9:30", "9:55", "2:10:00 / 9:55", "4:30:00 / 10:15"]
-        - ["9:00", "30:00 / 9:40", "62:30 / 10:00", "10:30", "2:20:00 / 10:40", "4:45:00 / 10:50"]
-        - ["9:30", "31:45 / 10:15", "66:00 / 10:35", "11:00", "2:25:00 / 11:05", "5:00:00 / 11:25"]
-        - ["10:00", "33:00 / 10:40", "69:00 / 11:05", "11:35", "2:35:00 / 11:45", "5:15:00 / 12:00"]
-        - ["10:30", "35:00 / 11:15", "72:00 / 11:35", "12:00", "2:40:00 / 12:10", "5:30:00 / 12:35"]
-        - ["11:00", "36:15 / 11:40", "75:00 / 12:00", "12:35", "2:50:00 / 12:55", "5:40:00 / 13:00"]
-        - ["11:30", "38:00 / 12:15", "78:30 / 12:35", "13:00", "2:55:00 / 13:15", "5:50:00 / 13:20"]
-        - ["12:00", "39:30 / 12:40", "81:30 / 13:05", "13:35", "3:05:00 / 14:05", "6:00:00 / 13:45"]
+        - ["5:00", "17:05 / 3:25", "35:45 / 3:35", "9:45", "1:18:00 / 3:40", "2:44:00 / 3:55"]
+        - ["5:30", "18:45 / 3:45", "39:00 / 3:55", "10:35", "1:25:00 / 4:00", "3:00:00 / 4:15"]
+        - ["6:00", "20:15 / 4:05", "42:00 / 4:10", "11:25", "1:35:00 / 4:30", "3:15:00 / 4:35"]
+        - ["6:30", "22:00 / 4:25", "45:45 / 4:35", "12:20", "1:40:00 / 4:45", "3:30:00 / 5:00"]
+        - ["7:00", "23:45 / 4:45", "49:00 / 4:55", "13:15", "1:50:00 / 5:15", "3:45:00 / 5:20"]
+        - ["7:30", "25:15 / 5:05", "52:30 / 5:15", "14:15", "1:55:00 / 5:25", "4:00:00 / 5:40"]
+        - ["8:00", "27:00 / 5:25", "55:50 / 5:35", "15:10", "2:05:00 / 5:55", "4:15:00 / 6:05"]
+        - ["8:30", "28:30 / 5:40", "59:00 / 5:55", "16:00", "2:10:00 / 6:10", "4:30:00 / 6:25"]
+        - ["9:00", "30:00 / 6:00", "62:30 / 6:15", "16:55", "2:20:00 / 6:40", "4:45:00 / 6:45"]
+        - ["9:30", "31:45 / 6:20", "66:00 / 6:35", "17:40", "2:25:00 / 6:50", "5:00:00 / 7:05"]
+        - ["10:00", "33:00 / 6:35", "69:00 / 6:55", "18:40", "2:35:00 / 7:20", "5:15:00 / 7:30"]
+        - ["10:30", "35:00 / 7:00", "72:00 / 7:10", "19:20", "2:40:00 / 7:35", "5:30:00 / 7:50"]
+        - ["11:00", "36:15 / 7:15", "75:00 / 7:30", "20:15", "2:50:00 / 8:05", "5:40:00 / 8:05"]
+        - ["11:30", "38:00 / 7:35", "78:30 / 7:50", "20:55", "2:55:00 / 8:20", "5:50:00 / 8:20"]
+        - ["12:00", "39:30 / 7:55", "81:30 / 8:10", "21:50", "3:05:00 / 8:45", "6:00:00 / 8:30"]
       examples:
         - title: "If your last 5K was 27:00"
-          row: ["8:00", "27:00 / 8:40", "55:50 / 9:00", "9:25", "2:05:00 / 9:30", "4:15:00 / 9:45"]
+          row: ["8:00", "27:00 / 5:25", "55:50 / 5:35", "15:10", "2:05:00 / 5:55", "4:15:00 / 6:05"]
           targets:
             - "Best Mile Pace: 8:00 minutes"
-            - "5K Average Mile Pace: 8:40 minutes"
-            - "10K Average Mile Pace: 9:00 minutes"
-            - "Tempo Pace: 9:25 minutes"
-            - "Marathon Average Mile Pace: 9:45 minutes"
+            - "5K Pace: 27:00 / 5:25 min/km"
+            - "10K Pace: 55:50 / 5:35 min/km"
+            - "Tempo Pace: 15:10 min/km"
+            - "Marathon Pace: 4:15:00 / 6:05 min/km"
         - title: "If your Best Mile time is 9:30"
-          row: ["9:30", "31:45 / 10:15", "66:00 / 10:35", "11:00", "2:25:00 / 11:05", "5:00:00 / 11:25"]
+          row: ["9:30", "31:45 / 6:20", "66:00 / 6:35", "17:40", "2:25:00 / 6:50", "5:00:00 / 7:05"]
           targets:
             - "Best Mile Pace: 9:30 minutes"
-            - "5K Average Mile Pace: 10:15 minutes"
-            - "10K Average Mile Pace: 10:35 minutes"
-            - "Tempo Pace: 11 minutes"
-            - "Marathon Average Mile Pace: 11:25 minutes"
+            - "5K Pace: 31:45 / 6:20 min/km"
+            - "10K Pace: 66:00 / 6:35 min/km"
+            - "Tempo Pace: 17:40 min/km"
+            - "Marathon Pace: 5:00:00 / 7:05 min/km"
     glossary:
       - term: "Progression Run"
         definition: >-

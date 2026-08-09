@@ -58,8 +58,26 @@ the original Nike Run Club coaching content. The block has the following keys
 
 The Studio renders the block as a collapsible **Coaching guide** section
 above the calendar. Markdown, HTML and PDF exports all render the guide as
-their first page (after the cover). Pace chart cells keep Nike's original
-mile-based values; the runner applies the chart themselves.
+their first page (after the cover).
+
+### Pace chart units
+
+The pace chart is **metric** (min/km) for every column except the first.
+The runner finds their row by personal-best mile time, then reads the
+target paces directly in min/km:
+
+- `Mile best` stays in miles so the row matches a runner's known mile PR.
+- `5K best / avg km`, `10K best / avg km`, `Half marathon best / avg km` and
+  `Marathon best / avg km` keep the original race time in `h:mm` or `h:mm:ss`
+  and compute the per-kilometer pace from that time and the race distance
+  (rounded to the nearest 5 seconds). For example, a `30:00` 5K time maps
+  to a `6:00 min/km` average pace.
+- `Tempo min/km` and `Recovery min/km` are pure pace values converted from
+  the original mile-pace column via `miles × 1.609344`, rounded to the
+  nearest 5 seconds.
+
+The worked examples report target paces for each runner's row so the
+runner can copy the values directly into Garmin Connect.
 
 ## Conventions
 
