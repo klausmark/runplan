@@ -17,6 +17,32 @@ function programStorageKey(userId) { return `runplan-program:${userId}`; }
 function weekOpenStorageKey(userId, programId, week) { return `runplan-week-open:${userId}:${programId}:${week}`; }
 function userQuery() { return `user=${encodeURIComponent(state.user.id)}`; }
 
+function normalizePaceSide(side) {
+  const trimmed = side.trim();
+  if (/^\d+$/.test(trimmed)) return `${parseInt(trimmed, 10)}:00`;
+  if (/^\d+:[0-5]\d$/.test(trimmed)) return trimmed;
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const totalSec = Math.round(parseFloat(trimmed) * 60);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+function normalizePaceInput(raw) {
+  const text = (raw || "").trim();
+  if (!text) return null;
+  const stripped = text.replace(/\s*min\s*\/\s*km\s*$/i, "").trim();
+  const parts = stripped.split(/\s*-\s*/).map(normalizePaceSide);
+  if (parts.some((p) => p === null)) return null;
+  for (const part of parts) {
+    const [mm, ss] = part.split(":").map((n) => parseInt(n, 10));
+    if (ss >= 60 || mm <= 0) return null;
+  }
+  return `${parts.join("-")} min/km`;
+}
+
 async function request(url, options = {}) {
   const response = await fetch(url, options);
   const type = response.headers.get("content-type") || "";
@@ -1111,7 +1137,7 @@ $("#user-settings-button").addEventListener("click", async () => {
     const settings = await request(`/api/users/${encodeURIComponent(state.user.id)}/settings`);
     $("#user-settings-username").value = settings.id;
     $("#user-settings-full-name").value = settings.fullName;
-    $("#user-settings-default-pace").value = settings.defaultPace;
+    $("#user-settings-default-pace").value = normalizePaceInput(settings.defaultPace) ?? settings.defaultPace;
     $("#user-settings-garmin-email").value = settings.garminEmail;
     $("#user-settings-garmin-password").value = "";
     $("#user-settings-garmin-password").required = false;
@@ -1150,6 +1176,10 @@ $("#user-settings-form").addEventListener("submit", async (event) => {
     $("#user-settings-dialog").close();
     if (state.program) await loadProgram(state.program.file);
   } catch (error) { showError(error.message); }
+});
+$("#user-settings-default-pace").addEventListener("blur", (event) => {
+  const normalized = normalizePaceInput(event.target.value);
+  if (normalized !== null) event.target.value = normalized;
 });
 $("#workout-form").addEventListener("submit", async (event) => {
   event.preventDefault();
