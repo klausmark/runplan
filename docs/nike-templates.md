@@ -7,6 +7,20 @@ templates are stored as static YAML files under
 `runplan.templates` module and through the Runplan Studio catalog at
 `/api/templates`.
 
+## Source material
+
+The original Nike Run Club training plans that informed these templates are
+preserved under `docs/source/nike/`:
+
+- `Nike-Run-Club-5K-Training-Plan.md`
+- `Nike-Run-Club-10K-Training-Plan.md`
+- `Nike-Run-Club-Half-Marathon-Training-Plan-Audio-Guided-Runs.md`
+- `Nike-Run-Club-Marathon-Training-Plan.md`
+
+These are reference documents retained for traceability; the actual bundled
+templates live as structured YAML so they can be edited, synced to Garmin
+Connect, and surfaced through the Studio.
+
 ## Status
 
 The Runplan templates are **unofficial adaptations** of the Nike Run Club
