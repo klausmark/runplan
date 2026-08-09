@@ -6,7 +6,21 @@ from .application.export import ProgramExport, build_program_export
 from .application.sync import delete_all_managed, reconcile_program, sync_program_week
 from .cli import run_sync
 from .domain.errors import WorkoutDefinitionError
-from .domain.models import Program, Step, Week, Workout, WorkoutStatus
+from .domain.models import (
+    CoachingGuide,
+    CoachingSection,
+    CoachingTip,
+    GlossaryEntry,
+    PaceChart,
+    PaceColumn,
+    PaceExample,
+    PaceType,
+    Program,
+    Step,
+    Week,
+    Workout,
+    WorkoutStatus,
+)
 from .domain.selectors import WeekSelection, WeekSelectionError
 from .exporters.html import export_html, format_program_html
 from .exporters.markdown import export_markdown, format_program_markdown
@@ -55,8 +69,16 @@ logging.getLogger("runplan").addHandler(logging.NullHandler())
 
 __all__ = [
     "BRace",
+    "CoachingGuide",
+    "CoachingSection",
+    "CoachingTip",
     "GeneratorRequest",
+    "GlossaryEntry",
     "GoalRace",
+    "PaceChart",
+    "PaceColumn",
+    "PaceExample",
+    "PaceType",
     "Program",
     "ProgramExport",
     "Step",

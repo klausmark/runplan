@@ -13,6 +13,7 @@ from ..presentation.text import (
     format_seconds_compact,
     format_weekday,
 )
+from .coaching_sections import coaching_lines
 from .writer import write_export
 
 
@@ -42,6 +43,8 @@ def format_program_markdown(program: ProgramExport) -> str:
             f"{format_estimated_distance(program.summary.estimated_distance_meters)}",
         )
     )
+    if program.coaching is not None:
+        lines.extend(_coaching_markdown(program.coaching))
     for week in program.weeks:
         lines.extend(
             (
@@ -79,6 +82,20 @@ def format_program_markdown(program: ProgramExport) -> str:
                 lines.extend(("", _escape(workout.description)))
             lines.extend(("", "```text", format_model_steps(workout.steps, indent=""), "```"))
     return "\n".join(lines) + "\n"
+
+
+def _coaching_markdown(guide) -> list[str]:
+    sections = coaching_lines(guide)
+    if not sections:
+        return []
+    lines = ["", "---", "", "## Coaching guide"]
+    for title, content in sections:
+        if title == "__eyebrow__":
+            lines.extend(("", f"_{content[0]}_"))
+            continue
+        lines.extend(("", f"### {_escape(title)}"))
+        lines.extend(content)
+    return lines
 
 
 def export_markdown(program: ProgramExport, output_path: Path, force: bool) -> None:

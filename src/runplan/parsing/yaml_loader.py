@@ -11,6 +11,7 @@ import yaml
 
 from ..domain.errors import WorkoutDefinitionError
 from ..domain.models import Program
+from .coaching import parse_coaching
 from .yaml_models import program_model
 from .yaml_tracking import normalize_tracking
 
@@ -108,6 +109,9 @@ def _program_fields(program: dict[str, Any]) -> dict[str, Any]:
     if description is not None and not isinstance(description, str):
         raise WorkoutDefinitionError("program.description: must be text or null")
     start_week, start_date = parse_iso_week(program.get("start_week"))
+    if "coaching" in program and not isinstance(program["coaching"], (dict, type(None))):
+        raise WorkoutDefinitionError("program.coaching: must be an object or null")
+    coaching = parse_coaching(program.get("coaching"))
     return {
         "program_id": program_id,
         "program_name": name.strip(),
@@ -115,6 +119,7 @@ def _program_fields(program: dict[str, Any]) -> dict[str, Any]:
         "program_description": description.strip() if isinstance(description, str) else None,
         "start_week": start_week,
         "start_date": start_date,
+        "coaching": coaching,
     }
 
 

@@ -28,12 +28,14 @@ def list_templates_response() -> dict[str, Any]:
 
 
 def get_template_response(template_id: str) -> dict[str, Any]:
-    """Return a single template's metadata and suggested filename."""
+    """Return a single template's metadata, suggested filename and coaching summary."""
     metadata = get_template(template_id)
-    return {
+    response: dict[str, Any] = {
         "template": _metadata_payload(metadata),
         "suggestedFilename": suggested_filename(metadata),
     }
+    response["hasCoaching"] = _template_has_coaching(template_id)
+    return response
 
 
 def copy_template_response(template_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -89,6 +91,14 @@ def parse_template_yaml(text: str) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError("Template YAML must contain a program document")
     return loaded
+
+
+def _template_has_coaching(template_id: str) -> bool:
+    from .parsing.yaml_loader import load_program_model
+    from .templates.catalog import load_template_document
+
+    raw = load_template_document(template_id)
+    return load_program_model(raw).coaching is not None
 
 
 def _metadata_payload(item: Any) -> dict[str, Any]:

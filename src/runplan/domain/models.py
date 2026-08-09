@@ -76,6 +76,79 @@ class Week:
 
 
 @dataclass(frozen=True, slots=True)
+class CoachingSection:
+    """One titled prose section of the program coaching guide."""
+
+    title: str
+    body: str
+
+
+@dataclass(frozen=True, slots=True)
+class CoachingTip:
+    """A coaching tip that may carry prose or a bullet list."""
+
+    title: str
+    body: str
+    items: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PaceColumn:
+    """One column header in the pace chart."""
+
+    label: str
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
+class PaceExample:
+    """One worked example from the pace chart (e.g. 'If your last 5K was 27:00')."""
+
+    title: str
+    row: tuple[str, ...]
+    targets: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PaceChart:
+    """The full pace chart with columns, rows and worked examples."""
+
+    title: str
+    intro: str
+    headers: tuple[PaceColumn, ...]
+    rows: tuple[tuple[str, ...], ...]
+    examples: tuple[PaceExample, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class GlossaryEntry:
+    term: str
+    definition: str
+
+
+@dataclass(frozen=True, slots=True)
+class PaceType:
+    name: str
+    effort: str
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
+class CoachingGuide:
+    """Structured coaching content that ships with a program."""
+
+    tagline: str | None = None
+    intro_sections: tuple[CoachingSection, ...] = ()
+    weekly_workouts: tuple[CoachingSection, ...] = ()
+    plan_tips: tuple[CoachingTip, ...] = ()
+    pace_chart: PaceChart | None = None
+    glossary: tuple[GlossaryEntry, ...] = ()
+    pace_types: tuple[PaceType, ...] = ()
+    things_to_know: tuple[str, ...] = ()
+    situational_advice: tuple[CoachingTip, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class Program:
     id: str
     name: str
@@ -84,6 +157,7 @@ class Program:
     start_date: date
     start_week: str
     weeks: tuple[Week, ...]
+    coaching: CoachingGuide | None = None
 
     def week(self, number: int) -> Week:
         for week in self.weeks:
@@ -93,9 +167,16 @@ class Program:
 
 
 __all__ = [
+    "CoachingGuide",
+    "CoachingSection",
+    "CoachingTip",
     "EndKind",
+    "GlossaryEntry",
+    "PaceChart",
+    "PaceColumn",
+    "PaceExample",
+    "PaceType",
     "Program",
-    "Step",
     "StepAction",
     "Week",
     "Workout",

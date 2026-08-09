@@ -154,6 +154,7 @@ function showEmptyPrograms() {
   $("#program-description").textContent = "Upload a YAML running program to get started.";
   $("#calendar").replaceChildren();
   $("#empty-programs").classList.remove("hidden");
+  $("#coaching-guide").classList.add("hidden");
   $("#app-status").classList.add("hidden");
   $("#program-select").disabled = true;
   for (const selector of ["#sync-button", "#settings-button", "#export-button"]) {
@@ -347,6 +348,7 @@ function render(program) {
   showProgramControls();
   $("#program-name").textContent = program.program.name;
   $("#program-description").textContent = program.program.description || "No program description";
+  renderCoachingGuide(program.program.coaching);
   setAppStatus("saved", "Saved");
   updateUndoControl();
   const calendar = $("#calendar");
@@ -512,6 +514,221 @@ function renderStepList(steps, list) {
       item.appendChild(note);
     }
   });
+}
+
+function renderCoachingGuide(guide) {
+  const section = $("#coaching-guide");
+  const body = $("#coaching-body");
+  const eyebrow = $("#coaching-eyebrow");
+  if (!guide || !_coachingHasContent(guide)) {
+    section.classList.add("hidden");
+    body.replaceChildren();
+    return;
+  }
+  eyebrow.textContent = guide.tagline || "Read before you start";
+  body.replaceChildren(..._coachingSections(guide));
+  section.classList.remove("hidden");
+}
+
+function _coachingHasContent(guide) {
+  return Boolean(
+    guide.tagline ||
+      (guide.introSections && guide.introSections.length) ||
+      (guide.weeklyWorkouts && guide.weeklyWorkouts.length) ||
+      (guide.planTips && guide.planTips.length) ||
+      guide.paceChart ||
+      (guide.glossary && guide.glossary.length) ||
+      (guide.paceTypes && guide.paceTypes.length) ||
+      (guide.thingsToKnow && guide.thingsToKnow.length) ||
+      (guide.situationalAdvice && guide.situationalAdvice.length)
+  );
+}
+
+function _coachingSections(guide) {
+  const sections = [];
+  for (const item of guide.introSections || []) sections.push(_coachingTextSection(item.title, item.body));
+  for (const item of guide.weeklyWorkouts || []) sections.push(_coachingTextSection(item.title, item.body));
+  for (const item of guide.planTips || []) sections.push(_coachingTipSection(item));
+  if (guide.paceChart) sections.push(_coachingPaceChartSection(guide.paceChart));
+  if ((guide.glossary || []).length) {
+    sections.push(_coachingGlossarySection("Types of Runs", guide.glossary));
+  }
+  if ((guide.paceTypes || []).length) {
+    sections.push(_coachingPaceTypesSection(guide.paceTypes));
+  }
+  if ((guide.thingsToKnow || []).length) {
+    sections.push(_coachingBulletSection("Things to Know", guide.thingsToKnow));
+  }
+  if ((guide.situationalAdvice || []).length) {
+    sections.push(_coachingSituationalSection(guide.situationalAdvice));
+  }
+  return sections;
+}
+
+function _coachingTextSection(title, body) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  const paragraph = document.createElement("p");
+  paragraph.textContent = body;
+  section.append(heading, paragraph);
+  return section;
+}
+
+function _coachingTipSection(item) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = item.title;
+  section.append(heading);
+  if (item.items && item.items.length) {
+    const list = document.createElement("ul");
+    for (const line of item.items) {
+      const li = document.createElement("li");
+      li.textContent = line;
+      list.append(li);
+    }
+    section.append(list);
+  } else if (item.body) {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = item.body;
+    section.append(paragraph);
+  }
+  return section;
+}
+
+function _coachingPaceChartSection(chart) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = chart.title;
+  section.append(heading);
+  if (chart.intro) {
+    const intro = document.createElement("p");
+    intro.textContent = chart.intro;
+    section.append(intro);
+  }
+  const table = document.createElement("table");
+  table.className = "coaching-pace-chart";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const col of chart.headers) {
+    const th = document.createElement("th");
+    th.textContent = col.label;
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  table.append(thead);
+  const tbody = document.createElement("tbody");
+  for (const row of chart.rows) {
+    const tr = document.createElement("tr");
+    for (const cell of row) {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  section.append(table);
+  if (chart.headers && chart.headers.length) {
+    const descriptions = document.createElement("ul");
+    for (const col of chart.headers) {
+      const li = document.createElement("li");
+      li.textContent = `${col.label} — ${col.description}`;
+      descriptions.append(li);
+    }
+    section.append(descriptions);
+  }
+  if (chart.examples && chart.examples.length) {
+    for (const example of chart.examples) {
+      const card = document.createElement("div");
+      card.className = "coaching-example";
+      const title = document.createElement("strong");
+      title.textContent = example.title;
+      card.append(title);
+      const list = document.createElement("ul");
+      for (const target of example.targets) {
+        const li = document.createElement("li");
+        li.textContent = target;
+        list.append(li);
+      }
+      card.append(list);
+      section.append(card);
+    }
+  }
+  return section;
+}
+
+function _coachingGlossarySection(title, items) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  section.append(heading);
+  const list = document.createElement("ul");
+  for (const item of items) {
+    const li = document.createElement("li");
+    const term = document.createElement("strong");
+    term.textContent = `${item.term} — `;
+    li.append(term, document.createTextNode(item.definition));
+    list.append(li);
+  }
+  section.append(list);
+  return section;
+}
+
+function _coachingPaceTypesSection(items) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = "Types of Pace";
+  section.append(heading);
+  const list = document.createElement("ul");
+  for (const item of items) {
+    const li = document.createElement("li");
+    const name = document.createElement("strong");
+    name.textContent = `${item.name} (${item.effort}) — `;
+    li.append(name, document.createTextNode(item.description));
+    list.append(li);
+  }
+  section.append(list);
+  return section;
+}
+
+function _coachingBulletSection(title, items) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  section.append(heading);
+  const list = document.createElement("ul");
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.append(li);
+  }
+  section.append(list);
+  return section;
+}
+
+function _coachingSituationalSection(items) {
+  const section = document.createElement("section");
+  section.className = "coaching-section";
+  const heading = document.createElement("h3");
+  heading.textContent = "If You...";
+  section.append(heading);
+  const list = document.createElement("ul");
+  for (const item of items) {
+    const li = document.createElement("li");
+    const title = document.createElement("strong");
+    title.textContent = `${item.title} — `;
+    li.append(title, document.createTextNode(item.body));
+    list.append(li);
+  }
+  section.append(list);
+  return section;
 }
 
 function renderWorkoutSteps(steps) {

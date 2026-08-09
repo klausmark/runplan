@@ -10,6 +10,264 @@ program:
     work, and a weekly Long Run grows endurance. Avoid scheduling Speed Runs on
     back-to-back days. The final week ends with the half marathon.
   start_week: 2027-W01
+  coaching:
+    tagline: "Speed, endurance, and recovery"
+    intro_sections:
+      - title: "A Great Coach"
+        body: >-
+          A great coach will tell you you've got a lot of different runners inside
+          of you. To be the best runner, you've got to let them all out.
+
+          Run on hills, run on a track, do short runs, long runs and
+          everything in-between. A great coach will tell you running shouldn't
+          hurt, and some days the best run is no run. If your week of runs looks
+          like a playlist with the same song by the same artist 17 times in a row,
+          a great coach will tell you to mix things up, to turn each week into an
+          epic, kickass playlist.
+
+          We'll guide you through it.
+
+          Download and run with the Nike Run Club App and this 8-week 5K Training
+          Program to coach yourself across the finish line.
+      - title: "It's Not Just About Running"
+        body: >-
+          We know that a smarter runner is a better runner. We've got the training
+          and guidance you need here in this plan. This training program is built
+          to help you to maximize your efforts on race day through Speed Runs,
+          Recovery Runs and Long Runs. But it takes so much more than running to
+          become a better runner. That's why this training plan is built to not
+          only help you become a better runner but also a better coach.
+    plan_tips:
+      - title: "This plan works for you"
+        body: >-
+          Your schedule varies. So does the weather and how you feel, but here are
+          a few things to keep in mind as you modify this plan to your needs:
+          Speed Runs and Long Runs are essential parts of the plan to maximize your
+          training. You have two Recovery Runs and two Rest Days - use them to
+          break up your Speed and Long Runs. Avoid doing Speed Runs on back-to-back
+          days. Avoid doing Speed Runs on back-to-back
+          days.
+      - title: "Training starts when you start"
+        body: >-
+          This plan was designed around an 8-week schedule for maximum results. It
+          was built to adapt to your experience level and intended to be uniquely
+          flexible to your needs as you prepare to tackle a 5K. Whether you're
+          four or eight weeks from race day, you can jump into this program
+          whenever it suits you. You're in control of what you put into the program
+          and therefore what you get out of it. We do recommend that you plan on
+          training for at least 4 weeks before the 5K and can comfortably run and
+          complete the programmed workouts.
+      - title: "Tools to take you farther"
+        items:
+          - "Record your runs, reflect on progress, and grab some encouragement from your community along the way with the Nike Run Club App."
+          - "The Nike Training Club App is a great way to add cross-training to your schedule."
+    weekly_workouts:
+      - title: "Speed Runs"
+        body: >-
+          Building strength through speed training is important as you prepare.
+          Throughout this plan you'll be introduced to a variety of speed workouts
+          and drills that will make you faster. You'll get to do short and long
+          intervals, fartlek, hill workouts and tempo runs (see Types of Runs in
+          the Glossary for definitions of these).
+      - title: "Long Runs"
+        body: >-
+          You need endurance training to help prepare your body and mind to go the
+          distance on race day. You will work on endurance and pacing with weekly
+          Long Runs. It also helps you get familiar with the physical and mental
+          challenges that you might face during a race. This run should be run at
+          a comfortable pace, and as a Progression Run (see Types of Runs in the
+          Glossary for definition of Progression Run).
+      - title: "Recovery Runs"
+        body: >-
+          Recovering from your workout days is just as important as the workouts
+          themselves. Use these days to run easy and based on how you feel to help
+          you recover at the highest quality possible after intense training. Each
+          week of training includes two recovery runs. Recovery Runs are just as
+          important as your hard workouts.
+      - title: "Rest Days"
+        body: >-
+          Great running is dependent on great rest and recovery. These days are
+          meant for you to recharge and recover. Either take the day off, try one
+          of the workouts from "Simple Routines For Better Runs" in the NTC App or
+          go for a few easy miles or kilometers. It is essential that you talk to
+          and listen to your body as you progress through the training program.
+          Sometimes you will need to adjust the program to fit what you need. And
+          yes, that means that sometimes the best speed run or long run will be no
+          run.
+    pace_chart:
+      title: "Nike Run Club Pace Chart"
+      intro: >-
+        Throughout the plan, you will see and hear references to different paces
+        and efforts you should aim to maintain during specific workouts. Treat
+        each pace target as the middle of a range. You may train slightly above
+        or below these paces. They are not exact paces and you are not a robot.
+      headers:
+        - { label: "Mile best", description: "Your best one-mile effort." }
+        - { label: "5K best / avg mile", description: "Best 5K time and the average pace per mile you held during it." }
+        - { label: "10K best / avg mile", description: "Best 10K time and the average pace per mile you held during it." }
+        - { label: "Tempo avg mile", description: "Steady, hard-but-controlled pace you can hold for 30-60 minutes." }
+        - { label: "Half marathon best / avg mile", description: "Best half marathon time and the average pace per mile you held during it." }
+        - { label: "Marathon best / avg mile", description: "Best marathon time and the average pace per mile you held during it." }
+        - { label: "Recovery day pace", description: "Easy conversational pace, often 60-90 seconds per mile slower than your marathon pace." }
+      rows:
+        - ["5:00", "17:05 / 5:30", "35:45 / 5:45", "6:05", "1:18:00 / 6:00", "2:44:00 / 6:15", "7:00"]
+        - ["5:30", "18:45 / 6:00", "39:00 / 6:15", "6:35", "1:25:00 / 6:30", "3:00:00 / 6:50", "7:35"]
+        - ["6:00", "20:15 / 6:30", "42:00 / 6:45", "7:05", "1:35:00 / 7:15", "3:15:00 / 7:25", "8:10"]
+        - ["6:30", "22:00 / 7:05", "45:45 / 7:20", "7:40", "1:40:00 / 7:35", "3:30:00 / 8:00", "8:45"]
+        - ["7:00", "23:45 / 7:40", "49:00 / 7:55", "8:15", "1:50:00 / 8:20", "3:45:00 / 8:35", "9:20"]
+        - ["7:30", "25:15 / 8:05", "52:30 / 8:25", "8:50", "1:55:00 / 8:45", "4:00:00 / 9:10", "9:55"]
+        - ["8:00", "27:00 / 8:40", "55:50 / 9:00", "9:25", "2:05:00 / 9:30", "4:15:00 / 9:45", "10:30"]
+        - ["8:30", "28:30 / 9:10", "59:00 / 9:30", "9:55", "2:10:00 / 9:55", "4:30:00 / 10:15", "11:00"]
+        - ["9:00", "30:00 / 9:40", "62:30 / 10:00", "10:30", "2:20:00 / 10:40", "4:45:00 / 10:50", "11:35"]
+        - ["9:30", "31:45 / 10:15", "66:00 / 10:35", "11:00", "2:25:00 / 11:05", "5:00:00 / 11:25", "12:10"]
+        - ["10:00", "33:00 / 10:40", "69:00 / 11:05", "11:35", "2:35:00 / 11:45", "5:15:00 / 12:00", "12:45"]
+        - ["10:30", "35:00 / 11:15", "72:00 / 11:35", "12:00", "2:40:00 / 12:10", "5:30:00 / 12:35", "13:20"]
+        - ["11:00", "36:15 / 11:40", "75:00 / 12:00", "12:35", "2:50:00 / 12:55", "5:40:00 / 13:00", "13:45"]
+        - ["11:30", "38:00 / 12:15", "78:30 / 12:35", "13:00", "2:55:00 / 13:15", "5:50:00 / 13:20", "14:05"]
+        - ["12:00", "39:30 / 12:40", "81:30 / 13:05", "13:35", "3:05:00 / 14:05", "6:00:00 / 13:45", "14:30"]
+      examples:
+        - title: "If your last 5K was 27:00"
+          row: ["8:00", "27:00 / 8:40", "55:50 / 9:00", "9:25", "2:05:00 / 9:30", "4:15:00 / 9:45", "10:30"]
+          targets:
+            - "Best Mile Pace: 8:00 minutes"
+            - "5K Average Mile Pace: 8:40 minutes"
+            - "10K Average Mile Pace: 9:00 minutes"
+            - "Tempo Pace: 9:25 minutes"
+            - "Marathon Average Mile Pace: 9:45 minutes"
+        - title: "If your Best Mile time is 9:30"
+          row: ["9:30", "31:45 / 10:15", "66:00 / 10:35", "11:00", "2:25:00 / 11:05", "5:00:00 / 11:25", "12:10"]
+          targets:
+            - "Best Mile Pace: 9:30 minutes"
+            - "5K Average Mile Pace: 10:15 minutes"
+            - "10K Average Mile Pace: 10:35 minutes"
+            - "Tempo Pace: 11 minutes"
+            - "Marathon Average Mile Pace: 11:25 minutes"
+    glossary:
+      - term: "Audio Guided Run"
+        definition: >-
+          The Nike Run Club app offers a library of Audio Guided Runs. You can find
+          long and short runs, duration as well as distance-based runs and speed
+          runs of all types including fartlek, interval and tempo runs. Some of our
+          best coaches and athletes will meet you at the starting line to guide,
+          motivate and inspire you to a better run. Every run in this plan has an
+          accompanying Audio Guided Run. You can run alone, or you can run with us.
+          As always, the choice is yours.
+      - term: "Progression Run"
+        definition: >-
+          Progression Runs improve stamina and allow the body to adapt to the
+          stress of running. Build your pace over the course of each run by
+          starting at a slower than Recovery Run pace and finishing at a faster
+          than Recovery Run pace. Over the course of the run you will average your
+          Recovery Run pace. This progression from the slowest running of the run
+          to the fastest running of the run allows your body to ease into the run
+          and adjust to the activity of running in a natural way. Your Long and
+          Recovery Runs should be run as Progression Runs.
+      - term: "Intervals"
+        definition: >-
+          Intervals refer to a Speed Run session that includes a set of running
+          and rest intervals. There are any number of variations one could use when
+          doing an interval Speed Run. The distance or duration as well as the
+          pace and effort of the running interval can remain the same or change
+          over the course of the workout. The recovery interval duration is another
+          element of the Speed Run that can remain static or change during the
+          workout. Ideally a session like this takes place on a track but does
+          not need to. Any location that allows you to run freely is suitable for
+          an interval-based Speed Run.
+      - term: "Fartlek"
+        definition: >-
+          Fartlek is loosely translated from Swedish to "speed play". Fartlek
+          works on speed and strength by alternating distances and paces during a
+          continuous run. An example Fartlek workout structure could be one
+          minute running easy followed by one minute running hard, repeated for a
+          certain amount of minutes, miles or alternating every city block.
+      - term: "Hills"
+        definition: >-
+          Hill workouts develop speed and form. It takes extra effort to run
+          uphill so you do not need to run as fast as you would on a flat
+          section. While running uphill, remain in control of your breathing.
+          Don't lean too far forward. A light lean with the chin leading the
+          chest is enough. Running up hills is a great way to develop speed and
+          strength with minimal pounding on the legs. It's best to use effort as
+          a guide rather than pace when doing a hill workout.
+      - term: "Tempo Run"
+        definition: >-
+          A Tempo Run is a hard but controlled pace that can be run as long
+          intervals or a steady run of 1-10 miles. The purpose of a Tempo Run is
+          to build mental and physical endurance and to become comfortable being
+          uncomfortable.
+    pace_types:
+      - { name: "Best Pace", effort: "10 out of 10", description: "This is the pace that makes you feel like you are at your best. Sometimes this may mean your fastest and sometimes this will mean running easier. The pace and effort you run will be your choice." }
+      - { name: "Mile Pace", effort: "9 out of 10", description: "This is the pace you could race or run hard for one mile." }
+      - { name: "5K Pace", effort: "7-8 out of 10", description: "This is the pace you could race or run hard for about 3 miles." }
+      - { name: "10K Pace", effort: "6-7 out of 10", description: "This is the pace you could race or run hard for about 6 miles." }
+      - { name: "Tempo Pace", effort: "6 out of 10", description: "Teaching your body to be comfortable being uncomfortable by maintaining a hard pace and effort that is close to 30-35 seconds slower than your 5K pace." }
+      - { name: "Recovery Pace", effort: "4-5 out of 10", description: "A pace easy enough that you can talk, laugh or argue freely while running." }
+    things_to_know:
+      - "When in doubt be sure to focus on effort. Paces can change due to many factors including but not limited to changes in fitness, weather, elevation, stress, fatigue, and lack of sleep. Be sure to listen to your body and not just focus on the numbers on your watch or phone."
+      - "As you make your way through the training there will be days you may be a little ahead of pace, and other days a little behind. Remember that the paces are only to be used as a guide. You will have good days and bad days as an athlete. Be flexible with your expectations. Hopefully, you will be increasing your fitness each week and your paces will increase in speed as you go."
+      - "When this plan is completed and you head out for race day be confident in all the work you have done. It is that work that will take you to new fitness levels, faster paces, this starting line and all the ones beyond."
+    situational_advice:
+      - title: "If your schedule does not match the training schedule"
+        body: >-
+          Then adjust the training schedule to your needs. No training plan should
+          ever be seen as written in stone. Instead, look at this training program
+          as written in pencil and you have both an eraser and a pencil to make
+          adjustments as you see fit. You are not only the athlete here... you are
+          also the Head Coach. For best results, be sure to space out hard efforts
+          like Speed Runs and Long Runs. Use the Recovery Runs and Rest Days to
+          allow your body to recharge from the harder efforts.
+      - title: "If you don't know how to figure out your pace"
+        body: >-
+          Then experiment until you find it. When you're out running, you run on
+          feel. You have different gears whether you realize it or not. Be patient,
+          pay attention and have fun experimenting with your comfort level while
+          running at different speeds across different distances. Use the Nike Run
+          Club App while you run to keep track of your paces, and use our Pace
+          Chart guidelines to find your pace targets.
+      - title: "If you're tired"
+        body: >-
+          Figure out why. Feeling fatigued is normal as your training progresses,
+          but make sure you're supporting yourself in all other aspects of your
+          life: get enough sleep, eat right, hydrate properly, respect Recovery
+          days and wear the proper shoes. Sometimes the best training is to focus
+          on recovery and rest.
+      - title: "If you lack motivation"
+        body: >-
+          Look for inspiration. Even where you don't expect to find it - like on
+          a run that you don't want to do. And remember, if you are willing to
+          look for motivation that means you've already got some! Be kind and
+          patient with yourself... and you'll find that inspiration and motivation
+          you need.
+      - title: "If you have a terrible run"
+        body: >-
+          Move on to the next one. Some runs are just terrible - sometimes there's
+          no reason, sometimes there is. Take a moment to see if there's a reason
+          and learn something about yourself if there is. Being comfortable with a
+          bad run is just as important as the joy of a great run.
+      - title: "If you're hurt"
+        body: >-
+          Stop running. There is a difference between hurting and being hurt. It's
+          essential to listen to and learn from your body throughout your
+          training. Sometimes missing miles in the present lets you run better
+          miles in the future. We know it's not easy for an athlete to hold back
+          or take off some days. That's why it's important you look at yourself as
+          both an athlete and a coach.
+      - title: "If you feel like you need to adjust the recommended training on any given day"
+        body: >-
+          Adjust! Remember, this program is a guide. The daily training recommended
+          here is meant to serve as a starting point for you each day. We hope to
+          give you the guidance you need to be able to coach yourself as to when
+          to push forward, when to pull back and when it is best to maintain.
+          The best coach for you is you because you know your fitness better than
+          anyone else. Some days you will run the recommended training and other
+          days you will run more or less. Listen to your body.
+      - title: "If you are going to race"
+        body: >-
+          Give yourself time to recover - beforehand and afterwards. You may want
+          to back off in terms of distance or pace a few days prior to the race.
+          Be sure to give yourself a few days of rest and recovery after it's
+          over, too (regardless of whether or not you consider it a successful
+          race).
 
 weeks:
   - week: 1

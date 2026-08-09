@@ -94,4 +94,5 @@ def program_model(normalized: dict[str, Any]) -> Program:
         start_date=date.fromisoformat(normalized["start_date"]),
         start_week=normalized["start_week"],
         weeks=weeks,
+        coaching=normalized.get("coaching"),
     )

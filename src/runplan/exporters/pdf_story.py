@@ -15,6 +15,7 @@ from ..presentation.text import (
     format_seconds_compact,
     format_weekday,
 )
+from .coaching_sections import coaching_lines
 from .pdf_brand import RunplanMark
 from .pdf_styles import PdfStyles
 from .pdf_theme import CARD, GREEN, LINE
@@ -23,6 +24,9 @@ from .pdf_theme import CARD, GREEN, LINE
 def build_pdf_story(program: ProgramExport, width: float, styles: PdfStyles) -> list[Any]:
     """Build the cover followed by one page of flowables per selected week."""
     story = _cover(program, width, styles)
+    if program.coaching is not None and coaching_lines(program.coaching):
+        story.extend(_coaching_section(program.coaching, width, styles))
+        story.append(PageBreak())
     for index, week in enumerate(program.weeks):
         story.extend([_week_header(week, width, styles), Spacer(1, 3 * mm)])
         story.extend(
@@ -31,6 +35,65 @@ def build_pdf_story(program: ProgramExport, width: float, styles: PdfStyles) -> 
         if index < len(program.weeks) - 1:
             story.append(PageBreak())
     return story
+
+
+def _coaching_section(guide, width: float, styles: PdfStyles) -> list[Any]:
+    flowables: list[Any] = []
+    flowables.append(Paragraph("COACHING GUIDE", styles.eyebrow))
+    flowables.append(Paragraph("Read before you start", styles.title))
+    if guide.tagline:
+        flowables.append(Paragraph(f"<i>{html.escape(guide.tagline)}</i>", styles.subtitle))
+    flowables.append(Spacer(1, 6 * mm))
+
+    for title, content in coaching_lines(guide):
+        if title == "__eyebrow__":
+            continue
+        flowables.append(Paragraph(html.escape(title), styles.week_number))
+        kind = _coaching_block_kind(title, content)
+        if kind == "table":
+            flowables.extend(_coaching_table(content, width, styles))
+        else:
+            for line in content:
+                flowables.append(Paragraph(html.escape(line) if line else "", styles.body))
+        flowables.append(Spacer(1, 4 * mm))
+    return flowables
+
+
+def _coaching_block_kind(title: str, content: list[str]) -> str:
+    if title == "Nike Run Club Pace Chart" and content and content[0].startswith("|"):
+        return "table"
+    return "prose"
+
+
+def _coaching_table(content: list[str], width: float, styles: PdfStyles) -> list[Any]:
+    rows = [line for line in content if line.startswith("|")]
+    if len(rows) < 3:
+        return []
+    header = [cell.strip() for cell in rows[0].strip("|").split("|")]
+    data: list[list[Any]] = [
+        [Paragraph(f"<b>{html.escape(cell)}</b>", styles.body) for cell in header]
+    ]
+    for row in rows[2:]:
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        data.append([Paragraph(html.escape(cell), styles.body) for cell in cells])
+    col_width = width / len(header)
+    table = Table(data, colWidths=[col_width] * len(header), repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), CARD),
+                ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+                ("INNERGRID", (0, 0), (-1, -1), 0.3, LINE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 2 * mm),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
+                ("TOPPADDING", (0, 0), (-1, -1), 1.5 * mm),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5 * mm),
+            ]
+        )
+    )
+    return [table]
 
 
 def _stat(value: str, label: str, styles: PdfStyles) -> list[Paragraph]:

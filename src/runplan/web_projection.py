@@ -16,6 +16,7 @@ from .application.ports import StateRepository
 from .application.sync import workout_content_hash
 from .domain.errors import WorkoutDefinitionError
 from .domain.estimates import estimate_steps
+from .domain.models import CoachingGuide
 from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
 from .presentation.text import step_view
@@ -115,6 +116,52 @@ def _lifecycle_record(
     return None
 
 
+def _coaching_view(guide: CoachingGuide | None) -> dict[str, Any] | None:
+    if guide is None:
+        return None
+    pace_chart = None
+    if guide.pace_chart is not None:
+        pace_chart = {
+            "title": guide.pace_chart.title,
+            "intro": guide.pace_chart.intro,
+            "headers": [
+                {"label": col.label, "description": col.description}
+                for col in guide.pace_chart.headers
+            ],
+            "rows": [list(row) for row in guide.pace_chart.rows],
+            "examples": [
+                {
+                    "title": ex.title,
+                    "row": list(ex.row),
+                    "targets": list(ex.targets),
+                }
+                for ex in guide.pace_chart.examples
+            ],
+        }
+    return {
+        "tagline": guide.tagline,
+        "introSections": [{"title": sec.title, "body": sec.body} for sec in guide.intro_sections],
+        "weeklyWorkouts": [{"title": sec.title, "body": sec.body} for sec in guide.weekly_workouts],
+        "planTips": [
+            {"title": tip.title, "body": tip.body, "items": list(tip.items)}
+            for tip in guide.plan_tips
+        ],
+        "paceChart": pace_chart,
+        "glossary": [
+            {"term": entry.term, "definition": entry.definition} for entry in guide.glossary
+        ],
+        "paceTypes": [
+            {"name": pt.name, "effort": pt.effort, "description": pt.description}
+            for pt in guide.pace_types
+        ],
+        "thingsToKnow": list(guide.things_to_know),
+        "situationalAdvice": [
+            {"title": tip.title, "body": tip.body, "items": list(tip.items)}
+            for tip in guide.situational_advice
+        ],
+    }
+
+
 class ProgramProjector:
     """Build the read model for documents owned by one program store.
 
@@ -180,6 +227,7 @@ class ProgramProjector:
                 "short_name": model.short_name,
                 "description": model.description,
                 "start_week": model.start_week,
+                "coaching": _coaching_view(model.coaching),
             },
             "weeks": weeks,
         }

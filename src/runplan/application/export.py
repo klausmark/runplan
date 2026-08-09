@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from ..domain.estimates import DEFAULT_PACE_SECONDS_PER_KM, estimate_steps
-from ..domain.models import Program, Step
+from ..domain.models import CoachingGuide, Program, Step
 from ..domain.selectors import WeekSelection
 from .presentation_weeks import build_presentation_weeks, presentation_start
 
@@ -60,6 +60,7 @@ class ProgramExport:
     selected_week_count: int
     weeks: tuple[ExportWeek, ...]
     summary: ExportSummary
+    coaching: CoachingGuide | None = None
 
 
 def _summary(
@@ -100,6 +101,7 @@ def build_program_export(
         selected_week_count=len(weeks),
         weeks=weeks,
         summary=_summary(all_workouts, fallback_pace_seconds_per_km),
+        coaching=program.coaching,
     )
 
 

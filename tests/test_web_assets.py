@@ -123,6 +123,18 @@ class TestWebAsset:
         assert ".split-button" in styles
         assert ".add-program-dialog" in styles
 
+    def test_coaching_guide_section_is_packaged(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="coaching-guide"' in html
+        assert 'id="coaching-body"' in html
+        assert 'id="coaching-eyebrow"' in html
+        assert "function renderCoachingGuide(" in script
+        assert ".coaching-guide" in styles
+        assert ".coaching-pace-chart" in styles
+        assert "renderCoachingGuide(program.program.coaching)" in script
+
     def test_past_weeks_are_locally_persisted_collapsible_details(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
