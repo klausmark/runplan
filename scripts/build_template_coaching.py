@@ -65,7 +65,7 @@ def _pace_from_mile(mile_pace: str) -> str:
     """Convert a min/mile pace into a min/km pace, rounded to 5 seconds."""
     parts = mile_pace.split(":")
     seconds = int(parts[0]) * 60 + int(parts[1])
-    return _format_pace(_round5(seconds * 1.609344))
+    return _format_pace(_round5(seconds / 1.609344))
 
 
 MILE_BEST_COLUMN = {
