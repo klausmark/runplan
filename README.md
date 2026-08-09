@@ -325,6 +325,19 @@ A regular step may have an optional pace target in minutes per kilometer:
 The quotes are required so YAML does not interpret the colon. Garmin receives
 the target as a pace zone and can warn when the runner leaves that range.
 
+A regular step may carry an optional watch-facing note that the runner sees
+instead of the default step label (`Very easy run`, `Warm up`, `Walk`, or
+`Cool down`):
+
+```yaml
+- run: {distance: 10km, note: "Stay relaxed, focus on breathing"}
+- warmup: {time: 10m, note: "Start slow"}
+```
+
+The note is plain text, must be non-empty, and is capped at 140 characters so
+the watch face can render it. Use `note` together with `time`, `distance`, or
+`pace` on the same step.
+
 ## Garmin login
 
 Each configured Runplan user has an isolated credentials file, token store,

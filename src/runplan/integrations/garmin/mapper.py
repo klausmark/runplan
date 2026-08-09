@@ -17,7 +17,7 @@ from garminconnect.workout import (
 from ...domain.errors import WorkoutDefinitionError
 from ...domain.models import Step, Workout
 from ...domain.steps import estimate_duration, normalize_action, repeat_parts
-from ...parsing.values import parse_step_end, step_pace
+from ...parsing.values import parse_step_end, step_note, step_pace
 
 RUNNING_SPORT = {
     "sportTypeId": 1,
@@ -96,11 +96,12 @@ def compile_steps(step_definitions: list[Any], location: str = "steps") -> list[
             continue
 
         kind, end_value = parse_step_end(value, item_location)
-        creator, description = creators[action]
+        creator, default_description = creators[action]
         step = creator(end_value, step_order=order)
         step = set_step_end(step, kind, end_value)
         step = set_pace_target(step, step_pace(value, item_location))
-        compiled.append(add_description(step, description))
+        note = step_note(value, item_location)
+        compiled.append(add_description(step, note if note is not None else default_description))
     return compiled
 
 
@@ -127,6 +128,8 @@ def _step_definition(step: Step) -> dict[str, Any]:
         if fast != slow:
             value["pace"] += f"-{_format_pace(slow)}"
         value["pace"] += " min/km"
+    if step.note is not None:
+        value["note"] = step.note
     return {step.action: value}
 
 

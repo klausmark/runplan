@@ -18,10 +18,10 @@ weeks:
           Run the intervals evenly and use the walking recoveries for active
           recovery.
         steps:
-          - warmup: 10m
+          - warmup: {time: 10m, note: "Start slow, loosen up"}
           - repeat:
               count: 5
               steps:
-                - run: {distance: 400m, pace: "4:30-4:45 min/km"}
+                - run: {distance: 400m, pace: "4:30-4:45 min/km", note: "Hold form"}
                 - recovery: {time: 90s}
-          - cooldown: {distance: 1km}
+          - cooldown: {distance: 1km, note: "Finish easy"}

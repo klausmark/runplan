@@ -12,7 +12,7 @@ from ..domain.steps import (
     normalize_action,
     repeat_parts,
 )
-from ..parsing.values import parse_step_end, step_pace
+from ..parsing.values import parse_step_end, step_note, step_pace
 
 WEEKDAYS = (
     "Monday",
@@ -76,6 +76,11 @@ def format_model_step_value(step: Step) -> str:
     return f"{value} @ {format_pace(step.pace)}" if step.pace else value
 
 
+def _format_note(note: str | None) -> str:
+    """Return the human-readable note suffix, or empty when absent."""
+    return f" — {note}" if note else ""
+
+
 def model_step_totals(steps: tuple[Step, ...]) -> tuple[float, float]:
     """Calculate known duration and distance from typed recursive steps."""
     duration = 0.0
@@ -118,6 +123,8 @@ def format_model_steps(steps: tuple[Step, ...], indent: str = "  ") -> str:
             lines.append(format_model_steps(step.steps, indent + "  "))
         else:
             lines.append(f"{indent}{labels[step.action]}: {format_model_step_value(step)}")
+            if step.note:
+                lines.append(f"{indent}  Note: {step.note}")
     return "\n".join(lines)
 
 
@@ -167,7 +174,11 @@ def step_summary(steps: list[Any]) -> str:
             count, children = repeat_parts(value, f"steps[{index}]")
             parts.append(f"Repeat {count} times: {step_summary(children)}")
         else:
-            parts.append(f"{labels[action]} {format_step_value(value, f'steps[{index}]')}")
+            location = f"steps[{index}]"
+            note = step_note(value, location)
+            parts.append(
+                f"{labels[action]} {format_step_value(value, location)}{_format_note(note)}"
+            )
     return " · ".join(parts)
 
 
@@ -182,7 +193,11 @@ def format_step_overview(steps: list[Any], indent: str = "    ") -> str:
             lines.append(f"{indent}Repeat {count} times:")
             lines.append(format_step_overview(children, indent + "  "))
         else:
-            lines.append(f"{indent}{labels[action]}: {format_step_value(value, f'steps[{index}]')}")
+            location = f"steps[{index}]"
+            lines.append(f"{indent}{labels[action]}: {format_step_value(value, location)}")
+            note = step_note(value, location)
+            if note:
+                lines.append(f"{indent}  Note: {note}")
     return "\n".join(lines)
 
 

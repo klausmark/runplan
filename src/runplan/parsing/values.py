@@ -1,4 +1,4 @@
-"""Parse human-readable duration, distance and pace values."""
+"""Parse human-readable duration, distance, pace and note values."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import re
 from typing import Any
 
 from ..domain.errors import WorkoutDefinitionError
+
+MAX_STEP_NOTE_LENGTH = 140
 
 
 def parse_duration(value: Any, location: str) -> float:
@@ -84,7 +86,7 @@ def parse_step_end(value: Any, location: str) -> tuple[str, float]:
     if not isinstance(value, dict):
         return "time", parse_duration(value, location)
     end_keys = [key for key in value if key in ("time", "distance")]
-    unknown_keys = [key for key in value if key not in ("time", "distance", "pace")]
+    unknown_keys = [key for key in value if key not in ("time", "distance", "pace", "note")]
     if unknown_keys:
         raise WorkoutDefinitionError(
             f"{location}: unknown field {unknown_keys[0]!r}; use 'time', "
@@ -100,6 +102,32 @@ def parse_step_end(value: Any, location: str) -> tuple[str, float]:
     if kind == "time":
         return "time", parse_duration(raw_value, f"{location}.{raw_kind}")
     return "distance", parse_distance(raw_value, f"{location}.distance")
+
+
+def parse_note(value: Any, location: str) -> str:
+    """Validate and return a trimmed step note within the watch-display limit."""
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise WorkoutDefinitionError(f"{location}: the note must be text")
+    note = value.strip()
+    if not note:
+        raise WorkoutDefinitionError(f"{location}: the note is empty")
+    if len(note) > MAX_STEP_NOTE_LENGTH:
+        raise WorkoutDefinitionError(
+            f"{location}: the note must be at most {MAX_STEP_NOTE_LENGTH} characters"
+        )
+    return note
+
+
+def step_note(value: Any, location: str) -> str | None:
+    """Return an optional watch-facing note from a regular step."""
+    if not isinstance(value, dict):
+        return None
+    note_keys = [key for key in value if key == "note"]
+    if not note_keys:
+        return None
+    if len(note_keys) > 1:
+        raise WorkoutDefinitionError(f"{location}: use only one note field")
+    return parse_note(value[note_keys[0]], f"{location}.{note_keys[0]}")
 
 
 def parse_pace(value: Any, location: str) -> tuple[float, float]:
@@ -136,9 +164,12 @@ def step_pace(value: Any, location: str) -> tuple[float, float] | None:
 
 
 __all__ = [
+    "MAX_STEP_NOTE_LENGTH",
     "parse_distance",
     "parse_duration",
+    "parse_note",
     "parse_pace",
     "parse_step_end",
+    "step_note",
     "step_pace",
 ]

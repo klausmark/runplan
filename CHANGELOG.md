@@ -7,6 +7,11 @@ changes may be released in a new minor version.
 
 ## Unreleased
 
+- Added an optional watch-facing `note` field to every step in YAML. The note
+  replaces the default Garmin step label (`Very easy run`, `Warm up`, `Walk`,
+  `Cool down`) and is also rendered in previews, PDF, HTML, and Markdown
+  exports. Notes are plain text, must be non-empty, and are capped at 140
+  characters so the watch face can render them.
 - Added a deterministic first 10K program generator. The `runplan
   generation` module accepts a typed request and returns a validated Runplan
   program that round-trips through the existing parser. The `runplan

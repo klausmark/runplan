@@ -103,3 +103,67 @@ def test_invalid_pace_is_rejected(value: object) -> None:
 def test_invalid_compiled_pace_is_rejected(step: dict) -> None:
     with pytest.raises(WorkoutDefinitionError):
         compile_steps([step])
+
+
+def test_step_note_replaces_default_garmin_description() -> None:
+    step = compile_steps(
+        [{"run": {"distance": "10km", "note": "Stay relaxed, focus on breathing"}}]
+    )[0]
+
+    assert step.description == "Stay relaxed, focus on breathing"
+
+
+def test_step_note_absent_keeps_default_label() -> None:
+    run, warmup = compile_steps([{"run": {"distance": "10km"}}, {"warmup": "5m"}])
+
+    assert run.description == "Very easy run"
+    assert warmup.description == "Warm up"
+
+
+def test_step_note_inside_repeat_group_is_applied_to_each_step() -> None:
+    compiled = compile_steps(
+        [
+            {
+                "repeat": {
+                    "count": 2,
+                    "steps": [
+                        {"run": {"distance": "400m", "note": "Hold form"}},
+                        {"recovery": {"time": "1m"}},
+                    ],
+                }
+            }
+        ]
+    )
+    interval = compiled[0].workoutSteps[0]
+
+    assert interval.description == "Hold form"
+
+
+def test_step_note_too_long_is_rejected() -> None:
+    with pytest.raises(WorkoutDefinitionError, match=r"steps\[1\]\.note: the note must be at most"):
+        compile_steps([{"run": {"distance": "1km", "note": "x" * 141}}])
+
+
+@pytest.mark.parametrize("value", [123, True, "", "   "])
+def test_step_note_must_be_non_empty_text(value: object) -> None:
+    with pytest.raises(WorkoutDefinitionError):
+        compile_steps([{"run": {"distance": "1km", "note": value}}])
+
+
+def test_step_unknown_key_other_than_note_is_still_rejected() -> None:
+    with pytest.raises(WorkoutDefinitionError, match=r"unknown field 'comment'"):
+        compile_steps([{"run": {"distance": "1km", "comment": "Try not"}}])
+
+
+def test_step_summary_includes_note_suffix() -> None:
+    summary = step_summary(
+        [{"run": {"distance": "10km", "note": "Stay relaxed, focus on breathing"}}]
+    )
+
+    assert summary == "Run 10 km — Stay relaxed, focus on breathing"
+
+
+def test_step_summary_without_note_omits_suffix() -> None:
+    summary = step_summary([{"run": {"distance": "10km"}}])
+
+    assert summary == "Run 10 km"

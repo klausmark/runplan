@@ -8,7 +8,7 @@ from typing import Any
 from ..domain.errors import WorkoutDefinitionError
 from ..domain.models import Program, Step, Week, Workout
 from ..domain.steps import normalize_action, repeat_parts
-from .values import parse_step_end, step_pace
+from .values import parse_step_end, step_note, step_pace
 
 
 def _step_model(raw: Any, location: str) -> Step:
@@ -33,6 +33,7 @@ def _step_model(raw: Any, location: str) -> Step:
         end_kind=end_kind,
         end_value=end_value,
         pace=step_pace(value, location),
+        note=step_note(value, location),
     )
 
 

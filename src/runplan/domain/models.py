@@ -20,6 +20,7 @@ class Step:
     end_kind: EndKind | None = None
     end_value: float | None = None
     pace: tuple[float, float] | None = None
+    note: str | None = None
     count: int | None = None
     steps: tuple[Step, ...] = ()
 
