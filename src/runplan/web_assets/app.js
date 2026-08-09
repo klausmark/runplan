@@ -1114,10 +1114,11 @@ $("#user-settings-button").addEventListener("click", async () => {
     $("#user-settings-default-pace").value = settings.defaultPace;
     $("#user-settings-garmin-email").value = settings.garminEmail;
     $("#user-settings-garmin-password").value = "";
-    $("#user-settings-garmin-password").required = !settings.hasGarminPassword;
+    $("#user-settings-garmin-password").required = false;
+    $("#user-settings-garmin-email").required = false;
     $("#user-settings-password-help").textContent = settings.hasGarminPassword
-      ? "A password is saved. Leave blank to keep it."
-      : "No password is saved yet.";
+      ? "A password is saved. Leave blank to keep it. Optional."
+      : "Leave blank if you do not want to set up Garmin credentials right now. Optional.";
     $("#user-settings-dialog").showModal();
   } catch (error) { showError(error.message); }
 });

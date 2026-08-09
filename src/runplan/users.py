@@ -163,24 +163,33 @@ class UserRegistry:
             parse_pace(default_pace, "defaultPace")
         except ValueError as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
-        if not isinstance(email, str) or not email.strip():
-            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin email is required")
+        if not isinstance(email, str):
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin email is invalid")
         if not isinstance(password, str):
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin password is invalid")
         existing = self._credentials.read(user.credentials_file)
-        effective_password = password or existing.get("password")
-        if not isinstance(effective_password, str) or not effective_password:
+        submitted_email = email.strip()
+        submitted_password = password
+        effective_email = submitted_email or existing.get("email", "")
+        effective_password = submitted_password or existing.get("password", "")
+        if submitted_email and not effective_password:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin password is required")
+        if submitted_password and not effective_email:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Garmin email is required")
+        credentials_changed = submitted_email != existing.get("email", "") or bool(
+            submitted_password and submitted_password != existing.get("password", "")
+        )
         with self._lock:
             updated_user = replace(user, name=full_name.strip(), default_pace=default_pace.strip())
             updated = {**self._users, user.id: updated_user}
-            self._credentials.write(user.credentials_file, email.strip(), effective_password)
+            if credentials_changed:
+                self._credentials.write(user.credentials_file, effective_email, effective_password)
             self._write(updated.values())
             self._users = updated
         logger.info(
             "User settings saved user=%s password_changed=%s",
             user.id,
-            bool(password),
+            bool(submitted_password),
         )
         return {"user": updated_user.public(), "settings": self.settings(user.id)}
 

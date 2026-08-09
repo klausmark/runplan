@@ -88,6 +88,106 @@ def test_settings_require_valid_pace_and_initial_password(tmp_path: Path) -> Non
         registry.update_settings("runner", {**base, "defaultPace": "6:00 min/km"})
 
 
+def test_update_settings_allows_pace_change_without_garmin_credentials(tmp_path: Path) -> None:
+    registry = load_user_registry(tmp_path / "users.toml")
+    registry.create("runner", "Runner")
+    credentials_path = registry.get("runner").credentials_file
+
+    result = registry.update_settings(
+        "runner",
+        {
+            "fullName": "Runner Renamed",
+            "defaultPace": "5:30 min/km",
+            "garminEmail": "",
+            "garminPassword": "",
+        },
+    )
+
+    assert result["settings"]["defaultPace"] == "5:30 min/km"
+    assert result["settings"]["garminEmail"] == ""
+    assert result["settings"]["hasGarminPassword"] is False
+    assert not credentials_path.exists()
+    reloaded = load_user_registry(tmp_path / "users.toml").get("runner")
+    assert reloaded.default_pace == "5:30 min/km"
+    assert reloaded.name == "Runner Renamed"
+
+
+def test_update_settings_preserves_garmin_credentials_when_only_profile_changes(
+    tmp_path: Path,
+) -> None:
+    registry = load_user_registry(tmp_path / "users.toml")
+    registry.create("runner", "Runner")
+    registry.update_settings(
+        "runner",
+        {
+            "fullName": "Runner",
+            "defaultPace": "5:45 min/km",
+            "garminEmail": "runner@example.com",
+            "garminPassword": "secret-value",
+        },
+    )
+    credentials_path = registry.get("runner").credentials_file
+    original_credentials = credentials_path.read_text(encoding="utf-8")
+
+    registry.update_settings(
+        "runner",
+        {
+            "fullName": "Runner",
+            "defaultPace": "5:20 min/km",
+            "garminEmail": "",
+            "garminPassword": "",
+        },
+    )
+
+    assert registry.get("runner").default_pace == "5:20 min/km"
+    assert credentials_path.read_text(encoding="utf-8") == original_credentials
+
+
+def test_update_settings_with_email_only_keeps_existing_password(tmp_path: Path) -> None:
+    registry = load_user_registry(tmp_path / "users.toml")
+    registry.create("runner", "Runner")
+    registry.update_settings(
+        "runner",
+        {
+            "fullName": "Runner",
+            "defaultPace": "5:45 min/km",
+            "garminEmail": "runner@example.com",
+            "garminPassword": "secret-value",
+        },
+    )
+
+    registry.update_settings(
+        "runner",
+        {
+            "fullName": "Runner",
+            "defaultPace": "5:45 min/km",
+            "garminEmail": "new@example.com",
+            "garminPassword": "",
+        },
+    )
+
+    credentials_path = registry.get("runner").credentials_file
+    assert credentials_path.read_text(encoding="utf-8") == (
+        'email = "new@example.com"\npassword = "secret-value"\n'
+    )
+
+
+def test_update_settings_rejects_password_update_without_email(tmp_path: Path) -> None:
+    registry = load_user_registry(tmp_path / "users.toml")
+    registry.create("runner", "Runner")
+
+    with pytest.raises(WebError, match="(?i)email"):
+        registry.update_settings(
+            "runner",
+            {
+                "fullName": "Runner",
+                "defaultPace": "5:45 min/km",
+                "garminEmail": "",
+                "garminPassword": "new-secret",
+            },
+        )
+
+
 def test_loads_relative_profile_paths_without_exposing_them(tmp_path: Path) -> None:
     config = tmp_path / "users.toml"
     config.write_text(

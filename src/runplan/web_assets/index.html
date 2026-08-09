@@ -129,11 +129,12 @@
     <dialog id="user-settings-dialog">
       <form id="user-settings-form">
         <div class="dialog-heading"><div><p class="eyebrow">Runplan user</p><h2>User settings</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p class="editor-help">Profile fields can be saved without Garmin credentials. Leave the Garmin fields blank to keep the saved credentials, or fill them in to add or update them.</p>
         <label>Username<input id="user-settings-username" disabled></label>
         <label>Full name<input id="user-settings-full-name" autocomplete="name" maxlength="100" required></label>
         <label>Default pace<input id="user-settings-default-pace" required pattern="[0-9]+:[0-5][0-9](?:-[0-9]+:[0-5][0-9])? min/km" placeholder="6:00 min/km"><small>Used to estimate distance and duration when a workout has no explicit pace.</small></label>
-        <label>Garmin email<input id="user-settings-garmin-email" type="email" autocomplete="username" required></label>
-        <label>Garmin password<input id="user-settings-garmin-password" type="password" autocomplete="current-password"><small id="user-settings-password-help">Leave blank to keep the saved password.</small></label>
+        <label>Garmin email<input id="user-settings-garmin-email" type="email" autocomplete="username"></label>
+        <label>Garmin password<input id="user-settings-garmin-password" type="password" autocomplete="current-password"><small id="user-settings-password-help">Leave blank if you do not want to set up Garmin credentials right now. Optional.</small></label>
         <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save settings</button></footer>
       </form>
     </dialog>
