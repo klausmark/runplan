@@ -20,6 +20,9 @@ maintained content.
 | A sustained controlled effort | tempo run |
 | Repeated faster work with recoveries | interval workout |
 | The longest aerobic workout of a week | long run |
+| A version-neutral program that users copy with their own start week | template |
+| The Studio listing of bundled templates | template catalog |
+| The act of duplicating a template into a per-user program | copy template |
 
 Use “sync” for reconciliation with Garmin, “preview” for a read-only rendering,
 “export” for writing a presentation file, and “prune” only for explicitly

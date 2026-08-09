@@ -22,14 +22,22 @@ These features are sufficiently defined to be implemented next, in order.
   a `runplan generate first-10k` CLI command. The implementation lives
   in `src/runplan/generation/` and is exercised by the
   `tests/test_generation_*.py` suite.
+- Nike Run Club training plan templates. Four templates (5K, 10K,
+  half-marathon, marathon) ship under
+  `src/runplan/templates/programs/` as static YAML files. The
+  `runplan.templates` module exposes them through the public Python
+  API and the Studio catalog (`GET /api/templates`,
+  `GET /api/templates/<id>`, `POST /api/templates/<id>/copy`). The
+  Studio empty-state offers a **Browse templates** button that copies
+  the chosen template to the active user with a chosen start week.
+  The templates are unofficial adaptations; pace targets stay in step
+  notes so Garmin Connect receives the user's own pace when applied.
 
 ## Wishing well
 
 Ideas in this section are intentionally not implementation-ready. Promote an
 idea to the section above only after its scope and product decisions are clear.
 
-- Add validated generic 5K, half-marathon, and marathon programs that
-  users can browse and copy before editing.
 - Expose prompts and generic programs consistently through the CLI.
 - Add revision history and restore with readable change summaries.
 - Add calendar copy/paste, duplication, multi-select, and whole-week moves.

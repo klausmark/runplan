@@ -530,6 +530,43 @@ Runplan accepts complete program files containing `program` and `weeks`. The
 format and the maintained generation prompt are documented in
 `docs/program-prompt.md`.
 
+## Browse plan templates
+
+The Studio ships with four bundled Nike Run Club training plans that you can
+copy into your own programs:
+
+- **Nike Run Club 5K** – 8 weeks, 5 runs per week, race week included
+- **Nike Run Club 10K** – 8 weeks, 5 runs per week, race week included
+- **Nike Run Club Half Marathon** – 14 weeks with NRC Guided Runs
+- **Nike Run Club Marathon** – 18 weeks, 3 Recovery Runs per week
+
+When you have no programs yet, click **Browse templates** in the empty state.
+Pick a plan, choose the first start week, and confirm. The Studio copies the
+template into your program list, sets it as the active program, and lets you
+edit, rearrange, or delete workouts as if you had uploaded it yourself. The
+copied program keeps a stable id (`nike-5k-2026-w32` and similar) so that
+Garmin ownership survives template updates.
+
+The templates are unofficial adaptations; pace targets reference the Nike Run
+Club Pace Chart and stay in the watch-facing step notes. Add your own pace
+zones after copying if you want Garmin Connect to enforce them.
+
+The same templates are available from Python:
+
+```python
+from runplan.templates import list_templates, copy_template, template_yaml
+
+for metadata in list_templates():
+    print(metadata.id, metadata.distance_label, metadata.duration_weeks)
+
+yaml_text = template_yaml("nike-5k", start_week="2026-W32")
+```
+
+The catalog also lives at `GET /api/templates` and the copy endpoint at
+`POST /api/templates/<id>/copy` with a JSON body
+`{"start_week": "2026-W32"}`. See `docs/nike-templates.md` for the full
+conventions.
+
 ## Generate a first 10K program
 
 The `runplan generate first-10k` command builds a deterministic 10K program

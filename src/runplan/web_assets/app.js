@@ -899,14 +899,25 @@ async function uploadProgram(file) {
         content: await file.text(),
       }),
     });
-    storeValue(programStorageKey(state.user.id), file.name);
-    await loadPrograms();
+    await activateProgram(file.name);
+    $("#add-program-dialog").close();
   } catch (error) {
     if (state.program) setSaveFailure(error);
     showError(error.message);
   } finally {
     $("#program-file-input").value = "";
   }
+}
+
+async function activateProgram(filename) {
+  storeValue(programStorageKey(state.user.id), filename);
+  await request(`/api/users/${encodeURIComponent(state.user.id)}/active-program`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename }),
+  });
+  state.user = { ...state.user, activeProgram: filename };
+  await loadPrograms();
 }
 
 async function loadProgram(file) {
@@ -990,12 +1001,74 @@ $("#program-select").addEventListener("change", (event) => {
   setMobileMenu(false, false);
   loadProgram(event.target.value).catch(error => showError(error.message));
 });
-for (const selector of ["#upload-program-button", "#empty-upload-program-button"]) {
-  $(selector).addEventListener("click", () => $("#program-file-input").click());
-}
+$("#upload-program-button").addEventListener("click", () => $("#program-file-input").click());
+$("#empty-upload-program-button").addEventListener("click", () => openAddProgramDialog("upload"));
+$("#empty-browse-templates-button").addEventListener("click", () => openAddProgramDialog("templates"));
 $("#program-file-input").addEventListener("change", (event) => {
   uploadProgram(event.target.files[0]);
 });
+
+function closeAddProgramMenu() {
+  $("#add-program-menu").classList.add("hidden");
+  $("#add-program-button").setAttribute("aria-expanded", "false");
+  $("#add-program-toggle").setAttribute("aria-expanded", "false");
+}
+
+function toggleAddProgramMenu(force) {
+  const menu = $("#add-program-menu");
+  const willOpen = force ?? menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  $("#add-program-button").setAttribute("aria-expanded", String(willOpen));
+  $("#add-program-toggle").setAttribute("aria-expanded", String(willOpen));
+}
+
+$("#add-program-button").addEventListener("click", () => openAddProgramDialog("templates"));
+$("#add-program-toggle").addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleAddProgramMenu();
+});
+document.addEventListener("click", (event) => {
+  const menu = $("#add-program-menu");
+  if (menu.classList.contains("hidden")) return;
+  if (event.target.closest(".split-button")) return;
+  closeAddProgramMenu();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("#add-program-menu").classList.contains("hidden")) {
+    closeAddProgramMenu();
+  }
+});
+document.querySelectorAll("[data-add-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const action = button.dataset.addAction;
+    closeAddProgramMenu();
+    setMobileMenu(false, false);
+    openAddProgramDialog(action);
+  });
+});
+
+function openAddProgramDialog(tab = "upload") {
+  const dialog = $("#add-program-dialog");
+  switchAddProgramTab(tab);
+  dialog.showModal();
+}
+
+function switchAddProgramTab(tab) {
+  const tabs = document.querySelectorAll("#add-program-dialog [data-tab]");
+  tabs.forEach((button) => {
+    const selected = button.dataset.tab === tab;
+    button.setAttribute("aria-selected", String(selected));
+  });
+  for (const section of document.querySelectorAll("#add-program-dialog .add-program-tab")) {
+    section.classList.toggle("hidden", section.dataset.tab !== tab);
+  }
+  if (tab === "templates") loadTemplatesList();
+}
+
+document.querySelectorAll('#add-program-dialog [role="tab"]').forEach((button) => {
+  button.addEventListener("click", () => switchAddProgramTab(button.dataset.tab));
+});
+$("#add-program-upload-button").addEventListener("click", () => $("#program-file-input").click());
 $("#user-select").addEventListener("change", (event) => {
   setMobileMenu(false, false);
   selectUser(event.target.value).catch(error => showError(error.message));
@@ -1111,6 +1184,138 @@ document.querySelectorAll("[data-export]").forEach(link => link.addEventListener
   $("#export-options").classList.add("hidden");
   setMobileMenu(false, false);
 }));
+
+function nextMondayIsoDate(now = new Date()) {
+  const date = new Date(now);
+  const day = date.getDay();
+  const daysToMonday = (8 - (day === 0 ? 7 : day)) % 7 || 7;
+  date.setDate(date.getDate() + daysToMonday);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const dayText = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${dayText}`;
+}
+
+function isoWeekFromDate(mondayIsoDate) {
+  const [y, m, d] = mondayIsoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNr = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayNr + 3);
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const diff = target - firstThursday;
+  const week = 1 + Math.round(diff / (7 * 24 * 3600 * 1000));
+  return `${target.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+async function loadTemplatesList() {
+  const list = $("#templates-list");
+  const detail = $("#template-detail");
+  const empty = $("#templates-empty");
+  detail.classList.add("hidden");
+  $("#template-start-week").value = isoWeekFromDate(nextMondayIsoDate());
+  list.replaceChildren(Object.assign(document.createElement("p"), { className: "editor-help", textContent: "Loading templates…" }));
+  try {
+    const result = await request("/api/templates");
+    list.replaceChildren();
+    if (!result.templates.length) {
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+    for (const template of result.templates) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "template-card";
+      card.dataset.templateId = template.id;
+      const eyebrow = document.createElement("p");
+      eyebrow.className = "eyebrow";
+      eyebrow.textContent = `${template.distanceLabel} · ${template.durationWeeks} weeks`;
+      const title = document.createElement("h3");
+      title.textContent = template.name;
+      const summary = document.createElement("p");
+      summary.className = "description";
+      summary.textContent = template.description || "";
+      const meta = document.createElement("ul");
+      meta.className = "template-meta";
+      for (const item of [`${template.sessionsPerWeek} runs / week`, template.hasRaceWeek ? "Includes race week" : "No race week", `Source: ${template.source}`]) {
+        const li = document.createElement("li");
+        li.textContent = item;
+        meta.append(li);
+      }
+      card.append(eyebrow, title, summary, meta);
+      card.addEventListener("click", () => showTemplateDetail(template));
+      list.append(card);
+    }
+  } catch (error) {
+    list.replaceChildren(Object.assign(document.createElement("p"), { className: "sync-error", textContent: error.message }));
+  }
+}
+
+function showTemplateDetail(template) {
+  $("#template-detail-eyebrow").textContent = `${template.distanceLabel} · ${template.durationWeeks} weeks`;
+  $("#template-detail-name").textContent = template.name;
+  $("#template-detail-description").textContent = template.description || "";
+  const meta = $("#template-detail-meta");
+  meta.replaceChildren();
+  for (const item of [`${template.sessionsPerWeek} runs / week`, template.hasRaceWeek ? "Includes race week" : "No race week", `Source: ${template.source}`, `Suggested filename: ${template.id}-${$("#template-start-week").value.toLowerCase() || "<start-week>"}.yaml`]) {
+    const li = document.createElement("li");
+    li.textContent = item;
+    meta.append(li);
+  }
+  $("#template-use-button").dataset.templateId = template.id;
+  $("#template-detail").classList.remove("hidden");
+  $("#templates-list").classList.add("hidden");
+}
+
+$("#template-start-week").addEventListener("input", () => {
+  const button = $("#template-use-button");
+  const templateId = button.dataset.templateId;
+  if (!templateId) return;
+  const meta = $("#template-detail-meta");
+  const last = meta.lastElementChild;
+  if (last) last.textContent = `Suggested filename: ${templateId}-${$("#template-start-week").value.toLowerCase() || "<start-week>"}.yaml`;
+});
+
+$("#template-back-button").addEventListener("click", () => {
+  $("#template-detail").classList.add("hidden");
+  $("#templates-list").classList.remove("hidden");
+});
+
+async function useTemplate() {
+  const button = $("#template-use-button");
+  const templateId = button.dataset.templateId;
+  if (!templateId) return;
+  const startWeek = $("#template-start-week").value;
+  button.disabled = true;
+  try {
+    const copy = await request(`/api/templates/${encodeURIComponent(templateId)}/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start_week: startWeek }),
+    });
+    await request("/api/programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: state.user.id,
+        filename: copy.filename,
+        content: copy.content,
+      }),
+    });
+    await activateProgram(copy.filename);
+    $("#add-program-dialog").close();
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("#template-use-button").addEventListener("click", (event) => {
+  event.preventDefault();
+  useTemplate();
+});
 
 $("#auth-form").addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -1,0 +1,643 @@
+program:
+  id: nike-half-marathon
+  name: Nike Run Club - Half Marathon Training Plan
+  short_name: NHM
+  description: >-
+    Unofficial adaptation of the Nike Run Club Half Marathon Training Plan with
+    Audio Guided Runs. Pace targets reference the Nike Run Club Pace Chart
+    (Best, Mile, 5K, 10K, Tempo, Recovery, Half Marathon) and must be filled in
+    by the runner. Speed Runs build strength, Recovery Runs let you absorb the
+    work, and a weekly Long Run grows endurance. Avoid scheduling Speed Runs on
+    back-to-back days. The final week ends with the half marathon.
+  start_week: 2027-W01
+
+weeks:
+  - week: 1
+    focus: 14 weeks to go - Easy introduction
+    workouts:
+      - id: guided-14w-recovery
+        day: 1
+        name: NRC Guided Run - 14 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 14 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-first-speed
+        day: 2
+        name: NRC Guided Run - First Speed Run
+        description: Intervals are a Speed Run with running and rest intervals. The pace and effort of the running interval can stay the same or change.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 8
+              steps:
+                - run: {time: 1m, note: "1:00 5K Pace"}
+                - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+      - id: guided-easy-run
+        day: 3
+        name: NRC Guided Run - Easy Run
+        steps:
+          - run: {time: 25m, note: "NRC Guided Run: Easy Run - 25:00 Recovery Run"}
+      - id: guided-one-hard-two-easy
+        day: 4
+        name: NRC Guided Run - One Hard Two Easy
+        description: Fartlek is Swedish for speed play. Alternate distances and paces during a continuous run.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 7
+              steps:
+                - run: {time: 1m, note: "1:00 Hard Running"}
+                - recovery: {time: 2m, note: "2:00 Easy Running"}
+      - id: guided-5k-run
+        day: 6
+        name: NRC Guided Run - 5K Run
+        steps:
+          - run: {distance: 5km, note: "NRC Guided Run: 5K Run - 5K / 3.1 Mile Run"}
+  - week: 2
+    focus: 13 weeks to go - Pace ladders and 4-mile long run
+    workouts:
+      - id: guided-13w-recovery
+        day: 1
+        name: NRC Guided Run - 13 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 13 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-no-time-go-time
+        day: 2
+        name: NRC Guided Run - No Time Go Time
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - run: {time: 3m, note: "3:00 10K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+      - id: guided-recovery-headspace
+        day: 3
+        name: NRC Guided Run - Recovery Run with Headspace
+        steps:
+          - run: {time: 35m, note: "NRC Guided Run: Recovery Run with Headspace - 35:00 Run"}
+      - id: guided-run-strong-repeat
+        day: 4
+        name: NRC Guided Run - Run Strong. Repeat.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 4
+              steps:
+                - run: {time: 1m30s, note: "1:30 5K Pace"}
+                - recovery: {time: 45s, note: "45 second Recovery after 5K Pace Intervals"}
+          - run: {time: 1m30s, note: "1:30 Mile Pace"}
+          - recovery: {time: 1m, note: "1:00 recovery after Mile Pace Interval"}
+          - repeat:
+              count: 4
+              steps:
+                - run: {time: 1m30s, note: "1:30 5K Pace"}
+                - recovery: {time: 45s, note: "45 second Recovery after 5K Pace Intervals"}
+          - run: {time: 1m30s, note: "1:30 Mile Pace"}
+      - id: guided-four-mile-run
+        day: 6
+        name: NRC Guided Run - Four Mile Run
+        steps:
+          - run: {distance: 6.4km, note: "NRC Guided Run: Four Mile Run - 6.4K / 4 Mile Run"}
+  - week: 3
+    focus: 12 weeks to go - Hills and Triple 7's
+    workouts:
+      - id: guided-12w-recovery
+        day: 1
+        name: NRC Guided Run - 12 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 12 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-runner-up
+        day: 2
+        name: NRC Guided Run - Runner Up
+        description: Hill workouts develop speed and form. Stay in control of your breathing and lean slightly with the chin leading the chest. Use effort rather than pace.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 5
+              steps:
+                - run: {time: 45s, note: "45 seconds 10K Effort"}
+                - recovery: {time: 1m15s, note: "1:15 after 10K effort"}
+                - run: {time: 15s, note: "15 seconds Best Effort"}
+                - recovery: {time: 45s, note: "45 seconds after Best Effort"}
+      - id: guided-just-a-run
+        day: 3
+        name: NRC Guided Run - Just A Run
+        steps:
+          - run: {time: 30m, note: "NRC Guided Run: Just A Run - 30:00 Recovery Run"}
+      - id: guided-triple-7s
+        day: 4
+        name: NRC Guided Run - Triple 7's
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 7m, note: "7:00 5K Pace"}
+                - recovery: {time: 2m30s, note: "2:30 Recovery between intervals"}
+      - id: guided-five-mile-run
+        day: 6
+        name: NRC Guided Run - Five Mile Run
+        steps:
+          - run: {distance: 8km, note: "NRC Guided Run: Five Mile Run - 8K / 5 Mile Run"}
+  - week: 4
+    focus: 11 weeks to go - The Rundown and Tempo with Emily Infeld
+    workouts:
+      - id: guided-11w-recovery
+        day: 1
+        name: NRC Guided Run - 11 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 11 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-the-rundown
+        day: 2
+        name: NRC Guided Run - The Rundown
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 1m, note: "1:00 Mile Pace"}
+                - recovery: {time: 1m, note: "1:00 Recovery after Mile Pace"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 2m, note: "2:00 5K Pace"}
+                - recovery: {time: 1m30s, note: "1:30 Recovery after 5K Pace"}
+          - repeat:
+              count: 2
+              steps:
+                - run: {time: 1m, note: "1:00 Mile Pace"}
+                - recovery: {time: 1m, note: "1:00 Recovery after Mile Pace"}
+          - repeat:
+              count: 2
+              steps:
+                - run: {time: 2m, note: "2:00 5K Pace"}
+                - recovery: {time: 1m30s, note: "1:30 Recovery after 5K Pace"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after Mile Pace"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+      - id: guided-running-towards-goal
+        day: 3
+        name: NRC Guided Run - Running Towards Your Goal with Headspace
+        steps:
+          - run: {time: 40m, note: "NRC Guided Run: Running Towards Your Goal with Headspace - 40:00 Recovery Run"}
+      - id: guided-tempo-emily
+        day: 4
+        name: NRC Guided Run - Tempo Run with Emily Infeld
+        description: A Tempo Run is a hard but controlled pace run as long intervals or a steady run of 1-10 miles. The purpose is to build mental and physical endurance and become comfortable being uncomfortable.
+        steps:
+          - warmup: {time: 7m, note: "7:00 Warm Up"}
+          - run: {time: 25m, note: "25:00 Tempo Run"}
+      - id: guided-10k-run
+        day: 6
+        name: NRC Guided Run - 10K Run
+        steps:
+          - run: {distance: 10km, note: "NRC Guided Run: 10K Run - 10K / 6.2 Mile Run"}
+  - week: 5
+    focus: 10 weeks to go - Sneaky Speed and Out Strong Back Fast
+    workouts:
+      - id: guided-10w-recovery
+        day: 1
+        name: NRC Guided Run - 10 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 10 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-sneaky-speed
+        day: 2
+        name: NRC Guided Run - Sneaky Speed
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 1m30s, note: "1:30 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 45s, note: "45 seconds Mile Pace"}
+                - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - run: {time: 1m30s, note: "1:30 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 45s, note: "45 seconds Mile Pace"}
+                - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - run: {time: 1m30s, note: "1:30 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery Between Intervals"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 45s, note: "45 seconds Mile Pace"}
+      - id: guided-30-minute-head-starts
+        day: 3
+        name: NRC Guided Run - 30 Minute Head Starts
+        steps:
+          - run: {time: 30m, note: "NRC Guided Run: 30 Minute Head Starts - 30:00 Recovery Run"}
+      - id: guided-out-strong-back-fast
+        day: 4
+        name: NRC Guided Run - Out Strong Back Fast
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 23m, note: "23:00 Progression Tempo Run"}
+      - id: guided-another-10k-run
+        day: 6
+        name: NRC Guided Run - Another 10K Run
+        steps:
+          - run: {distance: 10km, note: "NRC Guided Run: Another 10K Run - 10K / 6.2 Mile Run"}
+  - week: 6
+    focus: 9 weeks to go - 20 x 0:30 Mile intervals and Hills
+    workouts:
+      - id: guided-9w-recovery
+        day: 1
+        name: NRC Guided Run - 9 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 9 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-run-fast-repeat
+        day: 2
+        name: NRC Guided Run - Run Fast. Repeat.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 30s, note: "0:30 5K Pace (interval #1)"}
+          - recovery: {time: 1m, note: "1:00 recovery between intervals"}
+          - repeat:
+              count: 9
+              steps:
+                - run: {time: 30s, note: "0:30 Mile Pace"}
+                - recovery: {time: 1m, note: "1:00 recovery between intervals"}
+          - run: {time: 30s, note: "0:30 5K Pace (interval #11)"}
+          - recovery: {time: 1m, note: "1:00 recovery between intervals"}
+          - repeat:
+              count: 9
+              steps:
+                - run: {time: 30s, note: "0:30 Mile Pace"}
+                - recovery: {time: 1m, note: "1:00 recovery between intervals"}
+      - id: guided-shalane-flanagan
+        day: 3
+        name: NRC Guided Run - Run with Shalane Flanagan
+        steps:
+          - run: {time: 45m, note: "NRC Guided Run: Run with Shalane Flanagan - 45:00 Recovery Run"}
+      - id: guided-hill-hillier-hilliest
+        day: 4
+        name: NRC Guided Run - Hill Hillier Hilliest
+        description: Hill workouts develop speed and form. Stay in control of your breathing and lean slightly with the chin leading the chest.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 1m, note: "1:00 10K Effort"}
+                - recovery: {time: 2m, note: "2:00 after 10K effort"}
+                - run: {time: 45s, note: "0:45 5K Effort"}
+                - recovery: {time: 1m30s, note: "1:30 after 5K effort"}
+                - run: {time: 30s, note: "0:30 Mile Effort"}
+                - recovery: {time: 1m, note: "1:00 after Mile effort"}
+      - id: guided-eight-mile-run
+        day: 6
+        name: NRC Guided Run - Eight Mile Run
+        steps:
+          - run: {distance: 12.5km, note: "NRC Guided Run: Eight Mile Run - 12.5K / 8 Mile Run"}
+  - week: 7
+    focus: 8 weeks to go - The Shifter and Power Pyramid
+    workouts:
+      - id: guided-8w-recovery
+        day: 1
+        name: NRC Guided Run - 8 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 8 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-the-shifter
+        day: 2
+        name: NRC Guided Run - The Shifter
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 4m, note: "4:00 Recovery Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after Recovery Run Pace interval"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - run: {time: 3m, note: "3:00 10K Pace"}
+          - recovery: {time: 1m30s, note: "1:30 Recovery after 10K Pace interval"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 2m, note: "2:00 Recovery after 5K Pace interval"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - run: {time: 1m, note: "1:00 Best Pace"}
+      - id: guided-breaking-through-barriers
+        day: 3
+        name: NRC Guided Run - Breaking Through Barriers with Headspace
+        steps:
+          - run: {time: 31m, note: "NRC Guided Run: Breaking Through Barriers with Headspace - 31:00 Recovery Run"}
+      - id: guided-power-pyramid
+        day: 4
+        name: NRC Guided Run - Power Pyramid
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - recovery: {time: 30s, note: "30 seconds after Mile Pace"}
+          - run: {time: 5m, note: "5:00 5K Pace"}
+          - recovery: {time: 2m30s, note: "2:30 after 5K pace"}
+          - run: {time: 10m, note: "10:00 10K Pace"}
+          - recovery: {time: 3m, note: "3:00 after 10K pace"}
+          - run: {time: 5m, note: "5:00 5K Pace"}
+          - recovery: {time: 2m30s, note: "2:30 after 5K pace"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+      - id: guided-15k-run
+        day: 6
+        name: NRC Guided Run - 15K Run
+        steps:
+          - run: {distance: 15km, note: "NRC Guided Run: 15K Run - 15K / 9.5 Mile Run"}
+  - week: 8
+    focus: 7 weeks to go - Deuces and Fartlek
+    workouts:
+      - id: guided-7w-recovery
+        day: 1
+        name: NRC Guided Run - 7 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 7 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-deuces
+        day: 2
+        name: NRC Guided Run - Deuces
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 10
+              steps:
+                - run: {time: 2m, note: "2:00 5K Pace"}
+                - recovery: {time: 1m, note: "1:00 recovery (after intervals #4 and #8 use 2:00)"}
+      - id: guided-just-another-run
+        day: 3
+        name: NRC Guided Run - Just Another Run
+        steps:
+          - run: {time: 35m, note: "NRC Guided Run: Just Another Run - 35:00 Recovery Run"}
+      - id: guided-one-hard-one-easy
+        day: 4
+        name: NRC Guided Run - One Hard. One Easy.
+        description: Fartlek is Swedish for speed play. Alternate 1:00 hard with 1:00 easy for 15:00.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 8
+              steps:
+                - run: {time: 1m, note: "1:00 Hard Running"}
+                - recovery: {time: 1m, note: "1:00 Easy Running"}
+      - id: guided-ten-mile-run
+        day: 6
+        name: NRC Guided Run - Ten Mile Run
+        steps:
+          - run: {distance: 16km, note: "NRC Guided Run: Ten Mile Run - 16K / 10 Mile Run"}
+  - week: 9
+    focus: 6 weeks to go - Rock n Roller and 8K Tempo
+    workouts:
+      - id: guided-6w-recovery
+        day: 1
+        name: NRC Guided Run - 6 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 6 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-rock-n-roller
+        day: 2
+        name: NRC Guided Run - Rock n Roller
+        steps:
+          - warmup: {time: 6m, note: "6:00 Warm Up"}
+          - run: {time: 5m, note: "5:00 10K Pace"}
+          - recovery: {time: 1m30s, note: "1:30 Recovery after 10K Pace"}
+          - run: {time: 2m30s, note: "2:30 5K Pace"}
+          - recovery: {time: 1m30s, note: "1:30 Recovery after 5K Pace"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after Mile Pace"}
+          - run: {time: 30s, note: "0:30 Best Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after Best Pace"}
+          - run: {time: 30s, note: "0:30 Best Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after Best Pace"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery"}
+          - run: {time: 2m30s, note: "2:30 5K Pace"}
+          - recovery: {time: 1m30s, note: "1:30 Recovery"}
+          - run: {time: 5m, note: "5:00 10K Pace"}
+      - id: guided-suckcess-run
+        day: 3
+        name: NRC Guided Run - Suckcess Run
+        steps:
+          - run: {time: 35m, note: "NRC Guided Run: Suckcess Run - 35:00 Recovery Run"}
+      - id: guided-8k-tempo
+        day: 4
+        name: NRC Guided Run - 8K Tempo Run
+        steps:
+          - warmup: {distance: 2km, note: "2K Warm Up"}
+          - run: {distance: 8km, note: "8K Tempo Run"}
+          - cooldown: {distance: 2km, note: "2K Cool Down"}
+      - id: guided-another-ten-mile-run
+        day: 6
+        name: NRC Guided Run - Another Ten Mile Run
+        steps:
+          - run: {distance: 16km, note: "NRC Guided Run: Another Ten Mile Run - 16K / 10 Mile Run"}
+  - week: 10
+    focus: 5 weeks to go - 90's and Speedurance
+    workouts:
+      - id: guided-5w-recovery
+        day: 1
+        name: NRC Guided Run - 5 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 5 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-90s
+        day: 2
+        name: NRC Guided Run - 90's
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 1m30s, note: "1:30 5K Pace"}
+                - recovery: {time: 1m30s, note: "1:30 between each interval"}
+                - run: {time: 1m30s, note: "1:30 10K Pace"}
+                - recovery: {time: 1m30s, note: "1:30 between each interval"}
+                - run: {time: 1m30s, note: "1:30 Mile Pace"}
+                - recovery: {time: 1m30s, note: "1:30 between each interval"}
+      - id: guided-thank-you-run
+        day: 3
+        name: NRC Guided Run - Thank You Run
+        steps:
+          - run: {time: 45m, note: "NRC Guided Run: Thank You Run - 45:00 Recovery Run"}
+      - id: guided-speedurance
+        day: 4
+        name: NRC Guided Run - Speedurance
+        steps:
+          - warmup: {time: 7m, note: "7:00 Warm Up"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace"}
+          - run: {time: 10m, note: "10:00 Tempo Run"}
+          - recovery: {time: 2m, note: "2:00 Recovery after Tempo Run"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 Recovery"}
+          - run: {time: 2m, note: "2:00 5K Pace"}
+      - id: guided-13-1k-dress-rehearsal
+        day: 6
+        name: NRC Guided Run - 13.1K Dress Rehearsal
+        steps:
+          - run: {distance: 13.1km, note: "NRC Guided Run: 13.1K Dress Rehearsal - 13.1K / 8 Mile Run"}
+  - week: 11
+    focus: 4 weeks to go - 5 x 5 x 10K Pace and Fartlek
+    workouts:
+      - id: guided-4w-recovery
+        day: 1
+        name: NRC Guided Run - 4 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 4 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-5x5x10k-pace
+        day: 2
+        name: NRC Guided Run - 5 x 5 x 10k Pace
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 5
+              steps:
+                - run: {time: 5m, note: "5:00 10K Pace"}
+                - recovery: {time: 2m, note: "2:00 recovery between intervals"}
+      - id: guided-whole-run-headspace
+        day: 3
+        name: NRC Guided Run - Whole Run with Headspace
+        steps:
+          - run: {time: 45m, note: "NRC Guided Run: Whole Run with Headspace - 45:00 Recovery Run"}
+      - id: guided-two-hard-one-easy
+        day: 4
+        name: NRC Guided Run - Two Hard. One Easy.
+        description: Fartlek is Swedish for speed play. Alternate 2:00 hard with 1:00 easy for 21:00.
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 7
+              steps:
+                - run: {time: 2m, note: "2:00 of hard running"}
+                - recovery: {time: 1m, note: "1:00 of easy running"}
+      - id: guided-20k-run
+        day: 6
+        name: NRC Guided Run - 20K Run
+        steps:
+          - run: {distance: 20km, note: "NRC Guided Run: 20K Run - 20K / 12.5 Mile Run"}
+  - week: 12
+    focus: 3 weeks to go - Long and Strong and Fast and Bring It Down
+    workouts:
+      - id: guided-3w-recovery
+        day: 1
+        name: NRC Guided Run - 3 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 3 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-long-strong-fast
+        day: 2
+        name: NRC Guided Run - Long and Strong and Fast
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warmup"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 8m, note: "8:00 10K Pace"}
+                - recovery: {time: 3m, note: "3:00 recovery after 10K Pace"}
+                - run: {time: 4m, note: "4:00 5K Pace"}
+                - recovery: {time: 2m, note: "2:00 recovery after 5K Pace"}
+                - run: {time: 2m, note: "2:00 Mile Pace"}
+                - recovery: {time: 2m, note: "2:00 recovery after Mile Pace"}
+      - id: guided-eliud-kipchoge
+        day: 3
+        name: NRC Guided Run - Run with Eliud Kipchoge
+        steps:
+          - run: {time: 60m, note: "NRC Guided Run: Run with Eliud Kipchoge - 60:00 Recovery Run"}
+      - id: guided-bring-it-down
+        day: 4
+        name: NRC Guided Run - Bring It Down
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warmup"}
+          - run: {time: 5m, note: "5:00 Recovery Run Pace"}
+          - run: {time: 4m, note: "4:00 10K Pace"}
+          - run: {time: 3m, note: "3:00 5K Pace"}
+          - run: {time: 2m, note: "2:00 Mile Pace"}
+          - run: {time: 1m, note: "1:00 Best Pace"}
+      - id: guided-one-hour-run
+        day: 6
+        name: NRC Guided Run - One Hour Run
+        steps:
+          - run: {time: 60m, note: "NRC Guided Run: One Hour Run - 60:00 Recovery Run"}
+  - week: 13
+    focus: 2 weeks to go - Stronger Faster and In Control
+    workouts:
+      - id: guided-2w-recovery
+        day: 1
+        name: NRC Guided Run - 2 Weeks to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 2 Weeks to Go - 15:00 Recovery Run"}
+      - id: guided-stronger-faster
+        day: 2
+        name: NRC Guided Run - Stronger Faster
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - repeat:
+              count: 3
+              steps:
+                - run: {time: 3m, note: "3:00 5K Pace"}
+                - recovery: {time: 2m, note: "2:00 Recovery after 5K Pace"}
+                - repeat:
+                    count: 4
+                    steps:
+                      - run: {time: 30s, note: "0:30 Mile Pace"}
+                      - recovery: {time: 1m, note: "1:00 Recovery after Mile Pace"}
+      - id: guided-5k-head-starts
+        day: 3
+        name: NRC Guided Run - 5K Head Starts
+        steps:
+          - run: {distance: 5km, note: "NRC Guided Run: 5K Head Starts - 5K / 3.1 Mile Recovery Run"}
+      - id: guided-in-control
+        day: 4
+        name: NRC Guided Run - In Control
+        steps:
+          - warmup: {time: 6m, note: "6:00 Warm Up"}
+          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - recovery: {time: 30s, note: "0:30 recovery after Mile Pace"}
+          - run: {time: 3m, note: "3:00 5K Pace"}
+          - recovery: {time: 1m30s, note: "1:30 recovery after 5K Pace"}
+          - run: {time: 5m, note: "5:00 10K Pace"}
+          - recovery: {time: 2m30s, note: "2:30 recovery after 10K Pace"}
+          - run: {time: 7m, note: "7:00 Recovery Run Pace"}
+      - id: guided-seven-mile-run
+        day: 6
+        name: NRC Guided Run - Seven Mile Run
+        steps:
+          - run: {distance: 11km, note: "NRC Guided Run: Seven Mile Run - 11K / 7 Mile Run"}
+  - week: 14
+    focus: 1 week to go - Race week
+    workouts:
+      - id: guided-1w-recovery
+        day: 1
+        name: NRC Guided Run - 1 Week to Go
+        steps:
+          - run: {time: 15m, note: "NRC Guided Run: 1 Week to Go - 15:00 Recovery Run"}
+      - id: guided-speed-run-before
+        day: 2
+        name: NRC Guided Run - The Speed Run Before
+        steps:
+          - warmup: {time: 5m, note: "5:00 Warm Up"}
+          - run: {time: 1m, note: "1:00 5K Pace"}
+          - recovery: {time: 1m, note: "1:00 recovery between all intervals"}
+          - run: {time: 2m, note: "2:00 10K Pace"}
+          - recovery: {time: 1m, note: "1:00 recovery"}
+          - run: {time: 5m, note: "5:00 Half Marathon Pace"}
+          - recovery: {time: 1m, note: "1:00 recovery"}
+          - run: {time: 2m, note: "2:00 10K Pace"}
+          - recovery: {time: 1m, note: "1:00 recovery"}
+          - run: {time: 1m, note: "1:00 5K Pace"}
+      - id: guided-big-day-headspace
+        day: 3
+        name: NRC Guided Run - Big Day Run with Headspace
+        steps:
+          - run: {time: 25m, note: "NRC Guided Run: Big Day Run with Headspace - 25:00 Recovery Run"}
+      - id: guided-two-mile-run
+        day: 6
+        name: NRC Guided Run - Two Mile Run
+        steps:
+          - run: {distance: 3.2km, note: "NRC Guided Run: Two Mile Run - 3.2K / 2 Mile Run"}
+      - id: race-half-marathon
+        day: 7
+        name: Race Day - Half Marathon
+        steps:
+          - run: {distance: 21.1km, note: "21.1K / 13.1 Miles"}

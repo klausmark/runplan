@@ -95,6 +95,31 @@ class TestWebAsset:
         assert "showEmptyPrograms()" in script
         assert 'request("/api/programs", {' in script
         assert "filename: file.name" in script
+        assert "async function activateProgram(" in script
+        assert 'openAddProgramDialog("upload")' in script
+        assert 'openAddProgramDialog("templates")' in script
+
+    def test_template_browser_button_and_dialog_are_packaged(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="empty-browse-templates-button"' in html
+        assert 'id="add-program-dialog"' in html
+        assert 'id="add-program-button"' in html
+        assert 'id="add-program-toggle"' in html
+        assert 'id="add-program-menu"' in html
+        assert 'data-tab="upload"' in html
+        assert 'data-tab="templates"' in html
+        assert 'id="template-detail"' in html
+        assert 'id="template-start-week"' in html
+        assert "function openAddProgramDialog(" in script
+        assert "function switchAddProgramTab(" in script
+        assert 'request("/api/templates")' in script
+        assert "/api/templates/${encodeURIComponent(templateId)}/copy" in script
+        assert "async function activateProgram(" in script
+        assert ".template-card" in styles
+        assert ".split-button" in styles
+        assert ".add-program-dialog" in styles
 
     def test_past_weeks_are_locally_persisted_collapsible_details(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

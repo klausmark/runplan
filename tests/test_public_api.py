@@ -13,20 +13,30 @@ def test_root_exports_remain_available() -> None:
     expected = {
         "Program",
         "ProgramExport",
+        "TEMPLATE_CATALOG",
+        "TemplateCopyError",
+        "TemplateMetadata",
         "WeekSelection",
         "build_program_export",
+        "copy_template",
+        "default_start_week",
         "delete_all_managed",
         "export_pdf",
+        "get_template",
+        "list_templates",
         "load_program",
         "load_program_model",
         "reconcile_program",
         "run_sync",
         "sync_program_week",
+        "template_yaml",
     }
 
     assert expected <= set(runplan.__all__)
     assert all(
-        callable(getattr(runplan, name)) or isinstance(getattr(runplan, name), type)
+        callable(getattr(runplan, name))
+        or isinstance(getattr(runplan, name), type)
+        or isinstance(getattr(runplan, name), tuple)
         for name in expected
     )
 

@@ -47,6 +47,14 @@
           <div class="user-control"><label class="user-picker">User <select id="user-select" aria-label="Runplan user"></select></label><button id="add-user-button" class="add-user-button" type="button">Add user</button></div>
           <label class="program-picker">Program <select id="program-select"></select></label>
           <button id="upload-program-button" class="button secondary" type="button">Upload program</button>
+          <div class="split-button">
+            <button id="add-program-button" class="button secondary" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="add-program-menu">Add program</button>
+            <button id="add-program-toggle" class="button secondary split-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="add-program-menu" aria-label="More ways to add a program"><span aria-hidden="true">▾</span></button>
+            <div id="add-program-menu" class="menu hidden" role="menu">
+              <button type="button" data-add-action="upload" role="menuitem">Upload YAML file</button>
+              <button type="button" data-add-action="templates" role="menuitem">Browse templates</button>
+            </div>
+          </div>
           <button id="sync-button" class="button primary">Sync Garmin</button>
           <button id="user-settings-button" class="button secondary">User settings</button>
           <button id="settings-button" class="button secondary">Plan settings</button>
@@ -81,9 +89,12 @@
       <div id="notice" class="notice hidden" role="alert"></div>
       <section id="empty-programs" class="empty-state hidden">
         <p class="eyebrow">No programs yet</p>
-        <h2>Upload your first running program</h2>
-        <p>Choose a valid Runplan YAML file. It will be stored only for the selected user.</p>
-        <button id="empty-upload-program-button" class="button primary" type="button">Upload program</button>
+        <h2>Add your first running program</h2>
+        <p>Upload a valid Runplan YAML file or start from a bundled training plan template. Your choice is stored only for the selected user.</p>
+        <div class="empty-state-actions">
+          <button id="empty-upload-program-button" class="button primary" type="button">Upload YAML file</button>
+          <button id="empty-browse-templates-button" class="button secondary" type="button">Browse templates</button>
+        </div>
       </section>
       <section id="calendar" class="calendar" aria-label="Training weeks"></section>
       <input id="program-file-input" class="visually-hidden" type="file" accept=".yaml,.yml,application/yaml,text/yaml">
@@ -168,6 +179,38 @@
         <div class="dialog-heading"><div><p class="eyebrow">Delete workout</p><h2 id="delete-workout-title">Delete workout?</h2></div><button type="button" class="icon-button close">×</button></div>
         <p id="delete-workout-message" class="editor-help"></p>
         <footer><button type="button" class="button secondary close">Cancel</button><button class="button danger">Delete workout</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="add-program-dialog" class="add-program-dialog">
+      <form id="add-program-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Programs</p><h2 id="add-program-title">Add a program</h2></div><button type="button" class="icon-button close">×</button></div>
+        <nav class="tabs" aria-label="Add program tabs">
+          <button type="button" class="tab" data-tab="upload" aria-selected="true" role="tab">Upload YAML</button>
+          <button type="button" class="tab" data-tab="templates" aria-selected="false" role="tab">Templates</button>
+        </nav>
+        <section id="add-program-tab-upload" class="add-program-tab" role="tabpanel" data-tab="upload">
+          <p class="editor-help">Choose a valid Runplan YAML file. It will be validated, stored for the selected user, and set as the active program.</p>
+          <button id="add-program-upload-button" class="button primary" type="button">Choose YAML file</button>
+        </section>
+        <section id="add-program-tab-templates" class="add-program-tab hidden" role="tabpanel" data-tab="templates">
+          <p class="editor-help">Choose a Nike Run Club training plan and start it on your preferred week. After copying it becomes a personal program you can edit, delete, or rearrange.</p>
+          <section id="templates-empty" class="templates-empty hidden">
+            <p>No bundled templates are available on this server.</p>
+          </section>
+          <section id="templates-list" class="templates-list"></section>
+          <section id="template-detail" class="template-detail hidden">
+            <div class="template-detail-header">
+              <p class="eyebrow" id="template-detail-eyebrow">Template</p>
+              <h3 id="template-detail-name"></h3>
+              <p id="template-detail-description" class="description"></p>
+              <ul id="template-detail-meta" class="template-meta"></ul>
+            </div>
+            <label>Start week<input id="template-start-week" required pattern="[0-9]{4}-W[0-9]{2}" placeholder="2026-W31"><small>First Monday on or after the chosen ISO week (YYYY-Www).</small></label>
+            <footer class="dialog-footer inner"><button id="template-back-button" type="button" class="button secondary">Back</button><button id="template-use-button" class="button primary">Create program</button></footer>
+          </section>
+        </section>
+        <footer><button type="button" class="button secondary close">Close</button></footer>
       </form>
     </dialog>
 

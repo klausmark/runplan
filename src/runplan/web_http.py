@@ -12,6 +12,12 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from .users import UserRegistry, WebError
 from .web_auth import WebAuthenticator
 from .web_auth_http import AuthResponse, WebAuthHttpAdapter
+from .web_templates import (
+    copy_template_dict_response,
+    copy_template_response,
+    get_template_response,
+    list_templates_response,
+)
 
 if TYPE_CHECKING:
     from .web import ProgramStore, WebSyncService
@@ -95,6 +101,10 @@ class RunplanHandler(BaseHTTPRequestHandler):
         if path == "/api/programs":
             self._upload_program(payload)
             return
+        template_parts = self._api_template_parts()
+        if len(template_parts) == 2 and template_parts[1] == "copy":
+            self._copy_template(payload)
+            return
         user_parts = self._api_user_parts(required=False)
         if len(user_parts) == 2 and user_parts[1] == "settings":
             self._json(HTTPStatus.OK, self.registry.update_settings(user_parts[0], payload))
@@ -129,6 +139,19 @@ class RunplanHandler(BaseHTTPRequestHandler):
         )
         self._json(HTTPStatus.CREATED, uploaded)
 
+    def _copy_template(self, payload: dict[str, Any]) -> None:
+        template_parts = self._api_template_parts()
+        if len(template_parts) != 2 or template_parts[1] != "copy":
+            raise WebError(HTTPStatus.NOT_FOUND, "Not found")
+        template_id = template_parts[0]
+        try:
+            response = copy_template_response(template_id, payload)
+        except ValueError as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
+        except KeyError as exc:
+            raise WebError(HTTPStatus.NOT_FOUND, str(exc)) from exc
+        self._json(HTTPStatus.OK, response)
+
     def _set_active_program(self, user_id: str, payload: dict[str, Any]) -> None:
         user = self.registry.get(user_id)
         filename = payload.get("filename")
@@ -160,6 +183,19 @@ class RunplanHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/users":
             self._json(HTTPStatus.OK, {"users": self.registry.list()})
+            return
+        if parsed.path == "/api/templates":
+            self._json(HTTPStatus.OK, list_templates_response())
+            return
+        template_parts = self._api_template_parts()
+        if len(template_parts) == 1:
+            try:
+                self._json(HTTPStatus.OK, get_template_response(template_parts[0]))
+            except KeyError as exc:
+                raise WebError(HTTPStatus.NOT_FOUND, str(exc)) from exc
+            return
+        if len(template_parts) == 3 and template_parts[1] == "preview":
+            self._json(HTTPStatus.OK, copy_template_dict_response(template_parts[0], query))
             return
         user_parts = self._api_user_parts(required=False)
         if len(user_parts) == 2 and user_parts[1] == "settings":
@@ -238,6 +274,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
 
     def _api_program_parts(self) -> list[str]:
         return self._api_parts("/api/programs/", required=True)
+
+    def _api_template_parts(self) -> list[str]:
+        return self._api_parts("/api/templates/", required=False)
 
     def _api_user_parts(self, *, required: bool = True) -> list[str]:
         return self._api_parts("/api/users/", required=required)

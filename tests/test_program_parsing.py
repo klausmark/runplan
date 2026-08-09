@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+import runplan
 from runplan import (
     WorkoutDefinitionError,
     build_workout,
@@ -134,6 +135,23 @@ def test_every_bundled_program_loads_and_builds_every_week() -> None:
         (PROJECT_DIR / "docs" / "examples").glob("*.yaml")
     )
     assert len(paths) >= 5
+
+    for path in paths:
+        first = load_definition(path)
+        assert first["program_short_name"], path.name
+        for week in first["weeks"]:
+            selected = load_definition(path, selected_week=week["number"])
+            for workout in selected["workouts"]:
+                assert not re.match(r"^Week\s+\d+\s+-", workout["name"]), path.name
+                build_workout(workout)
+
+
+def test_every_bundled_nike_template_loads_and_builds_every_week() -> None:
+    from runplan.templates.catalog import TEMPLATE_FILENAMES
+
+    template_dir = Path(runplan.__file__).parent / "templates" / "programs"
+    paths = sorted(template_dir / name for name in TEMPLATE_FILENAMES)
+    assert len(paths) == 4
 
     for path in paths:
         first = load_definition(path)

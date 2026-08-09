@@ -25,7 +25,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-runplan = ["web_assets/*.html", "web_assets/*.css", "web_assets/*.js", "web_assets/*.svg"]
+runplan = ["web_assets/*.html", "web_assets/*.css", "web_assets/*.js", "web_assets/*.svg", "templates/programs/*.yaml"]
 
 [dependency-groups]
 dev = [

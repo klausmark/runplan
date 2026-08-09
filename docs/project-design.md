@@ -250,6 +250,27 @@ Every published program should have:
 Personal programs remain useful fixtures but should live outside the general
 catalog without being deleted.
 
+## Plan templates
+
+Templates are a special case of curated programs: version-neutral content
+that the Studio can copy into a per-user program with a chosen start week.
+They live as static YAML files inside the `runplan` package at
+`src/runplan/templates/programs/` and are loaded with `importlib.resources`.
+The Python API (`runplan.templates`) and the HTTP endpoints
+`GET /api/templates`, `GET /api/templates/<id>`, and
+`POST /api/templates/<id>/copy` expose the same content; the Studio empty
+state shows a **Browse templates** button that opens the catalog and lets
+the user pick a template and a start week. The copied program has a
+per-user id (`<template-id>-<start-week>`) so that Garmin ownership stays
+stable across versions of the template.
+
+A template must satisfy the curated-program checklist above and additionally
+keep every pace reference in the `note` field of each step so that the
+runner can supply their own pace zones before syncing to Garmin Connect.
+The first delivery adapts the Nike Run Club 5K, 10K, half-marathon, and
+marathon plans; see `docs/nike-templates.md` for the conventions and the
+list of bundled files.
+
 ## Week selection and safe sync
 
 Preview, sync, and export should share one `WeekSelection` model supporting:
@@ -387,6 +408,7 @@ than reproduce domain behavior in browser code. Keep these boundaries explicit:
    separate community packages?
 5. What coaching review and source notes should accompany published programs?
 6. Ship the catalog inside the Python package or as a separately versioned
-   content package?
+   content package? Resolved: the bundled Nike templates ship as package data
+   under `src/runplan/templates/programs/`, loaded via `importlib.resources`.
 7. Which YAML round-trip representation can preserve unknown metadata and, if
    required, comments and formatting while supporting safe structured edits?

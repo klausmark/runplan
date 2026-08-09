@@ -40,6 +40,16 @@ from .presentation.text import (
     step_summary,
 )
 from .state.json_repository import load_state, save_state, state_path
+from .templates import (
+    TEMPLATE_CATALOG,
+    TemplateCopyError,
+    TemplateMetadata,
+    copy_template,
+    default_start_week,
+    get_template,
+    list_templates,
+    template_yaml,
+)
 
 logging.getLogger("runplan").addHandler(logging.NullHandler())
 
@@ -50,6 +60,9 @@ __all__ = [
     "Program",
     "ProgramExport",
     "Step",
+    "TEMPLATE_CATALOG",
+    "TemplateCopyError",
+    "TemplateMetadata",
     "TrainingDays",
     "Week",
     "WeekSelection",
@@ -61,6 +74,8 @@ __all__ = [
     "build_program_export",
     "compile_steps",
     "compose_program",
+    "copy_template",
+    "default_start_week",
     "delete_all_managed",
     "estimate_duration",
     "estimate_totals",
@@ -70,6 +85,8 @@ __all__ = [
     "format_program_html",
     "format_program_markdown",
     "format_totals",
+    "get_template",
+    "list_templates",
     "load_definition",
     "load_definition_model",
     "load_program",
@@ -87,4 +104,5 @@ __all__ = [
     "step_summary",
     "suggested_filename",
     "sync_program_week",
+    "template_yaml",
 ]
