@@ -86,11 +86,13 @@ def parse_step_end(value: Any, location: str) -> tuple[str, float]:
     if not isinstance(value, dict):
         return "time", parse_duration(value, location)
     end_keys = [key for key in value if key in ("time", "distance")]
-    unknown_keys = [key for key in value if key not in ("time", "distance", "pace", "note")]
+    unknown_keys = [
+        key for key in value if key not in ("time", "distance", "pace", "pace_type", "note")
+    ]
     if unknown_keys:
         raise WorkoutDefinitionError(
             f"{location}: unknown field {unknown_keys[0]!r}; use 'time', "
-            "'distance' and optionally 'pace'"
+            "'distance' and optionally 'pace' or 'pace_type'"
         )
     if len(end_keys) != 1:
         raise WorkoutDefinitionError(
@@ -163,6 +165,28 @@ def step_pace(value: Any, location: str) -> tuple[float, float] | None:
     return parse_pace(value[pace_keys[0]], f"{location}.{pace_keys[0]}")
 
 
+def step_pace_type(value: Any, location: str) -> str | None:
+    """Return an optional symbolic pace target from a regular step."""
+    if not isinstance(value, dict):
+        return None
+    pace_keys = [key for key in value if key == "pace_type"]
+    if not pace_keys:
+        return None
+    if len(pace_keys) > 1:
+        raise WorkoutDefinitionError(f"{location}: use only one pace_type field")
+    label = value[pace_keys[0]]
+    if not isinstance(label, str):
+        raise WorkoutDefinitionError(f"{location}: pace_type must be a string")
+    from ..domain.pace import PACE_INTENSITIES, TRAINING_INTENSITY_OFFSETS
+
+    if label not in PACE_INTENSITIES and label not in TRAINING_INTENSITY_OFFSETS:
+        raise WorkoutDefinitionError(
+            f"{location}: unknown pace_type {label!r}; "
+            f"use one of {sorted(PACE_INTENSITIES | TRAINING_INTENSITY_OFFSETS)}"
+        )
+    return label
+
+
 __all__ = [
     "MAX_STEP_NOTE_LENGTH",
     "parse_distance",
@@ -172,4 +196,5 @@ __all__ = [
     "parse_step_end",
     "step_note",
     "step_pace",
+    "step_pace_type",
 ]

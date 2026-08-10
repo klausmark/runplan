@@ -8,13 +8,16 @@ from typing import Any
 
 from .application.presentation_weeks import build_presentation_weeks, presentation_start
 from .domain.estimates import estimate_steps
+from .domain.pace import pace_zone, parse_total_seconds
 from .domain.selectors import WeekSelection
 from .domain.workout_titles import garmin_workout_title
 from .integrations.garmin.mapper import build_workout
 from .parsing.yaml_loader import load_definition, load_definition_model
 from .users import (
     DEFAULT_FIVE_K_BEST,
+    DEFAULT_PACE_ZONE_SECONDS_PER_KM,
     ENV_FIVE_K_BEST,
+    ENV_PACE_ZONE,
     fallback_pace_seconds_per_km,
 )
 
@@ -30,15 +33,33 @@ def week_selection(arguments: Namespace, *, default_all: bool = False) -> WeekSe
     return WeekSelection.all() if default_all else WeekSelection.ahead(1)
 
 
+def _resolve_pace_type(five_k_seconds: int, pace_zone_seconds_per_km: int):
+    """Return a closure that resolves a symbolic pace label into a Garmin target."""
+
+    def resolver(label: str) -> tuple[float, float]:
+        return pace_zone(five_k_seconds, label, tolerance_seconds_per_km=pace_zone_seconds_per_km)
+
+    return resolver
+
+
 def prepare_sync_selections(
     arguments: Namespace,
     *,
     fallback_pace_value: str | None = None,
+    pace_zone_seconds_per_km: int | None = None,
 ) -> list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]]:
     """Load, select, and compile weeks without terminal or Garmin I/O."""
     model = load_definition_model(arguments.yaml_file)
     five_k_best = fallback_pace_value or os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST)
+    five_k_seconds = parse_total_seconds(five_k_best)
     fallback_pace = fallback_pace_seconds_per_km(five_k_best)
+    zone = pace_zone_seconds_per_km
+    if zone is None:
+        try:
+            zone = int(os.getenv(ENV_PACE_ZONE, str(DEFAULT_PACE_ZONE_SECONDS_PER_KM)))
+        except ValueError:
+            zone = DEFAULT_PACE_ZONE_SECONDS_PER_KM
+    resolver = _resolve_pace_type(five_k_seconds, zone)
     presentation_weeks = build_presentation_weeks(model)
     selected_weeks = _resolved_weeks(arguments, model, presentation_weeks)
     selected_items = [
@@ -54,6 +75,7 @@ def prepare_sync_selections(
             selected_items,
             model.short_name,
             fallback_pace,
+            resolver,
         )
         for source_week in sorted({item.source_week for _, item in selected_items})
     ]
@@ -75,7 +97,12 @@ def _resolved_weeks(arguments: Namespace, model: Any, presentation_weeks: list[A
 
 
 def _compile_source_week(
-    path: Any, source_week: int, selected_items: list[Any], short_name: str, pace: float
+    path: Any,
+    source_week: int,
+    selected_items: list[Any],
+    short_name: str,
+    pace: float,
+    resolver,
 ) -> Any:
     definition = load_definition(path, source_week)
     presented = {
@@ -87,14 +114,18 @@ def _compile_source_week(
         workout for workout in definition["workouts"] if workout["id"] in presented
     ]
     compiled = [
-        _compile_workout(workout, presented[workout["id"]], short_name, pace)
+        _compile_workout(workout, presented[workout["id"]], short_name, pace, resolver)
         for workout in definition["workouts"]
     ]
     return definition, compiled
 
 
 def _compile_workout(
-    workout: dict[str, Any], presented: tuple[int, Any], short_name: str, pace: float
+    workout: dict[str, Any],
+    presented: tuple[int, Any],
+    short_name: str,
+    pace: float,
+    resolver,
 ) -> Any:
     presentation_week, item = presented
     workout["presentation_week"] = presentation_week
@@ -107,4 +138,4 @@ def _compile_workout(
     workout["name"] = garmin_workout_title(
         short_name, presentation_week, item.workout, pace, workout_name=item.name
     )
-    return workout, build_workout(workout)
+    return workout, build_workout(workout, resolve_pace_type=resolver)

@@ -75,6 +75,7 @@ class ProgramStore:
         *,
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> dict[str, Any]:
         """Validate and atomically store a new YAML program.
 
@@ -122,6 +123,7 @@ class ProgramStore:
             name,
             repository=repository,
             fallback_pace_value=fallback_pace_value,
+            pace_zone_seconds_per_km=pace_zone_seconds_per_km,
         )
 
     def list(self) -> list[dict[str, str]]:
@@ -167,6 +169,7 @@ class ProgramStore:
         *,
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> dict[str, Any]:
         """Build the web read model for one stored program."""
         from .web_projection import ProgramProjector
@@ -175,6 +178,7 @@ class ProgramStore:
             name,
             repository=repository,
             fallback_pace_value=fallback_pace_value,
+            pace_zone_seconds_per_km=pace_zone_seconds_per_km,
         )
 
     def edit(
@@ -184,6 +188,7 @@ class ProgramStore:
         *,
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> dict[str, Any]:
         """Validate and apply one program edit transaction."""
         from .web_editing import ProgramEditor
@@ -193,6 +198,7 @@ class ProgramStore:
             request,
             repository=repository,
             fallback_pace_value=fallback_pace_value,
+            pace_zone_seconds_per_km=pace_zone_seconds_per_km,
         )
 
     def delete(self, name: str) -> None:
@@ -205,8 +211,19 @@ class ProgramStore:
         logger.info("YAML program deleted file=%s", path)
 
     def export(
-        self, name: str, format_name: str, *, fallback_pace_value: str | None = None
+        self,
+        name: str,
+        format_name: str,
+        *,
+        fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> tuple[bytes, str, str]:
         path = self.path(name)
         raw, _ = self._read(path)
-        return export_program(path, raw, format_name, fallback_pace_value=fallback_pace_value)
+        return export_program(
+            path,
+            raw,
+            format_name,
+            fallback_pace_value=fallback_pace_value,
+            pace_zone_seconds_per_km=pace_zone_seconds_per_km,
+        )

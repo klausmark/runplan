@@ -192,6 +192,7 @@ class ProgramProjector:
         *,
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> dict[str, Any]:
         """Build one complete web read model.
 

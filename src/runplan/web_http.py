@@ -139,6 +139,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
             payload.get("content"),
             repository=self.sync.repository_for(user.id, filename),
             fallback_pace_value=user.five_k_best,
+            pace_zone_seconds_per_km=user.pace_zone_seconds_per_km,
         )
         self._json(HTTPStatus.CREATED, uploaded)
 
@@ -175,6 +176,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 payload,
                 repository=self.sync.repository_for(user.id, filename),
                 fallback_pace_value=user.five_k_best,
+                pace_zone_seconds_per_km=user.pace_zone_seconds_per_km,
             ),
         )
 
@@ -237,6 +239,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
                     parts[0],
                     repository=self.sync.repository_for(user.id, parts[0]),
                     fallback_pace_value=user.five_k_best,
+                    pace_zone_seconds_per_km=user.pace_zone_seconds_per_km,
                 ),
             )
             return
@@ -245,6 +248,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 parts[0],
                 query.get("format", [""])[0],
                 fallback_pace_value=user.five_k_best,
+                pace_zone_seconds_per_km=user.pace_zone_seconds_per_km,
             )
             self._bytes(content, content_type, filename)
             return

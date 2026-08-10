@@ -8,7 +8,7 @@ from typing import Any
 from ..domain.errors import WorkoutDefinitionError
 from ..domain.models import Program, Step, Week, Workout
 from ..domain.steps import normalize_action, repeat_parts
-from .values import parse_step_end, step_note, step_pace
+from .values import parse_step_end, step_note, step_pace, step_pace_type
 
 
 def _step_model(raw: Any, location: str) -> Step:
@@ -18,13 +18,17 @@ def _step_model(raw: Any, location: str) -> Step:
     action = normalize_action(raw_action, location)
     if action == "repeat":
         count, children = repeat_parts(value, location)
+        child_steps = tuple(
+            _step_model(child, f"{location}.steps[{index}]")
+            for index, child in enumerate(children, start=1)
+        )
+        for child in child_steps:
+            if child.pace_type is not None:
+                raise WorkoutDefinitionError(f"{location}: repeat children cannot carry pace_type")
         return Step(
             action="repeat",
             count=count,
-            steps=tuple(
-                _step_model(child, f"{location}.steps[{index}]")
-                for index, child in enumerate(children, start=1)
-            ),
+            steps=child_steps,
         )
     end_kind, end_value = parse_step_end(value, location)
     public_action = "recovery" if action == "walk" else action
@@ -33,6 +37,7 @@ def _step_model(raw: Any, location: str) -> Step:
         end_kind=end_kind,
         end_value=end_value,
         pace=step_pace(value, location),
+        pace_type=step_pace_type(value, location),
         note=step_note(value, location),
     )
 

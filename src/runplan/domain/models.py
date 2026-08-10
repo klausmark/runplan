@@ -20,6 +20,7 @@ class Step:
     end_kind: EndKind | None = None
     end_value: float | None = None
     pace: tuple[float, float] | None = None
+    pace_type: str | None = None
     note: str | None = None
     count: int | None = None
     steps: tuple[Step, ...] = ()
@@ -28,12 +29,19 @@ class Step:
         if self.action == "repeat":
             if self.count is None or self.count <= 0 or not self.steps:
                 raise ValueError("repeat steps require a positive count and child steps")
-            if self.end_kind is not None or self.end_value is not None or self.pace:
+            if (
+                self.end_kind is not None
+                or self.end_value is not None
+                or self.pace
+                or self.pace_type
+            ):
                 raise ValueError("repeat steps cannot have an end condition or pace")
         elif self.end_kind is None or self.end_value is None or self.end_value <= 0:
             raise ValueError("regular steps require a positive end condition")
         elif self.count is not None or self.steps:
             raise ValueError("regular steps cannot contain repeat fields")
+        if self.pace is not None and self.pace_type is not None:
+            raise ValueError("regular steps cannot combine pace and pace_type")
 
 
 @dataclass(frozen=True, slots=True)

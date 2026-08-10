@@ -31,6 +31,7 @@ def export_program(
     format_name: str,
     *,
     fallback_pace_value: str | None = None,
+    pace_zone_seconds_per_km: int | None = None,
 ) -> tuple[bytes, str, str]:
     """Render one program document in the requested download format."""
     try:

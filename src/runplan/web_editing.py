@@ -51,8 +51,14 @@ class ProgramEditor:
         *,
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> dict[str, Any]:
-        return self.store.get(name, repository=repository, fallback_pace_value=fallback_pace_value)
+        return self.store.get(
+            name,
+            repository=repository,
+            fallback_pace_value=fallback_pace_value,
+            pace_zone_seconds_per_km=pace_zone_seconds_per_km,
+        )
 
     def edit(
         self,
@@ -61,6 +67,7 @@ class ProgramEditor:
         *,
         repository: StateRepository | None = None,
         fallback_pace_value: str | None = None,
+        pace_zone_seconds_per_km: int | None = None,
     ) -> dict[str, Any]:
         path = self.path(name)
         raw, text = self._read(path)
@@ -85,6 +92,7 @@ class ProgramEditor:
             name,
             repository=repository,
             fallback_pace_value=fallback_pace_value,
+            pace_zone_seconds_per_km=pace_zone_seconds_per_km,
         )
 
     def _apply_request(

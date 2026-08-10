@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from garminconnect.workout import (
@@ -17,13 +18,15 @@ from garminconnect.workout import (
 from ...domain.errors import WorkoutDefinitionError
 from ...domain.models import Step, Workout
 from ...domain.steps import estimate_duration, normalize_action, repeat_parts
-from ...parsing.values import parse_step_end, step_note, step_pace
+from ...parsing.values import parse_step_end, step_note, step_pace, step_pace_type
 
 RUNNING_SPORT = {
     "sportTypeId": 1,
     "sportTypeKey": "running",
     "displayOrder": 1,
 }
+
+PaceResolver = Callable[[str], tuple[float, float]]
 
 
 def add_description(step: Any, text: str) -> Any:
@@ -66,7 +69,12 @@ def set_pace_target(step: Any, pace: tuple[float, float] | None) -> Any:
     )
 
 
-def compile_steps(step_definitions: list[Any], location: str = "steps") -> list[Any]:
+def compile_steps(
+    step_definitions: list[Any],
+    location: str = "steps",
+    *,
+    resolve_pace_type: PaceResolver | None = None,
+) -> list[Any]:
     """Recursively compile human-authored steps to Garmin models."""
     compiled: list[Any] = []
     creators = {
@@ -89,7 +97,11 @@ def compile_steps(step_definitions: list[Any], location: str = "steps") -> list[
             compiled.append(
                 create_repeat_group(
                     iterations=count,
-                    workout_steps=compile_steps(child_steps, location=f"{item_location}.steps"),
+                    workout_steps=compile_steps(
+                        child_steps,
+                        location=f"{item_location}.steps",
+                        resolve_pace_type=resolve_pace_type,
+                    ),
                     step_order=order,
                 )
             )
@@ -99,7 +111,16 @@ def compile_steps(step_definitions: list[Any], location: str = "steps") -> list[
         creator, default_description = creators[action]
         step = creator(end_value, step_order=order)
         step = set_step_end(step, kind, end_value)
-        step = set_pace_target(step, step_pace(value, item_location))
+        pace = step_pace(value, item_location)
+        if pace is None:
+            label = step_pace_type(value, item_location)
+            if label is not None:
+                if resolve_pace_type is None:
+                    raise WorkoutDefinitionError(
+                        f"{item_location}: pace_type {label!r} requires a 5K best resolver"
+                    )
+                pace = resolve_pace_type(label)
+        step = set_pace_target(step, pace)
         note = step_note(value, item_location)
         compiled.append(add_description(step, note if note is not None else default_description))
     return compiled
@@ -110,12 +131,19 @@ def _format_pace(seconds: float) -> str:
     return f"{minutes}:{remainder:02d}"
 
 
-def _step_definition(step: Step) -> dict[str, Any]:
+def _step_definition(
+    step: Step,
+    *,
+    resolve_pace_type: PaceResolver | None = None,
+) -> dict[str, Any]:
     if step.action == "repeat":
         return {
             "repeat": {
                 "count": step.count,
-                "steps": [_step_definition(child) for child in step.steps],
+                "steps": [
+                    _step_definition(child, resolve_pace_type=resolve_pace_type)
+                    for child in step.steps
+                ],
             }
         }
     assert step.end_kind is not None and step.end_value is not None
@@ -128,31 +156,48 @@ def _step_definition(step: Step) -> dict[str, Any]:
         if fast != slow:
             value["pace"] += f"-{_format_pace(slow)}"
         value["pace"] += " min/km"
+    elif step.pace_type is not None:
+        if resolve_pace_type is None:
+            raise WorkoutDefinitionError(
+                f"step with pace_type {step.pace_type!r} requires a 5K best resolver"
+            )
+        fast, slow = resolve_pace_type(step.pace_type)
+        value["pace"] = f"{_format_pace(fast)}-{_format_pace(slow)} min/km"
     if step.note is not None:
         value["note"] = step.note
     return {step.action: value}
 
 
-def workout_definition(workout: Workout) -> dict[str, Any]:
+def workout_definition(
+    workout: Workout,
+    *,
+    resolve_pace_type: PaceResolver | None = None,
+) -> dict[str, Any]:
     """Map a domain workout to the canonical definition consumed by Garmin."""
     return {
         "id": workout.id,
         "day": workout.day,
         "name": workout.name,
         "description": workout.description,
-        "steps": [_step_definition(step) for step in workout.steps],
+        "steps": [
+            _step_definition(step, resolve_pace_type=resolve_pace_type) for step in workout.steps
+        ],
         "schedule_date": workout.schedule_date.isoformat(),
     }
 
 
-def build_workout(definition: dict[str, Any] | Workout) -> RunningWorkout:
+def build_workout(
+    definition: dict[str, Any] | Workout,
+    *,
+    resolve_pace_type: PaceResolver | None = None,
+) -> RunningWorkout:
     """Build a typed Garmin running workout."""
     if isinstance(definition, Workout):
-        definition = workout_definition(definition)
+        definition = workout_definition(definition, resolve_pace_type=resolve_pace_type)
     segment = WorkoutSegment(
         segmentOrder=1,
         sportType=RUNNING_SPORT,
-        workoutSteps=compile_steps(definition["steps"]),
+        workoutSteps=compile_steps(definition["steps"], resolve_pace_type=resolve_pace_type),
     )
     return RunningWorkout(
         workoutName=definition["name"],
@@ -162,4 +207,4 @@ def build_workout(definition: dict[str, Any] | Workout) -> RunningWorkout:
     )
 
 
-__all__ = ["build_workout", "compile_steps", "workout_definition"]
+__all__ = ["PaceResolver", "build_workout", "compile_steps", "workout_definition"]
