@@ -70,13 +70,17 @@ def test_template_metadata_matches_expected_layout(template_id: str) -> None:
 @pytest.mark.parametrize("template_id", list(EXPECTED_TEMPLATES))
 def test_template_loads_and_builds_every_week(template_id: str) -> None:
     item = get_template(template_id)
+
+    def resolver(_label: str) -> tuple[float, float]:
+        return (295.0, 305.0)
+
     for week_number in range(1, item.duration_weeks + 1):
         normalized = load_program(_load_template_raw(template_id), selected_week=week_number)
         for workout in normalized["workouts"]:
             assert not re.match(r"^Week\s+\d+\s+-", workout["name"])
             assert workout["steps"], workout
-            assert compile_steps(workout["steps"])
-            build_workout(workout)
+            assert compile_steps(workout["steps"], resolve_pace_type=resolver)
+            build_workout(workout, resolve_pace_type=resolver)
 
 
 @pytest.mark.parametrize("template_id", list(EXPECTED_TEMPLATES))

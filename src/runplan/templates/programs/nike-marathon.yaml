@@ -102,13 +102,13 @@ program:
         each pace target as the middle of a range. You may train slightly above
         or below these paces. They are not exact paces and you are not a robot.
       headers:
-        - { label: "1K best", description: "Your best 1K effort in minutes per kilometer." }
-        - { label: "5K best / avg km", description: "Best 5K time and the average pace per kilometer you held during it." }
-        - { label: "10K best / avg km", description: "Best 10K time and the average pace per kilometer you held during it." }
-        - { label: "Tempo min/km", description: "Steady, hard-but-controlled pace per kilometer." }
-        - { label: "Half marathon best / avg km", description: "Best half marathon time and the average pace per kilometer you held during it." }
-        - { label: "Marathon best / avg km", description: "Best marathon time and the average pace per kilometer you held during it." }
-        - { label: "Recovery min/km", description: "Easy conversational pace per kilometer." }
+        - {label: "1K best", description: "Your best 1K effort in minutes per kilometer."}
+        - {label: "5K best / avg km", description: "Best 5K time and the average pace per kilometer you held during it."}
+        - {label: "10K best / avg km", description: "Best 10K time and the average pace per kilometer you held during it."}
+        - {label: "Tempo min/km", description: "Steady, hard-but-controlled pace per kilometer."}
+        - {label: "Half marathon best / avg km", description: "Best half marathon time and the average pace per kilometer you held during it."}
+        - {label: "Marathon best / avg km", description: "Best marathon time and the average pace per kilometer you held during it."}
+        - {label: "Recovery min/km", description: "Easy conversational pace per kilometer."}
       rows:
         - ["3:00", "16:40 / 3:20", "35:00 / 3:30", "3:40", "1:19:07 / 3:45", "2:45:16 / 3:55", "4:20"]
         - ["3:20", "18:45 / 3:45", "39:10 / 3:55", "4:05", "1:27:54 / 4:10", "3:02:51 / 4:20", "4:45"]
@@ -188,12 +188,12 @@ program:
           to build mental and physical endurance and to become comfortable being
           uncomfortable.
     pace_types:
-      - { name: "Best Pace", effort: "10 out of 10", description: "This is the pace that makes you feel like you are at your best. Sometimes this may mean your fastest and sometimes this will mean running easier. The pace and effort you run will be your choice." }
-      - { name: "Mile Pace", effort: "9 out of 10", description: "This is the pace you could race or run hard for one mile." }
-      - { name: "5K Pace", effort: "7-8 out of 10", description: "This is the pace you could race or run hard for about 3 miles." }
-      - { name: "10K Pace", effort: "6-7 out of 10", description: "This is the pace you could race or run hard for about 6 miles." }
-      - { name: "Tempo Pace", effort: "6 out of 10", description: "Teaching your body to be comfortable being uncomfortable by maintaining a hard pace and effort that is close to 30-35 seconds slower than your 5K pace." }
-      - { name: "Recovery Pace", effort: "4-5 out of 10", description: "A pace easy enough that you can talk, laugh or argue freely while running." }
+      - {name: "Best Pace", effort: "10 out of 10", description: "This is the pace that makes you feel like you are at your best. Sometimes this may mean your fastest and sometimes this will mean running easier. The pace and effort you run will be your choice."}
+      - {name: "1K Pace", effort: "9 out of 10", description: "This is the pace you could race or run hard for one kilometer."}
+      - {name: "5K Pace", effort: "7-8 out of 10", description: "This is the pace you could race or run hard for about 3 miles."}
+      - {name: "10K Pace", effort: "6-7 out of 10", description: "This is the pace you could race or run hard for about 6 miles."}
+      - {name: "Tempo Pace", effort: "6 out of 10", description: "Teaching your body to be comfortable being uncomfortable by maintaining a hard pace and effort that is close to 30-35 seconds slower than your 5K pace."}
+      - {name: "Recovery Pace", effort: "4-5 out of 10", description: "A pace easy enough that you can talk, laugh or argue freely while running."}
     things_to_know:
       - "When in doubt be sure to focus on effort. Paces can change due to many factors including but not limited to changes in fitness, weather, elevation, stress, fatigue, and lack of sleep. Be sure to listen to your body and not just focus on the numbers on your watch or phone."
       - "As you make your way through the training there will be days you may be a little ahead of pace, and other days a little behind. Remember that the paces are only to be used as a guide. You will have good days and bad days as an athlete. Be flexible with your expectations. Hopefully, you will be increasing your fitness each week and your paces will increase in speed as you go."
@@ -270,7 +270,7 @@ weeks:
         name: Recovery Run
         description: Progression Runs build pace from slower than Recovery pace to faster than Recovery pace. Your Long and Recovery Runs should be run as Progression Runs.
         steps:
-          - run: {time: 10m, note: "10:00 Recovery Run"}
+          - run: {time: 10m, note: "10:00 Recovery Run", pace_type: recovery}
       - id: speed-intervals
         day: 2
         name: Speed Run - Intervals
@@ -286,12 +286,12 @@ weeks:
         day: 4
         name: Recovery Run
         steps:
-          - run: {distance: 3.2km, note: "3.2K / 2 Mile Recovery Run"}
+          - run: {distance: 3.2km, note: "3.2K / 2 Mile Recovery Run", pace_type: recovery}
       - id: recovery-7
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 7m, note: "7:00 Recovery Run"}
+          - run: {time: 7m, note: "7:00 Recovery Run", pace_type: recovery}
       - id: long-five-mile
         day: 7
         name: Long Run
@@ -304,40 +304,40 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 15m, note: "15:00 Recovery Run"}
+          - run: {time: 15m, note: "15:00 Recovery Run", pace_type: recovery}
       - id: recovery-5k-a
         day: 3
         name: Recovery Run
         steps:
-          - run: {distance: 5km, note: "5K / 3.1 Mile Recovery Run"}
+          - run: {distance: 5km, note: "5K / 3.1 Mile Recovery Run", pace_type: recovery}
       - id: speed-pyramid
         day: 4
         name: Speed Run - Intervals
         steps:
           - warmup: {time: 5m, note: "5:00 Warm Up"}
-          - run: {time: 1m, note: "1:00 5K Pace"}
-          - run: {time: 2m, note: "2:00 10K Pace"}
-          - run: {time: 1m, note: "1:00 5K Pace"}
+          - run: {time: 1m, note: "1:00 5K Pace", pace_type: 5k}
+          - run: {time: 2m, note: "2:00 10K Pace", pace_type: 10k}
+          - run: {time: 1m, note: "1:00 5K Pace", pace_type: 5k}
           - repeat:
               count: 2
               steps:
-                - run: {time: 45s, note: "0:45 Mile Pace"}
-          - run: {time: 2m, note: "2:00 10K Pace"}
-          - run: {time: 1m, note: "1:00 5K Pace"}
-          - run: {time: 45s, note: "0:45 Mile Pace"}
+                - run: {time: 45s, note: "0:45 1K Pace"}
+          - run: {time: 2m, note: "2:00 10K Pace", pace_type: 10k}
+          - run: {time: 1m, note: "1:00 5K Pace", pace_type: 5k}
+          - run: {time: 45s, note: "0:45 1K Pace", pace_type: 1k}
           - run: {time: 30s, note: "0:30 Best Pace"}
           - run: {time: 15s, note: "0:15 Best Pace"}
-          - recovery: {time: 1m, note: "1:00 Recovery between all intervals"}
+          - recovery: {time: 1m, note: "1:00 Recovery between all intervals", pace_type: recovery}
       - id: recovery-one-mile-a
         day: 5
         name: Recovery Run
         steps:
-          - run: {distance: 1.6km, note: "1.6K / 1 Mile Recovery Run"}
+          - run: {distance: 1.6km, note: "1.6K / 1 Mile Recovery Run", pace_type: recovery}
       - id: long-10k-a
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 10km, note: "10K / 6.2 Mile Run"}
+          - run: {distance: 10km, note: "10K / 6.2 Mile Run", pace_type: 10k}
   - week: 3
     focus: 16 weeks to go - Fartlek and 7-mile long run
     workouts:
@@ -345,12 +345,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 15m, note: "15:00 Recovery Run"}
+          - run: {time: 15m, note: "15:00 Recovery Run", pace_type: recovery}
       - id: recovery-5k-b
         day: 3
         name: Recovery Run
         steps:
-          - run: {distance: 5km, note: "5K / 3.1 Mile Recovery Run"}
+          - run: {distance: 5km, note: "5K / 3.1 Mile Recovery Run", pace_type: recovery}
       - id: speed-fartlek
         day: 4
         name: Speed Run - Fartlek
@@ -366,12 +366,12 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: long-seven-mile
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 11.25km, note: "11.25K / 7 Mile Run"}
+          - run: {distance: 11.25km, note: "11.25K / 7 Mile Run", pace_type: 5k}
   - week: 4
     focus: 15 weeks to go - Hills and 10K long run
     workouts:
@@ -379,12 +379,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 20m, note: "20:00 Recovery Run"}
+          - run: {time: 20m, note: "20:00 Recovery Run", pace_type: recovery}
       - id: recovery-30
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: speed-hills
         day: 4
         name: Speed Run - Hills
@@ -402,12 +402,12 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 35m, note: "35:00 Recovery Run"}
+          - run: {time: 35m, note: "35:00 Recovery Run", pace_type: recovery}
       - id: long-10k-b
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 10km, note: "10K / 6.2 Mile Run"}
+          - run: {distance: 10km, note: "10K / 6.2 Mile Run", pace_type: 10k}
   - week: 5
     focus: 14 weeks to go - Speedurance and 13K long run
     workouts:
@@ -415,35 +415,35 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: recovery-40
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 40m, note: "40:00 Recovery Run"}
+          - run: {time: 40m, note: "40:00 Recovery Run", pace_type: recovery}
       - id: speed-speedurance
         day: 4
         name: Speed Run - Intervals
         steps:
           - warmup: {time: 7m, note: "7:00 Warm Up"}
-          - run: {time: 2m, note: "2:00 5K Pace"}
-          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace"}
-          - run: {time: 2m, note: "2:00 5K Pace"}
-          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace"}
-          - run: {time: 2m, note: "2:00 5K Pace"}
-          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace"}
-          - run: {time: 10m, note: "10:00 Tempo Run"}
-          - recovery: {time: 2m, note: "2:00 Recovery after Tempo Run"}
-          - run: {time: 2m, note: "2:00 5K Pace"}
-          - recovery: {time: 1m, note: "1:00 Recovery"}
-          - run: {time: 2m, note: "2:00 5K Pace"}
-          - recovery: {time: 1m, note: "1:00 Recovery"}
-          - run: {time: 2m, note: "2:00 5K Pace"}
+          - run: {time: 2m, note: "2:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace", pace_type: recovery}
+          - run: {time: 2m, note: "2:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace", pace_type: recovery}
+          - run: {time: 2m, note: "2:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 1m, note: "1:00 Recovery after 5K Pace", pace_type: recovery}
+          - run: {time: 10m, note: "10:00 Tempo Run", pace_type: tempo}
+          - recovery: {time: 2m, note: "2:00 Recovery after Tempo Run", pace_type: tempo}
+          - run: {time: 2m, note: "2:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 1m, note: "1:00 Recovery", pace_type: recovery}
+          - run: {time: 2m, note: "2:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 1m, note: "1:00 Recovery", pace_type: recovery}
+          - run: {time: 2m, note: "2:00 5K Pace", pace_type: 5k}
       - id: recovery-45
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 45m, note: "45:00 Recovery Run"}
+          - run: {time: 45m, note: "45:00 Recovery Run", pace_type: recovery}
       - id: long-13k
         day: 7
         name: Long Run
@@ -456,12 +456,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: recovery-35-b
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 35m, note: "35:00 Recovery Run"}
+          - run: {time: 35m, note: "35:00 Recovery Run", pace_type: recovery}
       - id: speed-3x-5k-mile
         day: 4
         name: Speed Run - Intervals
@@ -475,13 +475,13 @@ weeks:
                 - repeat:
                     count: 4
                     steps:
-                      - run: {time: 30s, note: "0:30 Mile Pace"}
-                      - recovery: {time: 1m, note: "1:00 Recovery after Mile Pace"}
+                      - run: {time: 30s, note: "0:30 1K Pace"}
+                      - recovery: {time: 1m, note: "1:00 Recovery after 1K Pace"}
       - id: recovery-45-b
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 45m, note: "45:00 Recovery Run"}
+          - run: {time: 45m, note: "45:00 Recovery Run", pace_type: recovery}
       - id: long-16k
         day: 7
         name: Long Run
@@ -494,29 +494,29 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 35m, note: "35:00 Recovery Run"}
+          - run: {time: 35m, note: "35:00 Recovery Run", pace_type: recovery}
       - id: recovery-30-c
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: speed-tempo-20
         day: 4
         name: Speed Run - Tempo
         description: A Tempo Run is a hard but controlled pace run as long intervals or a steady run.
         steps:
           - warmup: {time: 7m, note: "7:00 Warm Up"}
-          - run: {time: 20m, note: "20:00 Tempo Run"}
+          - run: {time: 20m, note: "20:00 Tempo Run", pace_type: tempo}
       - id: recovery-48
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 48m, note: "48:00 Recovery Run"}
+          - run: {time: 48m, note: "48:00 Recovery Run", pace_type: recovery}
       - id: long-15k
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 15km, note: "15K / 9.32 Mile Run"}
+          - run: {distance: 15km, note: "15K / 9.32 Mile Run", pace_type: 5k}
   - week: 8
     focus: 11 weeks to go - Triple 7's and 20K long run
     workouts:
@@ -524,12 +524,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 35m, note: "35:00 Recovery Run"}
+          - run: {time: 35m, note: "35:00 Recovery Run", pace_type: recovery}
       - id: recovery-25-c
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: speed-3x7
         day: 4
         name: Speed Run - Intervals
@@ -544,7 +544,7 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 60m, note: "60:00 Recovery Run"}
+          - run: {time: 60m, note: "60:00 Recovery Run", pace_type: recovery}
       - id: long-20k
         day: 7
         name: Long Run
@@ -557,28 +557,28 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 45m, note: "45:00 Recovery Run"}
+          - run: {time: 45m, note: "45:00 Recovery Run", pace_type: recovery}
       - id: recovery-32
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 32m, note: "32:00 Recovery Run"}
+          - run: {time: 32m, note: "32:00 Recovery Run", pace_type: recovery}
       - id: speed-tempo-25
         day: 4
         name: Speed Run - Tempo
         steps:
           - warmup: {time: 7m, note: "7:00 Warm Up"}
-          - run: {time: 25m, note: "25:00 Tempo Run"}
+          - run: {time: 25m, note: "25:00 Tempo Run", pace_type: tempo}
       - id: recovery-33
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 33m, note: "33:00 Recovery Run"}
+          - run: {time: 33m, note: "33:00 Recovery Run", pace_type: recovery}
       - id: long-half-marathon
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 21.1km, note: "21.1K / 13.1 Miles"}
+          - run: {distance: 21.1km, note: "21.1K / 13.1 Miles", pace_type: half-marathon}
   - week: 10
     focus: 9 weeks to go - 5 x 5 x 10K Pace and 120-minute long run
     workouts:
@@ -586,12 +586,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 50m, note: "50:00 Recovery Run"}
+          - run: {time: 50m, note: "50:00 Recovery Run", pace_type: recovery}
       - id: recovery-60-b
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 60m, note: "60:00 Recovery Run"}
+          - run: {time: 60m, note: "60:00 Recovery Run", pace_type: recovery}
       - id: speed-5x5x10k
         day: 4
         name: Speed Run - Intervals
@@ -606,7 +606,7 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 33m, note: "33:00 Recovery Run"}
+          - run: {time: 33m, note: "33:00 Recovery Run", pace_type: recovery}
       - id: long-120
         day: 7
         name: Long Run
@@ -619,12 +619,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 40m, note: "40:00 Recovery Run"}
+          - run: {time: 40m, note: "40:00 Recovery Run", pace_type: recovery}
       - id: recovery-35-e
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 35m, note: "35:00 Recovery Run"}
+          - run: {time: 35m, note: "35:00 Recovery Run", pace_type: recovery}
       - id: speed-tempo-23
         day: 4
         name: Speed Run - Tempo
@@ -636,7 +636,7 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: long-14-16
         day: 7
         name: Long Run
@@ -649,12 +649,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 60m, note: "60:00 Recovery Run"}
+          - run: {time: 60m, note: "60:00 Recovery Run", pace_type: recovery}
       - id: recovery-30-e
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: speed-hill-hillier-hilliest
         day: 4
         name: Speed Run - Hills
@@ -674,7 +674,7 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: long-16-18
         day: 7
         name: Long Run
@@ -687,12 +687,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 65m, note: "65:00 Recovery Run"}
+          - run: {time: 65m, note: "65:00 Recovery Run", pace_type: recovery}
       - id: recovery-31
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 31m, note: "31:00 Recovery Run"}
+          - run: {time: 31m, note: "31:00 Recovery Run", pace_type: recovery}
       - id: speed-long-strong-fast
         day: 4
         name: Speed Run - Intervals
@@ -705,13 +705,13 @@ weeks:
                 - recovery: {time: 3m, note: "3:00 recovery after 10K Pace"}
                 - run: {time: 4m, note: "4:00 5K Pace"}
                 - recovery: {time: 2m, note: "2:00 recovery after 5K Pace"}
-                - run: {time: 2m, note: "2:00 Mile Pace"}
-                - recovery: {time: 2m, note: "2:00 recovery after Mile Pace"}
+                - run: {time: 2m, note: "2:00 1K Pace"}
+                - recovery: {time: 2m, note: "2:00 recovery after 1K Pace"}
       - id: recovery-30-g
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: long-90
         day: 7
         name: Long Run
@@ -724,12 +724,12 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 75m, note: "75:00 Recovery Run"}
+          - run: {time: 75m, note: "75:00 Recovery Run", pace_type: recovery}
       - id: recovery-25-d
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: speed-fartlek-2-1
         day: 4
         name: Speed Run - Fartlek
@@ -745,12 +745,12 @@ weeks:
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: long-18-22
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 32km, note: "Long Run - 29-35K / 18-22 Mile Run (pick what feels right)"}
+          - run: {distance: 32km, note: "Long Run - 29-35K / 18-22 Mile Run (pick what feels right)", pace_type: 5k}
   - week: 15
     focus: 4 weeks to go - Power Pyramid and 15-16 mile long run
     workouts:
@@ -758,31 +758,31 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 45m, note: "45:00 Recovery Run"}
+          - run: {time: 45m, note: "45:00 Recovery Run", pace_type: recovery}
       - id: recovery-45-e
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 45m, note: "45:00 Recovery Run"}
+          - run: {time: 45m, note: "45:00 Recovery Run", pace_type: recovery}
       - id: speed-power-pyramid
         day: 4
         name: Speed Run - Intervals
         steps:
           - warmup: {time: 5m, note: "5:00 Warm Up"}
-          - run: {time: 1m, note: "1:00 Mile Pace"}
-          - recovery: {time: 30s, note: "30 seconds after Mile Pace"}
-          - run: {time: 5m, note: "5:00 5K Pace"}
-          - recovery: {time: 2m30s, note: "2:30 after 5K pace"}
-          - run: {time: 10m, note: "10:00 10K Pace"}
-          - recovery: {time: 3m, note: "3:00 after 10K pace"}
-          - run: {time: 5m, note: "5:00 5K Pace"}
-          - recovery: {time: 2m30s, note: "2:30 after 5K pace"}
-          - run: {time: 1m, note: "1:00 Mile Pace"}
+          - run: {time: 1m, note: "1:00 1K Pace", pace_type: 1k}
+          - recovery: {time: 30s, note: "30 seconds after 1K Pace", pace_type: 1k}
+          - run: {time: 5m, note: "5:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 2m30s, note: "2:30 after 5K pace", pace_type: 5k}
+          - run: {time: 10m, note: "10:00 10K Pace", pace_type: 10k}
+          - recovery: {time: 3m, note: "3:00 after 10K pace", pace_type: 10k}
+          - run: {time: 5m, note: "5:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 2m30s, note: "2:30 after 5K pace", pace_type: 5k}
+          - run: {time: 1m, note: "1:00 1K Pace", pace_type: 1k}
       - id: recovery-25-e
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: long-15-16
         day: 7
         name: Long Run
@@ -795,29 +795,29 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 80m, note: "80:00 Recovery Run"}
+          - run: {time: 80m, note: "80:00 Recovery Run", pace_type: recovery}
       - id: recovery-25-f
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: speed-8k-tempo
         day: 4
         name: Speed Run - Tempo
         steps:
           - warmup: {distance: 2km, note: "2K Warm Up"}
-          - run: {distance: 8km, note: "8K Tempo Run"}
+          - run: {distance: 8km, note: "8K Tempo Run", pace_type: tempo}
           - cooldown: {distance: 2km, note: "2K Cool Down"}
       - id: recovery-30-i
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 30m, note: "30:00 Recovery Run"}
+          - run: {time: 30m, note: "30:00 Recovery Run", pace_type: recovery}
       - id: long-12-14
         day: 7
         name: Long Run
         steps:
-          - run: {distance: 21km, note: "Long Run - 19-23K / 12-14 Mile Run (pick what feels right)"}
+          - run: {distance: 21km, note: "Long Run - 19-23K / 12-14 Mile Run (pick what feels right)", pace_type: half-marathon}
   - week: 17
     focus: 2 weeks to go - In Control intervals and 10-mile long run
     workouts:
@@ -825,29 +825,29 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {time: 45m, note: "45:00 Recovery Run"}
+          - run: {time: 45m, note: "45:00 Recovery Run", pace_type: recovery}
       - id: recovery-four-mile
         day: 3
         name: Recovery Run
         steps:
-          - run: {distance: 6.5km, note: "6.5K / 4.0 Mile Recovery Run"}
+          - run: {distance: 6.5km, note: "6.5K / 4.0 Mile Recovery Run", pace_type: recovery}
       - id: speed-in-control
         day: 4
         name: Speed Run - Intervals
         steps:
           - warmup: {time: 6m, note: "6:00 Warm Up"}
-          - run: {time: 1m, note: "1:00 Mile Pace"}
-          - recovery: {time: 30s, note: "0:30 recovery after Mile Pace"}
-          - run: {time: 3m, note: "3:00 5K Pace"}
-          - recovery: {time: 1m30s, note: "1:30 recovery after 5K Pace"}
-          - run: {time: 5m, note: "5:00 10K Pace"}
-          - recovery: {time: 2m30s, note: "2:30 recovery after 10K Pace"}
-          - run: {time: 7m, note: "7:00 Recovery Run Pace"}
+          - run: {time: 1m, note: "1:00 1K Pace", pace_type: 1k}
+          - recovery: {time: 30s, note: "0:30 recovery after 1K Pace", pace_type: 1k}
+          - run: {time: 3m, note: "3:00 5K Pace", pace_type: 5k}
+          - recovery: {time: 1m30s, note: "1:30 recovery after 5K Pace", pace_type: recovery}
+          - run: {time: 5m, note: "5:00 10K Pace", pace_type: 10k}
+          - recovery: {time: 2m30s, note: "2:30 recovery after 10K Pace", pace_type: recovery}
+          - run: {time: 7m, note: "7:00 Recovery Run Pace", pace_type: recovery}
       - id: recovery-60-d
         day: 5
         name: Recovery Run
         steps:
-          - run: {time: 60m, note: "60:00 Recovery Run"}
+          - run: {time: 60m, note: "60:00 Recovery Run", pace_type: recovery}
       - id: long-10-mile
         day: 7
         name: Long Run
@@ -860,21 +860,21 @@ weeks:
         day: 1
         name: Recovery Run
         steps:
-          - run: {distance: 5km, note: "5K / 3.1 Mile Recovery Run"}
+          - run: {distance: 5km, note: "5K / 3.1 Mile Recovery Run", pace_type: recovery}
       - id: recovery-25-g
         day: 3
         name: Recovery Run
         steps:
-          - run: {time: 25m, note: "25:00 Recovery Run"}
+          - run: {time: 25m, note: "25:00 Recovery Run", pace_type: recovery}
       - id: speed-progression-tempo
         day: 4
         name: Speed Run - Tempo
         steps:
           - warmup: {time: 5m, note: "5:00 Warmup"}
-          - run: {time: 5m, note: "5:00 Recovery Run Pace"}
-          - run: {time: 4m, note: "4:00 10K Pace"}
-          - run: {time: 3m, note: "3:00 5K Pace"}
-          - run: {time: 2m, note: "2:00 Mile Pace"}
+          - run: {time: 5m, note: "5:00 Recovery Run Pace", pace_type: recovery}
+          - run: {time: 4m, note: "4:00 10K Pace", pace_type: 10k}
+          - run: {time: 3m, note: "3:00 5K Pace", pace_type: 5k}
+          - run: {time: 2m, note: "2:00 1K Pace", pace_type: 1k}
           - run: {time: 1m, note: "1:00 Best Pace"}
       - id: recovery-one-mile-b
         day: 5
@@ -885,4 +885,4 @@ weeks:
         day: 7
         name: Race Day - Marathon
         steps:
-          - run: {distance: 42.2km, note: "THE RACE - 42.2K / 26.2 Miles"}
+          - run: {distance: 42.2km, note: "THE RACE - 42.2K / 26.2 Miles", pace_type: marathon}

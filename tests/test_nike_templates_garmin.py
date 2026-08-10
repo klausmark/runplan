@@ -19,16 +19,20 @@ def test_every_template_workout_compiles_to_garmin_payload(template_id: str) -> 
     from runplan.templates.catalog import load_template_program
 
     program = load_template_program(template_id)
+
+    def resolver(_label: str) -> tuple[float, float]:
+        return (295.0, 305.0)
+
     for week in program.weeks:
         for workout in week.workouts:
-            payload = build_workout(workout)
+            payload = build_workout(workout, resolve_pace_type=resolver)
             assert payload.sportType["sportTypeKey"] == "running"
             assert payload.workoutSegments, workout.id
             assert payload.workoutSegments[0].workoutSteps, workout.id
             from runplan.integrations.garmin.mapper import workout_definition
 
-            definition = workout_definition(workout)
-            assert compile_steps(definition["steps"]), workout.id
+            definition = workout_definition(workout, resolve_pace_type=resolver)
+            assert compile_steps(definition["steps"], resolve_pace_type=resolver), workout.id
 
 
 @pytest.mark.parametrize(

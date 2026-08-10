@@ -153,6 +153,9 @@ def test_every_bundled_nike_template_loads_and_builds_every_week() -> None:
     paths = sorted(template_dir / name for name in TEMPLATE_FILENAMES)
     assert len(paths) == 4
 
+    def resolver(_label: str) -> tuple[float, float]:
+        return (295.0, 305.0)
+
     for path in paths:
         first = load_definition(path)
         assert first["program_short_name"], path.name
@@ -160,7 +163,7 @@ def test_every_bundled_nike_template_loads_and_builds_every_week() -> None:
             selected = load_definition(path, selected_week=week["number"])
             for workout in selected["workouts"]:
                 assert not re.match(r"^Week\s+\d+\s+-", workout["name"]), path.name
-                build_workout(workout)
+                build_workout(workout, resolve_pace_type=resolver)
 
 
 def test_fictional_marathon_calendar_preserves_key_dates() -> None:
