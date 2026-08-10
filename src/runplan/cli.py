@@ -38,13 +38,17 @@ from .generation import (
 from .generation.errors import GenerationError
 from .integrations.garmin.client import login_to_garmin
 from .logging_config import LOG_LEVELS
-from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_definition_model
 from .presentation.json_output import format_json
 from .presentation.overview import format_overview
 from .presentation.program_text import format_program_text
 from .state.json_repository import JsonStateRepository
 from .state.yaml_repository import YamlStateRepository
+from .users import (
+    DEFAULT_FIVE_K_BEST,
+    ENV_FIVE_K_BEST,
+    fallback_pace_seconds_per_km,
+)
 
 
 def default_program_directory() -> Path:
@@ -127,14 +131,11 @@ def run_export(arguments: Namespace) -> int:
         if arguments.format != "text" and arguments.output is None:
             raise ValueError(f"{arguments.format.upper()} export requires --output")
         program = load_definition_model(arguments.yaml_file)
-        fallback_pace = parse_pace(
-            os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
-            "RUNPLAN_DEFAULT_PACE",
-        )
+        five_k_best = os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST)
         export = build_program_export(
             program,
             week_selection(arguments, default_all=True),
-            fallback_pace_seconds_per_km=sum(fallback_pace) / len(fallback_pace),
+            fallback_pace_seconds_per_km=fallback_pace_seconds_per_km(five_k_best),
         )
         if arguments.format == "text":
             print(format_program_text(export))
@@ -245,7 +246,7 @@ def _sync_one_user(arguments: Namespace, user: Any) -> int:
         repository=YamlStateRepository(path, legacy_directory=user.state_directory),
         credentials_file=user.credentials_file,
         token_store=user.token_store,
-        fallback_pace_value=user.default_pace,
+        fallback_pace_value=user.five_k_best,
     )
     try:
         return run_sync(Namespace(**values))

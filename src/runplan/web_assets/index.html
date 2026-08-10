@@ -140,7 +140,8 @@
         <p class="editor-help">Profile fields can be saved without Garmin credentials. Leave the Garmin fields blank to keep the saved credentials, or fill them in to add or update them.</p>
         <label>Username<input id="user-settings-username" disabled></label>
         <label>Full name<input id="user-settings-full-name" autocomplete="name" maxlength="100" required></label>
-        <label>Default pace<input id="user-settings-default-pace" required pattern="[0-9]+:[0-5][0-9](?:-[0-9]+:[0-5][0-9])? min/km" placeholder="6:00 min/km"><small>Used to estimate distance and duration when a workout has no explicit pace.</small></label>
+        <label>5K best<input id="user-settings-five-k-best" required pattern="[0-9]+:[0-5][0-9](:[0-5][0-9])?" placeholder="27:00"><small>Your measured 5K race time. Used to compute every other pace target.</small></label>
+        <label>Garmin pace zone<input id="user-settings-pace-zone" type="number" min="0" max="60" step="1" required inputmode="numeric"><small>Seconds per kilometer the Garmin target widens above and below each pace. Use 0 for a fixed target, default 5.</small></label>
         <label>Garmin email<input id="user-settings-garmin-email" type="email" autocomplete="username"></label>
         <label>Garmin password<input id="user-settings-garmin-password" type="password" autocomplete="current-password"><small id="user-settings-password-help">Leave blank if you do not want to set up Garmin credentials right now. Optional.</small></label>
         <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Save settings</button></footer>

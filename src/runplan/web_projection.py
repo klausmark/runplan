@@ -17,11 +17,15 @@ from .application.sync import workout_content_hash
 from .domain.errors import WorkoutDefinitionError
 from .domain.estimates import estimate_steps
 from .domain.models import CoachingGuide
-from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
 from .presentation.text import step_view
 from .state.yaml_repository import tracking_from_record
-from .users import WebError
+from .users import (
+    DEFAULT_FIVE_K_BEST,
+    ENV_FIVE_K_BEST,
+    WebError,
+    fallback_pace_seconds_per_km,
+)
 from .web_yaml import dump_editable_yaml
 
 if TYPE_CHECKING:
@@ -200,14 +204,11 @@ class ProgramProjector:
             model = load_program_model(raw)
         except WorkoutDefinitionError as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
+        five_k_best = fallback_pace_value or os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST)
         try:
-            pace = parse_pace(
-                fallback_pace_value or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
-                "RUNPLAN_DEFAULT_PACE",
-            )
+            fallback_pace = fallback_pace_seconds_per_km(five_k_best)
         except ValueError as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
-        fallback_pace = sum(pace) / len(pace)
         lifecycle = self._lifecycle(
             name,
             model.id,

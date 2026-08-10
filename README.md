@@ -227,10 +227,11 @@ server-side paths automatically:
 
 Only the users configuration is created immediately. Add `email` and `password`
 through User settings before that user performs the first Garmin sync. The same
-dialog configures `default_pace`, which Runplan uses for that user's web totals,
-exports, Garmin titles, and sync calculations whenever a step has no explicit
-pace. It defaults to `RUNPLAN_DEFAULT_PACE`, or `6:00 min/km` when the environment
-variable is unset. CLI commands continue using the existing Garmin environment
+dialog configures the user's `five_k_best` (5K race time) and `pace_zone_seconds_per_km`
+(tolerance for Garmin pace targets), which Runplan uses to derive every personalized
+pace and to estimate distance and duration when a step has no explicit pace. The
+default falls back to `RUNPLAN_5K_BEST` and `RUNPLAN_PACE_ZONE` (defaults `30:00` and
+`5` respectively). CLI commands continue using the existing Garmin environment
 variables and single-user default paths.
 
 ## Requirements
@@ -343,7 +344,7 @@ the watch face can render it. Use `note` together with `time`, `distance`, or
 ## Garmin login
 
 Each configured Runplan user has an isolated credentials file, token store,
-sync state directory, default pace, and active program. A user created through
+sync state directory, 5K best, pace zone, and active program. A user created through
 the web interface receives the paths documented above. Its credentials file
 contains:
 
@@ -515,11 +516,11 @@ uv run runplan export ~/.local/share/runplan/programs/morgan-example-5k.yaml --f
 Both formats support the same week selectors and `--force` behavior as PDF.
 
 Program and weekly totals are estimates. A step's explicit pace is used when
-available. Otherwise Runplan uses the fallback pace from
-`RUNPLAN_DEFAULT_PACE`, which defaults to `6:00 min/km`. For example:
+available. Otherwise Runplan derives the fallback pace from the user's 5K
+best. The CLI exports resolve `RUNPLAN_5K_BEST` (default `30:00`). For example:
 
 ```bash
-RUNPLAN_DEFAULT_PACE="5:45 min/km" uv run runplan export ~/.local/share/runplan/programs/morgan-example-5k.yaml --format text
+RUNPLAN_5K_BEST=27:00 uv run runplan export ~/.local/share/runplan/programs/morgan-example-5k.yaml --format text
 ```
 
 Distance-only steps use pace to estimate duration. Time-only running, warmup,

@@ -81,6 +81,6 @@ def test_sync_selection_preserves_source_names_weeks_and_dates(tmp_path: Path):
 
     assert [definition["week"] for definition, _ in selections] == [2]
     definitions = [item for _, compiled in selections for item, _ in compiled]
-    assert [item["name"] for item in definitions] == ["CAL - W2 - Monday run - ~1.7k"]
+    assert [item["name"] for item in definitions] == ["CAL - W2 - Monday run - ~1.4k"]
     assert [item["schedule_date"] for item in definitions] == ["2026-01-05"]
     assert all(item["presentation_week"] == 2 for item in definitions)

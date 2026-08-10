@@ -39,17 +39,17 @@ class TestProgramStore:
         assert "id: mixed" in loaded["weeks"][0]["workouts"][0]["yaml"]
 
     def test_loads_workout_and_week_calendar_summaries(self) -> None:
-        loaded = self.store.get("plan.yaml")
+        loaded = self.store.get("plan.yaml", fallback_pace_value="30:00")
         week = loaded["weeks"][0]
         mixed, easy = week["workouts"]
-        assert 2633.33 == pytest.approx(mixed["estimated_distance_meters"], rel=0.1)
-        assert 1062 == pytest.approx(mixed["estimated_duration_seconds"])
+        assert 2514.29 == pytest.approx(mixed["estimated_distance_meters"], rel=0.1)
+        assert 1122 == pytest.approx(mixed["estimated_duration_seconds"])
         assert mixed["distance_is_approximate"]
         assert mixed["duration_is_approximate"]
         assert 5000 == easy["estimated_distance_meters"]
         assert not easy["distance_is_approximate"]
         assert easy["duration_is_approximate"]
-        assert 7633.33 == pytest.approx(week["estimated_distance_meters"], rel=0.1)
+        assert 7514.29 == pytest.approx(week["estimated_distance_meters"], rel=0.1)
         assert week["distance_is_approximate"]
 
     def test_completed_actual_and_missed_zero_replace_estimates_in_week_totals(self) -> None:
@@ -182,11 +182,11 @@ class TestProgramStore:
         assert loaded["revision"] == self.store.get("plan.yaml")["revision"]
 
     def test_user_default_pace_changes_time_based_estimates(self) -> None:
-        normal = self.store.get("plan.yaml", fallback_pace_value="6:00 min/km")
-        faster = self.store.get("plan.yaml", fallback_pace_value="5:00 min/km")
-        normal_mixed = normal["weeks"][0]["workouts"][0]
+        slower = self.store.get("plan.yaml", fallback_pace_value="30:00")
+        faster = self.store.get("plan.yaml", fallback_pace_value="25:00")
+        slower_mixed = slower["weeks"][0]["workouts"][0]
         faster_mixed = faster["weeks"][0]["workouts"][0]
-        assert faster_mixed["estimated_distance_meters"] > normal_mixed["estimated_distance_meters"]
+        assert faster_mixed["estimated_distance_meters"] > slower_mixed["estimated_distance_meters"]
 
     def test_loads_lifecycle_and_changed_since_sync_statuses(self) -> None:
         service = WebSyncService(

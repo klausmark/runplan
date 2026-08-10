@@ -23,7 +23,8 @@ def write_user_config(path: Path, users: Iterable[RunplanUser]) -> None:
                 f"credentials_file = {json.dumps(str(user.credentials_file))}",
                 f"token_store = {json.dumps(str(user.token_store))}",
                 f"state_dir = {json.dumps(str(user.state_directory))}",
-                f"default_pace = {json.dumps(user.default_pace)}",
+                f"five_k_best = {json.dumps(user.five_k_best)}",
+                f"pace_zone_seconds_per_km = {json.dumps(user.pace_zone_seconds_per_km)}",
             ]
         )
         if user.active_program is not None:

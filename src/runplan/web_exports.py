@@ -14,9 +14,13 @@ from .domain.errors import WorkoutDefinitionError
 from .domain.selectors import WeekSelection
 from .exporters.markdown import format_program_markdown
 from .exporters.pdf import export_pdf
-from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_program_model
-from .users import WebError
+from .users import (
+    DEFAULT_FIVE_K_BEST,
+    ENV_FIVE_K_BEST,
+    WebError,
+    fallback_pace_seconds_per_km,
+)
 
 logger = logging.getLogger("runplan.web")
 
@@ -31,14 +35,11 @@ def export_program(
     """Render one program document in the requested download format."""
     try:
         model = load_program_model(raw)
-        pace = parse_pace(
-            fallback_pace_value or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
-            "defaultPace",
-        )
+        five_k_best = fallback_pace_value or os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST)
         view = build_program_export(
             model,
             WeekSelection.all(),
-            fallback_pace_seconds_per_km=sum(pace) / len(pace),
+            fallback_pace_seconds_per_km=fallback_pace_seconds_per_km(five_k_best),
         )
     except (WorkoutDefinitionError, ValueError) as exc:
         raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc

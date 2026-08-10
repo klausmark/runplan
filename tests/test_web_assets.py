@@ -83,11 +83,12 @@ class TestWebAsset:
         assert 'request("/api/users")' in script
         assert '$("#user-dialog").showModal()' in script
         assert 'id="user-settings-dialog"' in html
-        assert 'id="user-settings-default-pace"' in html
+        assert 'id="user-settings-five-k-best"' in html
+        assert 'id="user-settings-pace-zone"' in html
         assert 'id="user-settings-garmin-password"' in html
         assert "hasGarminPassword" in script
-        assert "normalizePaceInput" in script
-        assert 'addEventListener("blur"' in script
+        assert "fiveKBest" in script
+        assert "paceZoneSecondsPerKm" in script
 
     def test_empty_program_state_and_yaml_upload_are_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")

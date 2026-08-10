@@ -13,11 +13,72 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from .parsing.values import parse_pace
+from .domain.pace import (
+    format_pace_seconds,
+    intensity_pace_seconds,
+    parse_total_seconds,
+)
 from .user_config import write_user_config
 from .user_credentials import CredentialStore
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_FIVE_K_BEST = "30:00"
+DEFAULT_PACE_ZONE_SECONDS_PER_KM = 5
+MAX_PACE_ZONE_SECONDS_PER_KM = 60
+
+ENV_FIVE_K_BEST = "RUNPLAN_5K_BEST"
+ENV_PACE_ZONE = "RUNPLAN_PACE_ZONE"
+ENV_LEGACY_DEFAULT_PACE = "RUNPLAN_DEFAULT_PACE"
+
+
+def _parse_legacy_default_pace_to_five_k(value: str) -> str:
+    """Convert a legacy ``M:SS min/km`` string into a 5K race total."""
+    text = value.strip()
+    match = re.fullmatch(
+        r"\s*(\d+):([0-5]\d)\s*(?:-\s*(\d+):([0-5]\d)\s*)?min/km\s*",
+        text,
+        re.IGNORECASE,
+    )
+    if match is None:
+        raise ValueError(f"invalid legacy pace {value!r}")
+    first = int(match.group(1)) * 60 + int(match.group(2))
+    second = int(match.group(3)) * 60 + int(match.group(4)) if match.group(3) is not None else first
+    midpoint = (first + second) / 2
+    total = round(midpoint * 5)
+    minutes, seconds = divmod(total, 60)
+    return f"{minutes}:{seconds:02d}"
+
+
+def _coerce_pace_zone(value: Any) -> int:
+    """Validate and normalize the user's Garmin pace zone tolerance."""
+    if isinstance(value, bool):
+        raise ValueError(f"invalid pace zone {value!r}; use 0-60")
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError(f"invalid pace zone {value!r}; use 0-60")
+        value = int(value)
+    elif isinstance(value, str):
+        try:
+            value = int(value.strip())
+        except ValueError as exc:
+            raise ValueError(f"invalid pace zone {value!r}; use 0-60") from exc
+    elif not isinstance(value, int):
+        raise ValueError(f"invalid pace zone {value!r}; use 0-60")
+    if not 0 <= value <= MAX_PACE_ZONE_SECONDS_PER_KM:
+        raise ValueError(f"pace zone {value} out of range; use 0-{MAX_PACE_ZONE_SECONDS_PER_KM}")
+    return value
+
+
+def five_k_pace_seconds(five_k_best: str) -> float:
+    """Return the average 5K pace (seconds per kilometer) for ``five_k_best``."""
+    total = parse_total_seconds(five_k_best)
+    return total / 5.0
+
+
+def fallback_pace_seconds_per_km(five_k_best: str) -> float:
+    """Return the recovery pace used as the generic estimate fallback."""
+    return intensity_pace_seconds(parse_total_seconds(five_k_best), "recovery")
 
 
 class WebError(Exception):
@@ -44,7 +105,8 @@ class RunplanUser:
     credentials_file: Path
     token_store: Path
     state_directory: Path
-    default_pace: str = "6:00 min/km"
+    five_k_best: str = "30:00"
+    pace_zone_seconds_per_km: int = 5
     active_program: str | None = None
 
     def public(self) -> dict[str, str | None]:
@@ -145,7 +207,10 @@ class UserRegistry:
                 credentials_file=base / "credentials.toml",
                 token_store=base / "tokens",
                 state_directory=base / "state",
-                default_pace=os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
+                five_k_best=os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST),
+                pace_zone_seconds_per_km=_coerce_pace_zone(
+                    os.getenv(ENV_PACE_ZONE, str(DEFAULT_PACE_ZONE_SECONDS_PER_KM))
+                ),
             )
             updated = {**self._users, username: user}
             self._write(updated.values())
@@ -159,7 +224,8 @@ class UserRegistry:
         return {
             "id": user.id,
             "fullName": user.name,
-            "defaultPace": user.default_pace,
+            "fiveKBest": user.five_k_best,
+            "paceZoneSecondsPerKm": user.pace_zone_seconds_per_km,
             "garminEmail": credentials.get("email", ""),
             "hasGarminPassword": bool(credentials.get("password")),
         }
@@ -167,15 +233,20 @@ class UserRegistry:
     def update_settings(self, user_id: str | None, request: dict[str, Any]) -> dict[str, Any]:
         user = self.get(user_id)
         full_name = request.get("fullName")
-        default_pace = request.get("defaultPace")
+        five_k_best = request.get("fiveKBest")
+        pace_zone = request.get("paceZoneSecondsPerKm")
         email = request.get("garminEmail")
         password = request.get("garminPassword", "")
         if not isinstance(full_name, str) or not full_name.strip():
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Full name is required")
-        if not isinstance(default_pace, str):
-            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "Default pace is required")
+        if not isinstance(five_k_best, str):
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, "5K best is required")
         try:
-            parse_pace(default_pace, "defaultPace")
+            normalized_five_k_best = parse_total_seconds(five_k_best.strip())
+        except ValueError as exc:
+            raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
+        try:
+            normalized_pace_zone = _coerce_pace_zone(pace_zone)
         except ValueError as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc
         if not isinstance(email, str):
@@ -194,8 +265,14 @@ class UserRegistry:
         credentials_changed = submitted_email != existing.get("email", "") or bool(
             submitted_password and submitted_password != existing.get("password", "")
         )
+        stored_five_k = format_pace_seconds(normalized_five_k_best)
         with self._lock:
-            updated_user = replace(user, name=full_name.strip(), default_pace=default_pace.strip())
+            updated_user = replace(
+                user,
+                name=full_name.strip(),
+                five_k_best=stored_five_k,
+                pace_zone_seconds_per_km=normalized_pace_zone,
+            )
             updated = {**self._users, user.id: updated_user}
             if credentials_changed:
                 self._credentials.write(user.credentials_file, effective_email, effective_password)
@@ -249,7 +326,8 @@ def _user_from_entry(configured: Path, entry: Any, index: int) -> RunplanUser:
     if not isinstance(entry, dict):
         raise ValueError(f"{configured}: users[{index}] must be a table")
     user_id, name = _user_identity(configured, entry, index)
-    default_pace = _user_pace(configured, entry, index)
+    five_k_best = _user_five_k_best(configured, entry, index)
+    pace_zone = _user_pace_zone(configured, entry, index)
     active_program = _active_program(configured, entry, index)
     return RunplanUser(
         id=user_id,
@@ -263,7 +341,8 @@ def _user_from_entry(configured: Path, entry: Any, index: int) -> RunplanUser:
         state_directory=_configured_user_path(
             configured, entry, index, "state_dir", f"state/{user_id}"
         ),
-        default_pace=default_pace,
+        five_k_best=five_k_best,
+        pace_zone_seconds_per_km=pace_zone,
         active_program=active_program,
     )
 
@@ -277,15 +356,43 @@ def _user_identity(configured: Path, entry: dict[str, Any], index: int) -> tuple
     return user_id, name.strip()
 
 
-def _user_pace(configured: Path, entry: dict[str, Any], index: int) -> str:
-    value = entry.get("default_pace", os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"))
-    if not isinstance(value, str):
-        raise ValueError(f"{configured}: users[{index}].default_pace is invalid")
+def _user_five_k_best(configured: Path, entry: dict[str, Any], index: int) -> str:
+    """Read or migrate a user's ``five_k_best`` entry."""
+    if "five_k_best" in entry:
+        value = entry["five_k_best"]
+        if not isinstance(value, str):
+            raise ValueError(f"{configured}: users[{index}].five_k_best is invalid")
+        try:
+            total = parse_total_seconds(value)
+        except ValueError as exc:
+            raise ValueError(f"{configured}: {exc}") from exc
+        return format_pace_seconds(total)
+    if "default_pace" in entry:
+        legacy = entry["default_pace"]
+        if not isinstance(legacy, str):
+            raise ValueError(f"{configured}: users[{index}].default_pace is invalid")
+        try:
+            return _parse_legacy_default_pace_to_five_k(legacy)
+        except ValueError as exc:
+            raise ValueError(f"{configured}: {exc}") from exc
+    legacy_env = os.getenv(ENV_LEGACY_DEFAULT_PACE)
+    if legacy_env:
+        try:
+            return _parse_legacy_default_pace_to_five_k(legacy_env)
+        except ValueError as exc:
+            raise ValueError(f"{ENV_LEGACY_DEFAULT_PACE}: {exc}") from exc
+    return os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST)
+
+
+def _user_pace_zone(configured: Path, entry: dict[str, Any], index: int) -> int:
+    """Read a user's Garmin pace zone tolerance from the entry."""
+    if "pace_zone_seconds_per_km" not in entry:
+        return _coerce_pace_zone(os.getenv(ENV_PACE_ZONE, str(DEFAULT_PACE_ZONE_SECONDS_PER_KM)))
+    value = entry["pace_zone_seconds_per_km"]
     try:
-        parse_pace(value, f"users[{index}].default_pace")
+        return _coerce_pace_zone(value)
     except ValueError as exc:
-        raise ValueError(f"{configured}: {exc}") from exc
-    return value
+        raise ValueError(f"{configured}: users[{index}].pace_zone_seconds_per_km: {exc}") from exc
 
 
 def _active_program(configured: Path, entry: dict[str, Any], index: int) -> str | None:

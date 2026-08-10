@@ -138,7 +138,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
             filename,
             payload.get("content"),
             repository=self.sync.repository_for(user.id, filename),
-            fallback_pace_value=user.default_pace,
+            fallback_pace_value=user.five_k_best,
         )
         self._json(HTTPStatus.CREATED, uploaded)
 
@@ -174,7 +174,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 filename,
                 payload,
                 repository=self.sync.repository_for(user.id, filename),
-                fallback_pace_value=user.default_pace,
+                fallback_pace_value=user.five_k_best,
             ),
         )
 
@@ -236,7 +236,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
                 self.sync.store_for(user.id).get(
                     parts[0],
                     repository=self.sync.repository_for(user.id, parts[0]),
-                    fallback_pace_value=user.default_pace,
+                    fallback_pace_value=user.five_k_best,
                 ),
             )
             return
@@ -244,7 +244,7 @@ class RunplanHandler(BaseHTTPRequestHandler):
             content, content_type, filename = self.sync.store_for(user.id).export(
                 parts[0],
                 query.get("format", [""])[0],
-                fallback_pace_value=user.default_pace,
+                fallback_pace_value=user.five_k_best,
             )
             self._bytes(content, content_type, filename)
             return

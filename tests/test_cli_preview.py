@@ -69,10 +69,10 @@ def test_overview_dry_run_is_additive_and_does_not_mutate_state(program_path) ->
 
     assert result == 0
     text = stdout.getvalue()
-    assert "CHAR - W1 - Mixed - ~2.6k" in text
+    assert "CHAR - W1 - Mixed - ~2.5k" in text
     assert "Monday · Mixed" in text
     assert "2026-12-28 · Week 1 - Mixed" not in text
-    assert "17 min 42 sec + 2.6 km" in text
+    assert "18 min 42 sec + 2.5 km" in text
     assert "Old workout (2026-11-01)" not in text
 
 

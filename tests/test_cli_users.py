@@ -67,8 +67,8 @@ def test_single_user_sync_injects_the_isolated_profile(tmp_path: Path) -> None:
         tmp_path / "credentials.toml",
         tmp_path / "tokens",
         tmp_path / "state",
-        "5:35 min/km",
-        "plan.yaml",
+        five_k_best="27:55",
+        active_program="plan.yaml",
     )
 
     with (
@@ -81,7 +81,7 @@ def test_single_user_sync_injects_the_isolated_profile(tmp_path: Path) -> None:
     delegated = sync.call_args.args[0]
     assert delegated.yaml_file == program
     assert not hasattr(delegated, "owner_id")
-    assert delegated.fallback_pace_value == "5:35 min/km"
+    assert delegated.fallback_pace_value == "27:55"
     assert delegated.credentials_file == user.credentials_file
     assert delegated.token_store == user.token_store
     assert delegated.repository.state_directory == user.state_directory.resolve()

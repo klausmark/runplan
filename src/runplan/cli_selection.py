@@ -11,8 +11,12 @@ from .domain.estimates import estimate_steps
 from .domain.selectors import WeekSelection
 from .domain.workout_titles import garmin_workout_title
 from .integrations.garmin.mapper import build_workout
-from .parsing.values import parse_pace
 from .parsing.yaml_loader import load_definition, load_definition_model
+from .users import (
+    DEFAULT_FIVE_K_BEST,
+    ENV_FIVE_K_BEST,
+    fallback_pace_seconds_per_km,
+)
 
 
 def week_selection(arguments: Namespace, *, default_all: bool = False) -> WeekSelection:
@@ -33,11 +37,8 @@ def prepare_sync_selections(
 ) -> list[tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]]:
     """Load, select, and compile weeks without terminal or Garmin I/O."""
     model = load_definition_model(arguments.yaml_file)
-    fallback_pace = parse_pace(
-        fallback_pace_value or os.getenv("RUNPLAN_DEFAULT_PACE", "6:00 min/km"),
-        "RUNPLAN_DEFAULT_PACE",
-    )
-    fallback_pace_seconds_per_km = sum(fallback_pace) / len(fallback_pace)
+    five_k_best = fallback_pace_value or os.getenv(ENV_FIVE_K_BEST, DEFAULT_FIVE_K_BEST)
+    fallback_pace = fallback_pace_seconds_per_km(five_k_best)
     presentation_weeks = build_presentation_weeks(model)
     selected_weeks = _resolved_weeks(arguments, model, presentation_weeks)
     selected_items = [
@@ -52,7 +53,7 @@ def prepare_sync_selections(
             source_week,
             selected_items,
             model.short_name,
-            fallback_pace_seconds_per_km,
+            fallback_pace,
         )
         for source_week in sorted({item.source_week for _, item in selected_items})
     ]

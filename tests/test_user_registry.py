@@ -48,7 +48,8 @@ def test_settings_store_credentials_without_returning_password(tmp_path: Path) -
         "runner",
         {
             "fullName": "Runner Updated",
-            "defaultPace": "5:45 min/km",
+            "fiveKBest": "27:30",
+            "paceZoneSecondsPerKm": 5,
             "garminEmail": "runner@example.com",
             "garminPassword": "secret-value",
         },
@@ -57,7 +58,8 @@ def test_settings_store_credentials_without_returning_password(tmp_path: Path) -
         "runner",
         {
             "fullName": "Runner Updated",
-            "defaultPace": "5:30 min/km",
+            "fiveKBest": "26:30",
+            "paceZoneSecondsPerKm": 10,
             "garminEmail": "new@example.com",
             "garminPassword": "",
         },
@@ -65,27 +67,30 @@ def test_settings_store_credentials_without_returning_password(tmp_path: Path) -
 
     assert "garminPassword" not in result["settings"]
     assert result["settings"]["hasGarminPassword"]
-    assert preserved["settings"]["defaultPace"] == "5:30 min/km"
+    assert preserved["settings"]["fiveKBest"] == "26:30"
+    assert preserved["settings"]["paceZoneSecondsPerKm"] == 10
     reloaded = load_user_registry(config)
-    assert reloaded.get("runner").default_pace == "5:30 min/km"
+    assert reloaded.get("runner").five_k_best == "26:30"
+    assert reloaded.get("runner").pace_zone_seconds_per_km == 10
     credentials = reloaded.get("runner").credentials_file.read_text(encoding="utf-8")
     assert 'email = "new@example.com"' in credentials
     assert 'password = "secret-value"' in credentials
 
 
-def test_settings_require_valid_pace_and_initial_password(tmp_path: Path) -> None:
+def test_settings_require_valid_five_k_and_initial_password(tmp_path: Path) -> None:
     registry = load_user_registry(tmp_path / "users.toml")
     registry.create("runner", "Runner")
     base = {
         "fullName": "Runner",
         "garminEmail": "runner@example.com",
         "garminPassword": "",
+        "paceZoneSecondsPerKm": 5,
     }
     with pytest.raises(WebError):
-        registry.update_settings("runner", {**base, "defaultPace": "fast"})
+        registry.update_settings("runner", {**base, "fiveKBest": "fast"})
 
     with pytest.raises(WebError, match="(?i)password"):
-        registry.update_settings("runner", {**base, "defaultPace": "6:00 min/km"})
+        registry.update_settings("runner", {**base, "fiveKBest": "27:00"})
 
 
 def test_update_settings_allows_pace_change_without_garmin_credentials(tmp_path: Path) -> None:
@@ -97,18 +102,21 @@ def test_update_settings_allows_pace_change_without_garmin_credentials(tmp_path:
         "runner",
         {
             "fullName": "Runner Renamed",
-            "defaultPace": "5:30 min/km",
+            "fiveKBest": "26:30",
+            "paceZoneSecondsPerKm": 5,
             "garminEmail": "",
             "garminPassword": "",
         },
     )
 
-    assert result["settings"]["defaultPace"] == "5:30 min/km"
+    assert result["settings"]["fiveKBest"] == "26:30"
+    assert result["settings"]["paceZoneSecondsPerKm"] == 5
     assert result["settings"]["garminEmail"] == ""
     assert result["settings"]["hasGarminPassword"] is False
     assert not credentials_path.exists()
     reloaded = load_user_registry(tmp_path / "users.toml").get("runner")
-    assert reloaded.default_pace == "5:30 min/km"
+    assert reloaded.five_k_best == "26:30"
+    assert reloaded.pace_zone_seconds_per_km == 5
     assert reloaded.name == "Runner Renamed"
 
 
@@ -121,7 +129,8 @@ def test_update_settings_preserves_garmin_credentials_when_only_profile_changes(
         "runner",
         {
             "fullName": "Runner",
-            "defaultPace": "5:45 min/km",
+            "fiveKBest": "27:30",
+            "paceZoneSecondsPerKm": 5,
             "garminEmail": "runner@example.com",
             "garminPassword": "secret-value",
         },
@@ -133,13 +142,14 @@ def test_update_settings_preserves_garmin_credentials_when_only_profile_changes(
         "runner",
         {
             "fullName": "Runner",
-            "defaultPace": "5:20 min/km",
+            "fiveKBest": "26:00",
+            "paceZoneSecondsPerKm": 5,
             "garminEmail": "",
             "garminPassword": "",
         },
     )
 
-    assert registry.get("runner").default_pace == "5:20 min/km"
+    assert registry.get("runner").five_k_best == "26:00"
     assert credentials_path.read_text(encoding="utf-8") == original_credentials
 
 
@@ -150,7 +160,8 @@ def test_update_settings_with_email_only_keeps_existing_password(tmp_path: Path)
         "runner",
         {
             "fullName": "Runner",
-            "defaultPace": "5:45 min/km",
+            "fiveKBest": "27:30",
+            "paceZoneSecondsPerKm": 5,
             "garminEmail": "runner@example.com",
             "garminPassword": "secret-value",
         },
@@ -160,7 +171,8 @@ def test_update_settings_with_email_only_keeps_existing_password(tmp_path: Path)
         "runner",
         {
             "fullName": "Runner",
-            "defaultPace": "5:45 min/km",
+            "fiveKBest": "27:30",
+            "paceZoneSecondsPerKm": 5,
             "garminEmail": "new@example.com",
             "garminPassword": "",
         },
@@ -181,9 +193,53 @@ def test_update_settings_rejects_password_update_without_email(tmp_path: Path) -
             "runner",
             {
                 "fullName": "Runner",
-                "defaultPace": "5:45 min/km",
+                "fiveKBest": "27:30",
+                "paceZoneSecondsPerKm": 5,
                 "garminEmail": "",
                 "garminPassword": "new-secret",
+            },
+        )
+
+
+def test_load_user_registry_migrates_legacy_default_pace_to_five_k(tmp_path: Path) -> None:
+    config = tmp_path / "users.toml"
+    config.write_text(
+        '\n[[users]]\nid = "runner"\nname = "Runner"\n'
+        'credentials_file = "creds.toml"\ntoken_store = "tokens"\n'
+        'state_dir = "state"\ndefault_pace = "5:30 min/km"',
+        encoding="utf-8",
+    )
+    user = load_user_registry(config).get("runner")
+    # 5:30 min/km midpoint = 330s; 330 * 5 = 1650s = 27:30.
+    assert user.five_k_best == "27:30"
+    assert user.pace_zone_seconds_per_km == 5
+
+
+def test_load_user_registry_migrates_legacy_default_pace_range(tmp_path: Path) -> None:
+    config = tmp_path / "users.toml"
+    config.write_text(
+        '\n[[users]]\nid = "runner"\nname = "Runner"\n'
+        'credentials_file = "creds.toml"\ntoken_store = "tokens"\n'
+        'state_dir = "state"\ndefault_pace = "5:00-5:30 min/km"',
+        encoding="utf-8",
+    )
+    user = load_user_registry(config).get("runner")
+    # Midpoint = 315s; 315 * 5 = 1575s = 26:15.
+    assert user.five_k_best == "26:15"
+
+
+def test_update_settings_rejects_out_of_range_pace_zone(tmp_path: Path) -> None:
+    registry = load_user_registry(tmp_path / "users.toml")
+    registry.create("runner", "Runner")
+    with pytest.raises(WebError):
+        registry.update_settings(
+            "runner",
+            {
+                "fullName": "Runner",
+                "fiveKBest": "27:30",
+                "paceZoneSecondsPerKm": 120,
+                "garminEmail": "runner@example.com",
+                "garminPassword": "secret-value",
             },
         )
 

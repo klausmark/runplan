@@ -1514,7 +1514,8 @@ $("#user-settings-button").addEventListener("click", async () => {
     const settings = await request(`/api/users/${encodeURIComponent(state.user.id)}/settings`);
     $("#user-settings-username").value = settings.id;
     $("#user-settings-full-name").value = settings.fullName;
-    $("#user-settings-default-pace").value = normalizePaceInput(settings.defaultPace) ?? settings.defaultPace;
+    $("#user-settings-five-k-best").value = settings.fiveKBest;
+    $("#user-settings-pace-zone").value = String(settings.paceZoneSecondsPerKm ?? 5);
     $("#user-settings-garmin-email").value = settings.garminEmail;
     $("#user-settings-garmin-password").value = "";
     $("#user-settings-garmin-password").required = false;
@@ -1541,7 +1542,8 @@ $("#user-settings-form").addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fullName: $("#user-settings-full-name").value,
-        defaultPace: $("#user-settings-default-pace").value,
+        fiveKBest: $("#user-settings-five-k-best").value,
+        paceZoneSecondsPerKm: Number($("#user-settings-pace-zone").value),
         garminEmail: $("#user-settings-garmin-email").value,
         garminPassword: $("#user-settings-garmin-password").value,
       }),
@@ -1553,10 +1555,6 @@ $("#user-settings-form").addEventListener("submit", async (event) => {
     $("#user-settings-dialog").close();
     if (state.program) await loadProgram(state.program.file);
   } catch (error) { showError(error.message); }
-});
-$("#user-settings-default-pace").addEventListener("blur", (event) => {
-  const normalized = normalizePaceInput(event.target.value);
-  if (normalized !== null) event.target.value = normalized;
 });
 $("#workout-form").addEventListener("submit", async (event) => {
   event.preventDefault();

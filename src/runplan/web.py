@@ -140,7 +140,7 @@ class WebSyncService:
                     delete_all=False,
                     today=self.today(),
                 ),
-                fallback_pace_value=user.default_pace,
+                fallback_pace_value=user.five_k_best,
             )
         except (WorkoutDefinitionError, WeekSelectionError, ValueError) as exc:
             raise WebError(HTTPStatus.UNPROCESSABLE_ENTITY, str(exc)) from exc

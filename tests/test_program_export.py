@@ -77,25 +77,26 @@ def test_text_export_matches_snapshot(program) -> None:
 def test_environment_configures_fallback_pace_for_cli_export(tmp_path: Path, monkeypatch) -> None:
     source = write_program(tmp_path)
     stdout = StringIO()
-    monkeypatch.setenv("RUNPLAN_DEFAULT_PACE", "5:00 min/km")
+    # 25:00 5K => 5:00/km 5K pace => 6:00/km recovery. 10km @ 6:00 = 60min = "1 hr".
+    monkeypatch.setenv("RUNPLAN_5K_BEST", "25:00")
 
     with redirect_stdout(stdout):
         result = main(["export", str(source), "--format", "text", "--select-weeks", "2"])
 
     assert result == 0
-    assert "Estimated total duration: 50 min" in stdout.getvalue()
+    assert "Estimated total duration: 1 hr" in stdout.getvalue()
 
 
 def test_cli_rejects_invalid_environment_fallback_pace(tmp_path: Path, monkeypatch) -> None:
     source = write_program(tmp_path)
     stderr = StringIO()
-    monkeypatch.setenv("RUNPLAN_DEFAULT_PACE", "fast")
+    monkeypatch.setenv("RUNPLAN_5K_BEST", "fast")
 
     with redirect_stderr(stderr):
         result = main(["export", str(source), "--format", "text"])
 
     assert result == 2
-    assert "RUNPLAN_DEFAULT_PACE" in stderr.getvalue()
+    assert "fast" in stderr.getvalue()
 
 
 def test_text_cli_writes_selected_weeks_to_stdout(tmp_path: Path) -> None:

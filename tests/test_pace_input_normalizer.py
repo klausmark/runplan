@@ -122,11 +122,13 @@ def test_pace_normalizer_is_implemented_in_javascript_assets() -> None:
     script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
     assert "function normalizePaceInput" in script
     assert "function normalizePaceSide" in script
-    assert re.search(
-        r'\$\("#user-settings-default-pace"\)\.addEventListener\("blur"',
-        script,
+    assert "settings.defaultPace" not in script
+    assert 'id="user-settings-default-pace"' not in (
+        (ASSET_DIR / "index.html").read_text(encoding="utf-8")
     )
-    assert "normalizePaceInput(settings.defaultPace)" in script
+    assert 'id="user-settings-five-k-best"' in (
+        (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+    )
 
 
 def test_javascript_normalizer_body_matches_python_mirror_rules() -> None:

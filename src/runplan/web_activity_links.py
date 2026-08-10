@@ -85,7 +85,7 @@ class WebActivityLinkService:
         program = self.sync.store_for(user.id).get(
             name,
             repository=self.sync.repository_for(user.id, name),
-            fallback_pace_value=user.default_pace,
+            fallback_pace_value=user.five_k_best,
         )
         workout = self._workout(program, week, workout_id)
         if not workout.get("can_manage_activities"):
@@ -107,7 +107,7 @@ class WebActivityLinkService:
             raise WebError(HTTPStatus.CONFLICT, "A Garmin activity is no longer available")
         repository = self.sync.repository_for(user.id, name)
         program = self.sync.store_for(user.id).get(
-            name, repository=repository, fallback_pace_value=user.default_pace
+            name, repository=repository, fallback_pace_value=user.five_k_best
         )
         workout = self._workout(program, week, workout_id)
         state = repository.load(program["program"]["id"])
@@ -144,7 +144,7 @@ class WebActivityLinkService:
             ",".join(str(value) for value in sorted(selected_ids)) or "none",
         )
         return self.sync.store_for(user.id).get(
-            name, repository=repository, fallback_pace_value=user.default_pace
+            name, repository=repository, fallback_pace_value=user.five_k_best
         )
 
     def _activities(
