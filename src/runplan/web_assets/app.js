@@ -1,4 +1,4 @@
-const state = { users: [], user: null, program: null, pointerDrag: null, workout: null, undoMove: null };
+const state = { users: [], user: null, program: null, pointerDrag: null, workout: null, move: null, undoMove: null };
 const $ = (selector) => document.querySelector(selector);
 const MOVE_THRESHOLD = 6;
 const TOUCH_LONG_PRESS_MS = 350;
@@ -419,9 +419,13 @@ function workoutCard(week, workout) {
   card.className = "workout";
   card.classList.toggle("workout-locked", !workout.can_move);
   card.dataset.moveable = String(workout.can_move);
-  card.setAttribute("role", "button");
-  card.tabIndex = 0;
-  card.setAttribute("aria-label", `${workout.name}. Click to edit, press and drag to move.`);
+  const header = document.createElement("div");
+  header.className = "workout-header";
+  const content = document.createElement("div");
+  content.className = "workout-content";
+  content.setAttribute("role", "button");
+  content.tabIndex = 0;
+  content.setAttribute("aria-label", `${workout.name}. Click to edit.`);
   const title = document.createElement("h3");
   title.textContent = workout.name.replace(/^Week \d+\s*-\s*/, "");
   const status = document.createElement("span");
@@ -436,24 +440,36 @@ function workoutCard(week, workout) {
   const totalsKind = workout.totals_are_actual ? "Actual" : "Planned";
   summary.textContent = `${totalsKind} · ${distanceLabel(shownDistance, workout.totals_are_actual ? false : workout.distance_is_approximate)} · ${durationLabel(shownDuration, workout.totals_are_actual ? false : workout.duration_is_approximate)}`;
   if (workout.can_move) {
-    card.addEventListener("pointerdown", (event) => beginPointerDrag(event, card, week, workout));
+    const handle = document.createElement("button");
+    handle.className = "workout-drag-handle";
+    handle.type = "button";
+    handle.textContent = "⠿";
+    handle.title = "Hold and drag to move, or tap to choose a day";
+    handle.setAttribute("aria-label", `Move ${workout.name}`);
+    handle.addEventListener("pointerdown", (event) => beginPointerDrag(event, card, handle, week, workout));
+    handle.addEventListener("contextmenu", (event) => event.preventDefault());
+    handle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (handle.dataset.suppressClick === "true") {
+        delete handle.dataset.suppressClick;
+        return;
+      }
+      openMove(week, workout);
+    });
+    header.append(handle);
   }
-  card.addEventListener("click", (event) => {
-    if (event.target.closest("button")) return;
-    if (card.dataset.suppressClick === "true") {
-      delete card.dataset.suppressClick;
-      return;
-    }
+  content.addEventListener("click", () => {
     openWorkout(week, workout);
   });
-  card.addEventListener("keydown", (event) => {
-    if (event.target.closest("button")) return;
+  content.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       openWorkout(week, workout);
     }
   });
-  card.append(status, title, summary, description);
+  header.prepend(status);
+  content.append(title, summary, description);
+  card.append(header, content);
   return card;
 }
 
@@ -847,19 +863,15 @@ async function applyActivityLinks() {
   }
 }
 
-function pointerById(event, identifier) {
-  if (event.pointerId !== undefined && event.pointerId === identifier) return event;
-  return null;
-}
-
-function beginPointerDrag(event, card, week, workout) {
+function beginPointerDrag(event, card, handle, week, workout) {
+  if (!event.isPrimary) return;
   if (event.button !== undefined && event.button !== 0) return;
-  if (event.target.closest("button")) return;
   cancelPointerDrag();
   const isTouch = event.pointerType !== "mouse";
   state.pointerDrag = {
     pointerId: event.pointerId,
     card,
+    handle,
     week,
     workoutId: workout.id,
     day: workout.day,
@@ -894,13 +906,11 @@ function activatePointerDrag() {
   drag.started = true;
   drag.card.classList.add("touch-drag-source");
   document.body.classList.add("touch-dragging");
-  drag.card.style.touchAction = "none";
-  document.body.style.touchAction = "none";
   document.body.append(ghost);
   positionPointerGhost(drag.x, drag.y);
   updatePointerTarget(drag.x, drag.y);
   drag.scrollFrame = window.requestAnimationFrame(autoScrollPointerDrag);
-  try { drag.card.setPointerCapture(drag.pointerId); } catch (_) {}
+  try { drag.handle.setPointerCapture(drag.pointerId); } catch (_) {}
   navigator.vibrate?.(25);
 }
 
@@ -968,8 +978,9 @@ async function endPointerDrag(event) {
   // card does not open its edit dialog when the user finishes a drag. Only
   // suppress when the pointer actually travelled, so a long-press followed
   // by a release without movement still opens the edit dialog.
-  const moved = Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > TOUCH_CANCEL_DISTANCE;
-  if (moved) drag.card.dataset.suppressClick = "true";
+  const threshold = drag.isTouch ? TOUCH_CANCEL_DISTANCE : MOVE_THRESHOLD;
+  const moved = Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > threshold;
+  if (moved) drag.handle.dataset.suppressClick = "true";
   cancelPointerDrag();
   if (!target || sameDay) return;
   try {
@@ -989,10 +1000,37 @@ function cancelPointerDrag() {
   drag.card.classList.remove("touch-drag-source");
   drag.ghost?.remove();
   document.body.classList.remove("touch-dragging");
-  drag.card.style.touchAction = "";
-  document.body.style.touchAction = "";
-  try { drag.card.releasePointerCapture(drag.pointerId); } catch (_) {}
+  try { drag.handle.releasePointerCapture(drag.pointerId); } catch (_) {}
   state.pointerDrag = null;
+}
+
+function openMove(week, workout) {
+  if (!workout.can_move) return;
+  state.move = { week, workoutId: workout.id, day: workout.day };
+  $("#move-title").textContent = `Move ${workout.name.replace(/^Week \d+\s*-\s*/, "")}`;
+  $("#move-week").replaceChildren(...state.program.weeks.map((item) => {
+    const option = document.createElement("option");
+    option.value = item.week;
+    option.textContent = `Week ${item.week}`;
+    option.selected = item.week === week;
+    return option;
+  }));
+  $("#move-day").value = workout.day;
+  updateMoveDayOptions(week);
+  $("#move-dialog").showModal();
+}
+
+function updateMoveDayOptions(weekNumber) {
+  const selectedWeek = state.program.weeks.find((week) => week.week === weekNumber);
+  const daySelect = $("#move-day");
+  for (const option of daySelect.options) {
+    const occupant = selectedWeek?.workouts.find((workout) => workout.day === Number(option.value));
+    option.disabled = occupant?.can_move === false;
+  }
+  if (daySelect.selectedOptions[0]?.disabled) {
+    const available = Array.from(daySelect.options).find((option) => !option.disabled);
+    if (available) daySelect.value = available.value;
+  }
 }
 
 document.addEventListener("pointermove", movePointerDrag, { passive: false });
@@ -1447,6 +1485,28 @@ $("#delete-workout-form").addEventListener("submit", async (event) => {
     $("#workout-dialog").close();
   } catch (error) { setSaveFailure(error); showError(error.message); }
 });
+
+$("#move-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.move) return;
+  const toWeek = Number($("#move-week").value);
+  const toDay = Number($("#move-day").value);
+  if (state.move.week === toWeek && state.move.day === toDay) {
+    $("#move-dialog").close();
+    return;
+  }
+  try {
+    await persistMove(state.move.week, state.move.workoutId, toWeek, toDay);
+    $("#move-dialog").close();
+  } catch (error) {
+    setSaveFailure(error);
+    showError(error.message);
+  }
+});
+$("#move-week").addEventListener("change", (event) => {
+  updateMoveDayOptions(Number(event.target.value));
+});
+$("#move-dialog").addEventListener("close", () => { state.move = null; });
 
 $("#delete-program-button").addEventListener("click", () => {
   $("#delete-program-title").textContent = `Delete ${state.program.program.name}?`;

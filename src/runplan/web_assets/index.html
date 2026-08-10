@@ -191,6 +191,18 @@
       </form>
     </dialog>
 
+    <dialog id="move-dialog" aria-labelledby="move-title">
+      <form id="move-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Calendar</p><h2 id="move-title">Move workout</h2></div><button type="button" class="icon-button close">×</button></div>
+        <p class="editor-help">Moving to an occupied day swaps the two workouts.</p>
+        <div class="move-fields">
+          <label>Week<select id="move-week" required></select></label>
+          <label>Day<select id="move-day" required><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="7">Sunday</option></select></label>
+        </div>
+        <footer><button type="button" class="button secondary close">Cancel</button><button class="button primary">Move workout</button></footer>
+      </form>
+    </dialog>
+
     <dialog id="delete-program-dialog" class="confirm-dialog">
       <form id="delete-program-form">
         <div class="dialog-heading"><div><p class="eyebrow">Delete program</p><h2 id="delete-program-title">Delete program?</h2></div><button type="button" class="icon-button close">×</button></div>

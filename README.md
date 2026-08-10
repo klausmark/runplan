@@ -39,10 +39,11 @@ changes. Each Runplan user has an isolated directory under
 and can upload a valid `.yaml` or `.yml` plan in the web frontend. Set
 `RUNPLAN_PROGRAM_DIR` or pass `--program-dir` to use a different server-side
 root directory. It supports plan name,
-description, and start-week editing, click-to-edit and press-and-drag workout
+description, and start-week editing, click-to-edit and drag-handle workout
 scheduling, workout creation and editing through validated YAML, deletion with
 confirmation, and YAML, Markdown, and PDF downloads. Clicking a workout card
-opens the edit dialog; pressing and dragging the card moves it. Empty calendar
+opens the edit dialog; holding and dragging its grip moves it, while tapping the
+grip opens an accessible move dialog. Empty calendar
 days provide a valid starter workout and an inline reference for the supported
 step, duration, distance, pace, and repeat syntax. A week must retain at least
 one workout. Deleting a previously synchronized workout queues its Garmin

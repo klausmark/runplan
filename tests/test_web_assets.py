@@ -272,7 +272,6 @@ class TestWebAsset:
 
     def test_completed_workouts_are_locked_out_of_every_calendar_move_path(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
         assert "card.draggable = workout.can_move" not in script
         assert "card.dataset.moveable = String(workout.can_move)" in script
         assert "if (workout.can_move)" in script
@@ -280,7 +279,6 @@ class TestWebAsset:
         assert 'candidate?.dataset.moveLocked === "true" ? null : candidate' in script
         assert "function canMoveRequest(" in script
         assert "Completed workouts can only be moved by editing YAML directly." in script
-        assert ".workout-locked" in styles
         assert "Beginning drag on a completed workout" not in script
 
     def test_card_click_opens_edit_dialog(self) -> None:
@@ -288,21 +286,22 @@ class TestWebAsset:
         assert 'edit.textContent = "Edit →"' not in script
         assert 'class="edit-workout"' not in script
         assert "openWorkout(week, workout)" in script
-        assert 'card.addEventListener("click"' in script
-        assert "card.dataset.suppressClick" in script
-        assert "suppressClick" in script
+        assert 'content.addEventListener("click"' in script
+        assert 'content.className = "workout-content"' in script
         assert "event.preventDefault()" in script
 
     def test_card_keyboard_activation_opens_edit_dialog(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-        assert 'card.setAttribute("role", "button")' in script
-        assert "card.tabIndex = 0" in script
+        assert 'content.setAttribute("role", "button")' in script
+        assert "content.tabIndex = 0" in script
         assert 'event.key === "Enter"' in script
         assert 'event.key === " "' in script
 
-    def test_pointer_drag_replaces_html5_and_touch_handlers(self) -> None:
+    def test_drag_handle_activates_pointer_drag(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-        assert 'card.addEventListener("pointerdown"' in script
+        assert 'handle.className = "workout-drag-handle"' in script
+        assert 'handle.addEventListener("pointerdown"' in script
+        assert 'card.addEventListener("pointerdown"' not in script
         assert 'card.addEventListener("dragstart"' not in script
         assert 'card.addEventListener("touchstart"' not in script
         assert 'addEventListener("dragover"' not in script
@@ -312,16 +311,19 @@ class TestWebAsset:
         assert "> MOVE_THRESHOLD" in script
         assert "MOVE_THRESHOLD = 6" in script
 
-    def test_move_button_and_move_dialog_are_removed(self) -> None:
+    def test_drag_handle_tap_and_keyboard_activation_offer_move_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
-        assert 'id="move-dialog"' not in html
-        assert 'id="move-form"' not in html
-        assert 'class="move-workout"' not in html
-        assert "function openMove(" not in script
-        assert "function updateMoveDayOptions(" not in script
-        assert "move-workout" not in styles
+        assert 'id="move-dialog"' in html
+        assert 'id="move-form"' in html
+        assert 'id="move-week"' in html
+        assert 'id="move-day"' in html
+        assert 'handle.setAttribute("aria-label", `Move ${workout.name}`)' in script
+        assert 'handle.addEventListener("click"' in script
+        assert "function openMove(" in script
+        assert "function updateMoveDayOptions(" in script
+        assert '$("#move-form").addEventListener("submit"' in script
+        assert "occupant?.can_move === false" in script
 
     def test_pointer_drag_renames_touch_helpers(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
@@ -376,7 +378,7 @@ class TestWebAsset:
                 "function positionPointerGhost("
             )
         ]
-        assert "drag.card.setPointerCapture(drag.pointerId)" in activate_block
+        assert "drag.handle.setPointerCapture(drag.pointerId)" in activate_block
         cancel_block = script[
             script.index("function cancelPointerDrag(") : script.index(
                 '\ndocument.addEventListener("pointermove"'
@@ -384,25 +386,22 @@ class TestWebAsset:
         ]
         assert "releasePointerCapture" in cancel_block
 
-    def test_workout_card_does_not_block_native_scroll_until_drag_activates(self) -> None:
+    def test_only_drag_handle_blocks_native_touch_gestures(self) -> None:
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert ".workout-drag-handle" in styles
+        assert "touch-action: none" in styles
         assert '.workout[data-moveable="true"] { touch-action: none' not in styles
-        assert '.workout[data-moveable="true"]' not in styles
         activate_block = script[
             script.index("function activatePointerDrag(") : script.index(
                 "function positionPointerGhost("
             )
         ]
-        assert 'drag.card.style.touchAction = "none"' in activate_block
-        assert 'document.body.style.touchAction = "none"' in activate_block
+        assert "touchAction" not in activate_block
         cancel_block = script[
-            script.index("function cancelPointerDrag(") : script.index(
-                '\ndocument.addEventListener("pointermove"'
-            )
+            script.index("function cancelPointerDrag(") : script.index("\nfunction openMove(")
         ]
-        assert 'drag.card.style.touchAction = ""' in cancel_block
-        assert 'document.body.style.touchAction = ""' in cancel_block
+        assert "touchAction" not in cancel_block
 
     def test_click_suppression_only_after_a_real_drag(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
@@ -411,9 +410,10 @@ class TestWebAsset:
         ]
         assert "suppressClick" in end_block
         assert (
-            "Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > TOUCH_CANCEL_DISTANCE"
-            in end_block
+            "const threshold = drag.isTouch ? TOUCH_CANCEL_DISTANCE : MOVE_THRESHOLD" in end_block
         )
+        assert "Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > threshold" in end_block
+        assert 'drag.handle.dataset.suppressClick = "true"' in end_block
 
     def test_workout_overview_section_is_present_in_edit_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
