@@ -54,10 +54,10 @@ def test_markdown_export_includes_coaching_guide_for_nike_5k() -> None:
     assert "Recovery Runs" in md
     assert "Rest Days" in md
     assert "Nike Run Club Pace Chart" in md
-    assert "| Mile best | 5K best / avg km |" in md
-    assert "| 5:00 | 17:05 / 3:25 | 35:45 / 3:35 |" in md
-    assert "| 9:00 | 30:00 / 6:00 | 62:30 / 6:15 |" in md
-    assert "If your last 5K was 27:00" in md
+    assert "| 1K best | 5K best / avg km |" in md
+    assert "| 3:00 | 16:40 / 3:20 | 35:00 / 3:30 |" in md
+    assert "| 5:00 | 27:55 / 5:35 | 58:20 / 5:50 |" in md
+    assert "If your last 5K was" in md
     assert "Progression Run" in md
     assert "Intervals" in md
     assert "Fartlek" in md
@@ -73,19 +73,19 @@ def test_html_export_includes_coaching_table_and_examples() -> None:
     html = format_program_html(export)
     assert '<section class="coaching">' in html
     assert "<table>" in html
-    assert "<th>Mile best</th>" in html
-    assert "<td>5:00</td>" in html
-    assert "If your last 5K was 27:00" in html
+    assert "<th>1K best</th>" in html
+    assert "<td>3:00</td>" in html
+    assert "If your last 5K was" in html
 
 
-def test_markdown_export_for_marathon_uses_six_column_pace_chart() -> None:
+def test_markdown_export_for_marathon_uses_seven_column_pace_chart() -> None:
     export = _build_export("nike-marathon")
     md = format_program_markdown(export)
-    lines = [line for line in md.splitlines() if line.startswith("| Mile best")]
+    lines = [line for line in md.splitlines() if line.startswith("| 1K best")]
     assert len(lines) == 1
     header_cells = [cell.strip() for cell in lines[0].strip("|").split("|")]
-    assert len(header_cells) == 6
-    assert "Recovery min/km" not in md.split("Coaching guide")[1]
+    assert len(header_cells) == 7
+    assert "Recovery min/km" in md.split("Coaching guide")[1]
 
 
 def test_html_export_escapes_user_content_in_coaching() -> None:

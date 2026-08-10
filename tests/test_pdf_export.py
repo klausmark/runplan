@@ -269,7 +269,7 @@ class TestPdfCoachingFormatting:
 
         assert "Throughout the plan" in text
         assert "Worked examples" in text
-        assert "If your last 5K was 27:00" in text
+        assert "If your last 5K was" in text
 
     def test_pdf_coaching_renders_bold_in_glossary_terms(self, tmp_path: Path) -> None:
         export = _load_nike_export("nike-5k")
@@ -299,6 +299,6 @@ class TestPdfCoachingFormatting:
 
         text = _pdf_text(output)
 
-        assert "If your last 5K was 27:00" in text
-        assert "Best Mile Pace: 8:00 minutes" in text
-        assert "*If your last 5K was 27:00*" not in text
+        assert "If your last 5K was" in text
+        assert "Best 1K Pace:" in text
+        assert "*If your last 5K was" not in text

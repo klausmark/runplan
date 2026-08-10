@@ -57,6 +57,18 @@ def five_k_pace_seconds(five_k_seconds: float) -> float:
     return five_k_seconds / FIVE_KM
 
 
+def one_k_pace_to_five_k_seconds(one_k_pace_seconds_per_km: float) -> float:
+    """Predict the 5K race time implied by a 1K best pace.
+
+    Riegel's formula expressed in pace terms keeps the 1K pace as the
+    reference, so the implied 5K time is the 1K pace times the Riegel
+    time factor at the 5K distance.
+    """
+    if one_k_pace_seconds_per_km <= 0:
+        raise ValueError("one_k_pace_seconds_per_km must be greater than 0")
+    return one_k_pace_seconds_per_km * math.pow(FIVE_KM, RIEGEL_EXPONENT)
+
+
 def race_pace_seconds(five_k_seconds: float, distance_km: float) -> float:
     """Predict the average race pace for ``distance_km`` from a 5K time.
 

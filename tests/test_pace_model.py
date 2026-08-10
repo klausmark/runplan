@@ -18,6 +18,7 @@ from runplan.domain import (
     five_k_pace_seconds,
     format_pace_seconds,
     intensity_pace_seconds,
+    one_k_pace_to_five_k_seconds,
     pace_zone,
     parse_total_seconds,
     race_pace_seconds,
@@ -142,3 +143,18 @@ def test_five_k_pace_seconds_rejects_non_positive_input() -> None:
         five_k_pace_seconds(0)
     with pytest.raises(ValueError):
         five_k_pace_seconds(-1)
+
+
+def test_one_k_pace_to_five_k_seconds_matches_riegel() -> None:
+    # A 3:00 min/km 1K best predicts a 5K time longer than 15:00 because the
+    # runner cannot sustain 1K pace over the full 5K.
+    assert one_k_pace_to_five_k_seconds(180) == pytest.approx(180 * math.pow(5.0, RIEGEL_EXPONENT))
+    # Round-trip: a 1K best of 5:00 implies a 5K around 27:00 at Riegel 1.07.
+    assert one_k_pace_to_five_k_seconds(300) == pytest.approx(300 * math.pow(5.0, RIEGEL_EXPONENT))
+
+
+def test_one_k_pace_to_five_k_seconds_rejects_non_positive_input() -> None:
+    with pytest.raises(ValueError):
+        one_k_pace_to_five_k_seconds(0)
+    with pytest.raises(ValueError):
+        one_k_pace_to_five_k_seconds(-1)
