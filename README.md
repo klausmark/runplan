@@ -328,6 +328,21 @@ A regular step may have an optional pace target in minutes per kilometer:
 The quotes are required so YAML does not interpret the colon. Garmin receives
 the target as a pace zone and can warn when the runner leaves that range.
 
+A step can also carry a symbolic `pace_type` instead of an absolute pace.
+The runner's 5K best and pace-zone tolerance resolve it to a concrete Garmin
+pace zone at sync time:
+
+```yaml
+- run: {time: 3m, pace_type: 5k, note: "3:00 5K Pace"}
+- run: {time: 25m, pace_type: recovery, note: "25:00 Recovery Run"}
+```
+
+Supported symbolic intensities are `1k`, `5k`, `10k`, `half-marathon`,
+`marathon`, `tempo`, and `recovery`. Race distances use Riegel's formula;
+`tempo` and `recovery` add `20 s/km` and `60 s/km` to the 5K pace. The
+bundled Nike Run Club templates use `pace_type` exclusively so every runner
+syncs personalised targets from the same plan file.
+
 A regular step may carry an optional watch-facing note that the runner sees
 instead of the default step label (`Very easy run`, `Warm up`, `Walk`, or
 `Cool down`):

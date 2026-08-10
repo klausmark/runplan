@@ -93,9 +93,12 @@ exposes multiple server-configured Runplan users after that login. Each user has
 display name, Garmin credentials-file path, Garmin token-store directory, and
 isolated sync state. The settings UI may submit Garmin credentials to the
 server, but saved passwords and Garmin tokens are never returned to the browser.
-Each user also owns configurable estimation defaults, initially fallback pace,
-which must be applied consistently to web summaries, exports, Garmin titles,
-and sync previews. All
+Each user also owns a measured 5K best time and a configurable Garmin pace
+zone tolerance, which together drive every personalized pace target in the
+Nike Run Club templates. Those settings must be applied consistently to
+web summaries, exports, Garmin titles and Garmin workout payloads. The
+server stores them only as non-secret configuration; Garmin credentials
+remain in their own file. All
 Garmin operations resolve the supplied user ID against server configuration and
 partition clients, state, and future concurrency locks by user. This remains
 user selection rather than per-profile authorization: anyone who knows the
