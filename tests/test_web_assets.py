@@ -384,10 +384,25 @@ class TestWebAsset:
         ]
         assert "releasePointerCapture" in cancel_block
 
-    def test_moveable_workout_card_declares_touch_action_none(self) -> None:
+    def test_workout_card_does_not_block_native_scroll_until_drag_activates(self) -> None:
         styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
-        assert '.workout[data-moveable="true"]' in styles
-        assert "touch-action: none" in styles
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert '.workout[data-moveable="true"] { touch-action: none' not in styles
+        assert '.workout[data-moveable="true"]' not in styles
+        activate_block = script[
+            script.index("function activatePointerDrag(") : script.index(
+                "function positionPointerGhost("
+            )
+        ]
+        assert 'drag.card.style.touchAction = "none"' in activate_block
+        assert 'document.body.style.touchAction = "none"' in activate_block
+        cancel_block = script[
+            script.index("function cancelPointerDrag(") : script.index(
+                '\ndocument.addEventListener("pointermove"'
+            )
+        ]
+        assert 'drag.card.style.touchAction = ""' in cancel_block
+        assert 'document.body.style.touchAction = ""' in cancel_block
 
     def test_click_suppression_only_after_a_real_drag(self) -> None:
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

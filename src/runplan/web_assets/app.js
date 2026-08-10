@@ -894,6 +894,8 @@ function activatePointerDrag() {
   drag.started = true;
   drag.card.classList.add("touch-drag-source");
   document.body.classList.add("touch-dragging");
+  drag.card.style.touchAction = "none";
+  document.body.style.touchAction = "none";
   document.body.append(ghost);
   positionPointerGhost(drag.x, drag.y);
   updatePointerTarget(drag.x, drag.y);
@@ -987,6 +989,8 @@ function cancelPointerDrag() {
   drag.card.classList.remove("touch-drag-source");
   drag.ghost?.remove();
   document.body.classList.remove("touch-dragging");
+  drag.card.style.touchAction = "";
+  document.body.style.touchAction = "";
   try { drag.card.releasePointerCapture(drag.pointerId); } catch (_) {}
   state.pointerDrag = null;
 }
