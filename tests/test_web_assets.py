@@ -335,6 +335,71 @@ class TestWebAsset:
         assert "function movePointerDrag(" in script
         assert "function endPointerDrag(" in script
 
+    def test_touch_drag_uses_long_press_to_avoid_swallowing_taps(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert "TOUCH_LONG_PRESS_MS = 350" in script
+        assert "TOUCH_CANCEL_DISTANCE = 10" in script
+        assert 'event.pointerType !== "mouse"' in script
+        assert "window.setTimeout(activatePointerDrag, TOUCH_LONG_PRESS_MS)" in script
+        begin_block = script[
+            script.index("function beginPointerDrag(") : script.index(
+                "function activatePointerDrag("
+            )
+        ]
+        assert "TOUCH_LONG_PRESS_MS" in begin_block
+        move_block = script[
+            script.index("function movePointerDrag(") : script.index("function endPointerDrag(")
+        ]
+        assert "TOUCH_CANCEL_DISTANCE" in move_block
+        assert "cancelPointerDrag()" in move_block
+        end_block = script[
+            script.index("function endPointerDrag(") : script.index("function cancelPointerDrag(")
+        ]
+        assert "TOUCH_CANCEL_DISTANCE" in end_block
+        cancel_block = script[
+            script.index("function cancelPointerDrag(") : script.index(
+                '\ndocument.addEventListener("pointermove"'
+            )
+        ]
+        assert "window.clearTimeout(drag.timer)" in cancel_block
+
+    def test_pointer_capture_only_after_drag_activates(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        begin_block = script[
+            script.index("function beginPointerDrag(") : script.index(
+                "function activatePointerDrag("
+            )
+        ]
+        assert "setPointerCapture" not in begin_block
+        activate_block = script[
+            script.index("function activatePointerDrag(") : script.index(
+                "function positionPointerGhost("
+            )
+        ]
+        assert "drag.card.setPointerCapture(drag.pointerId)" in activate_block
+        cancel_block = script[
+            script.index("function cancelPointerDrag(") : script.index(
+                '\ndocument.addEventListener("pointermove"'
+            )
+        ]
+        assert "releasePointerCapture" in cancel_block
+
+    def test_moveable_workout_card_declares_touch_action_none(self) -> None:
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert '.workout[data-moveable="true"]' in styles
+        assert "touch-action: none" in styles
+
+    def test_click_suppression_only_after_a_real_drag(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        end_block = script[
+            script.index("function endPointerDrag(") : script.index("function cancelPointerDrag(")
+        ]
+        assert "suppressClick" in end_block
+        assert (
+            "Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > TOUCH_CANCEL_DISTANCE"
+            in end_block
+        )
+
     def test_workout_overview_section_is_present_in_edit_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

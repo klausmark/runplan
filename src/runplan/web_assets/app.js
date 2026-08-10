@@ -1,6 +1,8 @@
 const state = { users: [], user: null, program: null, pointerDrag: null, workout: null, undoMove: null };
 const $ = (selector) => document.querySelector(selector);
 const MOVE_THRESHOLD = 6;
+const TOUCH_LONG_PRESS_MS = 350;
+const TOUCH_CANCEL_DISTANCE = 10;
 const USER_STORAGE_KEY = "runplan-user";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let studioInitialized = false;
@@ -854,6 +856,7 @@ function beginPointerDrag(event, card, week, workout) {
   if (event.button !== undefined && event.button !== 0) return;
   if (event.target.closest("button")) return;
   cancelPointerDrag();
+  const isTouch = event.pointerType !== "mouse";
   state.pointerDrag = {
     pointerId: event.pointerId,
     card,
@@ -864,17 +867,23 @@ function beginPointerDrag(event, card, week, workout) {
     startY: event.clientY,
     x: event.clientX,
     y: event.clientY,
+    isTouch,
     started: false,
     target: null,
     ghost: null,
     scrollFrame: null,
+    timer: null,
   };
-  try { card.setPointerCapture(event.pointerId); } catch (_) {}
+  if (isTouch) {
+    state.pointerDrag.timer = window.setTimeout(activatePointerDrag, TOUCH_LONG_PRESS_MS);
+  }
 }
 
 function activatePointerDrag() {
   const drag = state.pointerDrag;
   if (!drag) return;
+  window.clearTimeout(drag.timer);
+  drag.timer = null;
   const bounds = drag.card.getBoundingClientRect();
   const ghost = drag.card.cloneNode(true);
   ghost.className = "workout touch-drag-ghost";
@@ -889,6 +898,7 @@ function activatePointerDrag() {
   positionPointerGhost(drag.x, drag.y);
   updatePointerTarget(drag.x, drag.y);
   drag.scrollFrame = window.requestAnimationFrame(autoScrollPointerDrag);
+  try { drag.card.setPointerCapture(drag.pointerId); } catch (_) {}
   navigator.vibrate?.(25);
 }
 
@@ -927,9 +937,12 @@ function movePointerDrag(event) {
   drag.x = event.clientX;
   drag.y = event.clientY;
   if (!drag.started) {
-    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > MOVE_THRESHOLD) {
-      activatePointerDrag();
+    const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (drag.isTouch) {
+      if (moved > TOUCH_CANCEL_DISTANCE) cancelPointerDrag();
+      return;
     }
+    if (moved > MOVE_THRESHOLD) activatePointerDrag();
     return;
   }
   event.preventDefault();
@@ -950,8 +963,11 @@ async function endPointerDrag(event) {
   const workoutId = drag.workoutId;
   const sameDay = target && Number(target.dataset.week) === drag.week && Number(target.dataset.day) === drag.day;
   // Suppress the click event that the browser fires after pointerup so the
-  // card does not open its edit dialog when the user finishes a drag.
-  drag.card.dataset.suppressClick = "true";
+  // card does not open its edit dialog when the user finishes a drag. Only
+  // suppress when the pointer actually travelled, so a long-press followed
+  // by a release without movement still opens the edit dialog.
+  const moved = Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > TOUCH_CANCEL_DISTANCE;
+  if (moved) drag.card.dataset.suppressClick = "true";
   cancelPointerDrag();
   if (!target || sameDay) return;
   try {
@@ -965,11 +981,13 @@ async function endPointerDrag(event) {
 function cancelPointerDrag() {
   const drag = state.pointerDrag;
   if (!drag) return;
+  if (drag.timer !== null) window.clearTimeout(drag.timer);
   if (drag.scrollFrame) window.cancelAnimationFrame(drag.scrollFrame);
   drag.target?.classList.remove("touch-drag-over");
   drag.card.classList.remove("touch-drag-source");
   drag.ghost?.remove();
   document.body.classList.remove("touch-dragging");
+  try { drag.card.releasePointerCapture(drag.pointerId); } catch (_) {}
   state.pointerDrag = null;
 }
 
