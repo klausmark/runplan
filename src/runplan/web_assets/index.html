@@ -243,6 +243,21 @@
       </form>
     </dialog>
 
+    <dialog id="sync-preview-dialog" class="sync-preview-dialog">
+      <div class="dialog-heading"><div><p class="eyebrow">Garmin sync</p><h2>Review sync changes</h2></div><button type="button" class="icon-button close" aria-label="Close">×</button></div>
+      <p id="sync-preview-help" class="editor-help">These are the Garmin actions this sync will perform. Confirm to proceed.</p>
+      <div id="sync-preview-warning" class="sync-preview-warning hidden"></div>
+      <ul id="sync-preview-summary" class="sync-preview-summary"></ul>
+      <details id="sync-preview-details" class="sync-preview-details">
+        <summary>Show every action</summary>
+        <ol id="sync-preview-actions" class="sync-preview-actions"></ol>
+      </details>
+      <footer>
+        <button id="sync-preview-cancel" type="button" class="button secondary close">Cancel</button>
+        <button id="sync-preview-confirm" type="button" class="button primary">Confirm and sync</button>
+      </footer>
+    </dialog>
+
     <script src="/app.js" defer></script>
   </body>
 </html>

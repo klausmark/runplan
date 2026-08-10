@@ -135,7 +135,7 @@ class WebSyncService:
             return prepare_sync_selections(
                 Namespace(
                     yaml_file=self.store_for(user.id).path(name),
-                    select_weeks=None,
+                    select_weeks="all",
                     weeks_ahead=None,
                     delete_all=False,
                     today=self.today(),

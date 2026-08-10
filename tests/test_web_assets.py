@@ -155,13 +155,16 @@ class TestWebAsset:
         assert "/sync/recovery" not in script
         assert "recoveryPreview" not in script
 
-    def test_garmin_sync_is_one_click_without_review_dialog(self) -> None:
+    def test_garmin_sync_uses_confirmation_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-        assert 'id="sync-dialog"' not in html
-        assert "syncPreview" not in script
-        assert '$("#sync-button").addEventListener("click", syncGarmin)' in script
-        assert "confirmationToken: preview.confirmationToken" in script
+        assert 'id="sync-preview-dialog"' in html
+        assert 'id="sync-preview-confirm"' in html
+        assert 'id="sync-preview-cancel"' in html
+        assert "renderSyncPreview" in script
+        assert "dialog.showModal()" in script
+        assert "dialog.close" in script
+        assert "syncPreviewDialog" not in script
         assert 'button.textContent = "Checking…"' in script
         assert 'button.textContent = "Syncing…"' in script
         assert 'button.textContent = "Done"' in script

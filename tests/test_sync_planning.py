@@ -108,3 +108,21 @@ class TestSyncPlanning(SyncTestBase):
         assert ["Old workout"] == deleted
         assert "Week 1 - Mixed" not in deleted
         assert "Week 2 - Long" not in deleted
+
+    def test_sync_plan_includes_unschedule_and_delete_for_replaced_workouts(self) -> None:
+        client = FakeGarmin()
+        self.sync(client)
+        changed_program, changed_compiled = compiled_week(1)
+        # Mutate the typed Garmin workout's name so its hash no longer matches.
+        changed_compiled[0][1].workoutName = "Updated workout name"
+        plan = plan_program_weeks(JsonStateRepository(), [(changed_program, changed_compiled)])
+        kinds = [action.kind for action in plan.actions]
+        # The replacement surfaces update + schedule for the new workout and
+        # unschedule + delete for the previously synced Garmin-owned workout.
+        assert kinds[:4] == ["update", "schedule", "unschedule", "delete"]
+        unschedule = next(action for action in plan.actions if action.kind == "unschedule")
+        delete = next(action for action in plan.actions if action.kind == "delete")
+        assert unschedule.schedule_id is not None
+        assert delete.workout_id is not None
+        # The remaining workouts in the program are reused, not duplicated.
+        assert "reuse" in kinds[4:]

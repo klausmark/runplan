@@ -43,6 +43,19 @@ def _plan_desired_workout(
     elif record.get("content_hash") != desired_hash:
         plan.add("update", definition["name"], workout_id=record.get("workout_id"))
         plan.add("schedule", definition["name"], date=definition["schedule_date"])
+        # The replacement cleans up the old Garmin workout as part of the
+        # same transaction. Surface those destructive actions in the
+        # preview so the user knows what the sync will do.
+        if record.get("schedule_id"):
+            plan.add(
+                "unschedule",
+                definition["name"],
+                workout_id=record.get("workout_id"),
+                schedule_id=record["schedule_id"],
+                date=record.get("date"),
+            )
+        if record.get("workout_id"):
+            plan.add("delete", definition["name"], workout_id=record["workout_id"])
     else:
         _plan_reusable_workout(plan, record, definition)
 

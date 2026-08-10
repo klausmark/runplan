@@ -308,6 +308,68 @@ const workoutStatusLabels = {
 
 let syncButtonResetTimer = null;
 
+const SYNC_ACTION_LABELS = {
+  create: "Create workout",
+  schedule: "Schedule workout",
+  reuse: "Reuse workout",
+  update: "Replace workout",
+  unschedule: "Unschedule old workout",
+  delete: "Delete old workout",
+  missed: "Mark as missed",
+  completed: "Completed",
+  retired: "Retired",
+};
+
+function describeSyncAction(action) {
+  const base = SYNC_ACTION_LABELS[action.kind] || action.kind;
+  if (action.date) return `${base} on ${action.date}`;
+  return base;
+}
+
+function summarizeSyncActions(actions) {
+  const counts = Object.create(null);
+  for (const action of actions) {
+    counts[action.kind] = (counts[action.kind] || 0) + 1;
+  }
+  return counts;
+}
+
+function renderSyncPreview(preview) {
+  const summary = $("#sync-preview-summary");
+  summary.innerHTML = "";
+  const actions = preview?.plan?.actions ?? [];
+  const counts = summarizeSyncActions(actions);
+  const order = ["create", "schedule", "reuse", "update", "unschedule", "delete", "missed"];
+  const summaryItems = order
+    .filter((kind) => counts[kind])
+    .map((kind) => `${counts[kind]} ${SYNC_ACTION_LABELS[kind].toLowerCase()}${counts[kind] > 1 ? "s" : ""}`);
+  if (summaryItems.length === 0) summaryItems.push("No changes");
+  for (const text of summaryItems) {
+    const item = document.createElement("li");
+    item.textContent = text;
+    summary.appendChild(item);
+  }
+
+  const warning = $("#sync-preview-warning");
+  const destructiveCount = (counts.delete || 0) + (counts.unschedule || 0);
+  if (destructiveCount > 0) {
+    warning.textContent = `This sync will remove ${destructiveCount} previously created Garmin workout${destructiveCount > 1 ? "s" : ""}.`;
+    warning.classList.remove("hidden");
+  } else {
+    warning.classList.add("hidden");
+    warning.textContent = "";
+  }
+
+  const list = $("#sync-preview-actions");
+  list.innerHTML = "";
+  for (const action of actions) {
+    const item = document.createElement("li");
+    item.textContent = describeSyncAction(action);
+    list.appendChild(item);
+  }
+  $("#sync-preview-details").open = false;
+}
+
 async function syncGarmin() {
   const button = $("#sync-button");
   const file = state.program.file;
@@ -317,12 +379,51 @@ async function syncGarmin() {
   button.disabled = true;
   button.textContent = "Checking…";
   setAppStatus("garmin", "Checking Garmin…");
+  let preview;
   try {
-    const preview = await request(
+    preview = await request(
       `/api/programs/${encodeURIComponent(file)}/sync/preview?user=${encodeURIComponent(userId)}`
     );
-    button.textContent = "Syncing…";
-    setAppStatus("garmin", "Syncing Garmin…");
+  } catch (error) {
+    showError(error.message);
+    button.textContent = "Sync Garmin";
+    button.disabled = false;
+    setAppStatus("failed", "Garmin sync failed");
+    return;
+  }
+  renderSyncPreview(preview);
+  const dialog = $("#sync-preview-dialog");
+  const confirmButton = $("#sync-preview-confirm");
+  const cancelButton = $("#sync-preview-cancel");
+  const closeHandler = (event) => {
+    if (event.target !== confirmButton && event.target !== cancelButton) return;
+    dialog.close(event.target === confirmButton ? "confirm" : "cancel");
+  };
+  dialog.addEventListener("click", closeHandler);
+  let result;
+  try {
+    result = await new Promise((resolve) => {
+      dialog.showModal();
+      dialog.addEventListener(
+        "close",
+        () => {
+          resolve(dialog.returnValue === "confirm" ? preview : null);
+        },
+        { once: true },
+      );
+    });
+  } finally {
+    dialog.removeEventListener("click", closeHandler);
+  }
+  if (!result) {
+    button.textContent = "Sync Garmin";
+    button.disabled = false;
+    setAppStatus("idle", "Sync cancelled");
+    return;
+  }
+  button.textContent = "Syncing…";
+  setAppStatus("garmin", "Syncing Garmin…");
+  try {
     await request(`/api/programs/${encodeURIComponent(file)}/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
