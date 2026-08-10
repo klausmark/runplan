@@ -136,8 +136,70 @@ class TestPdfExport:
         export_pdf(program, output, force=False)
 
         reader = PdfReader(output)
-        text = "\n".join(page.extract_text() or "" for page in reader.pages)
-        assert "400 m @ 4:30-4:45 min/km" in text
+        text = "".join(page.extract_text() or "" for page in reader.pages)
+        text = " ".join(text.split())
+        assert "400 m @ 4:30-4:45 min/km — Hold form" in text
+
+    def test_pdf_renders_step_note_inline(self, tmp_path: Path) -> None:
+        raw = {
+            "program": {
+                "id": "note-export",
+                "name": "Note Export",
+                "short_name": "NOTE",
+                "start_week": "2026-W01",
+            },
+            "weeks": [
+                {
+                    "week": 1,
+                    "workouts": [
+                        {
+                            "id": "w1",
+                            "day": 1,
+                            "name": "Intervals",
+                            "steps": [
+                                {"warmup": {"time": "5m"}},
+                                {
+                                    "repeat": {
+                                        "count": 2,
+                                        "steps": [
+                                            {
+                                                "run": {
+                                                    "time": "1m",
+                                                    "note": "1:00 5K Pace",
+                                                }
+                                            },
+                                            {
+                                                "recovery": {
+                                                    "time": "1m",
+                                                    "note": "1:00 jog",
+                                                }
+                                            },
+                                        ],
+                                    }
+                                },
+                                {
+                                    "cooldown": {
+                                        "time": "5m",
+                                        "note": "Finish easy",
+                                    }
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        program = build_program_export(load_program_model(raw), WeekSelection.all())
+
+        output = tmp_path / "note-export.pdf"
+        export_pdf(program, output, force=False)
+
+        reader = PdfReader(output)
+        text = " ".join("".join(page.extract_text() or "" for page in reader.pages).split())
+
+        assert "Run 1 min — 1:00 5K Pace" in text
+        assert "Recovery 1 min — 1:00 jog" in text
+        assert "Cooldown 5 min — Finish easy" in text
 
     @pytest.mark.skipif(shutil.which("pdftoppm") is None, reason="pdftoppm is not installed")
     def test_representative_pages_render_with_runplan_palette(self, tmp_path: Path) -> None:

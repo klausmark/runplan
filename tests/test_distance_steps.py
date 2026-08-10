@@ -10,6 +10,8 @@ from runplan import (
     parse_step_end,
     step_summary,
 )
+from runplan.domain.models import Step
+from runplan.presentation.text import format_model_step_value, format_model_steps
 
 
 @pytest.mark.parametrize(("value", "expected"), [("400m", 400), ("1.5km", 1500)])
@@ -167,3 +169,42 @@ def test_step_summary_without_note_omits_suffix() -> None:
     summary = step_summary([{"run": {"distance": "10km"}}])
 
     assert summary == "Run 10 km"
+
+
+def test_format_model_step_value_with_value_only() -> None:
+    step = Step(action="run", end_kind="time", end_value=60.0)
+
+    assert format_model_step_value(step) == "1 min"
+
+
+def test_format_model_step_value_with_pace_only() -> None:
+    step = Step(action="run", end_kind="distance", end_value=400.0, pace=(270.0, 285.0))
+
+    assert format_model_step_value(step) == "400 m @ 4:30-4:45 min/km"
+
+
+def test_format_model_step_value_with_note_only() -> None:
+    step = Step(action="run", end_kind="time", end_value=60.0, note="1:00 5K Pace")
+
+    assert format_model_step_value(step) == "1 min — 1:00 5K Pace"
+
+
+def test_format_model_step_value_with_pace_and_note() -> None:
+    step = Step(
+        action="run",
+        end_kind="distance",
+        end_value=400.0,
+        pace=(270.0, 285.0),
+        note="Hold form",
+    )
+
+    assert format_model_step_value(step) == "400 m @ 4:30-4:45 min/km — Hold form"
+
+
+def test_format_model_steps_renders_note_inline_not_as_separate_line() -> None:
+    steps = (Step(action="run", end_kind="time", end_value=60.0, note="1:00 5K Pace"),)
+
+    rendered = format_model_steps(steps, indent="")
+
+    assert rendered == "Run: 1 min — 1:00 5K Pace"
+    assert "Note:" not in rendered

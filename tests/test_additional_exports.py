@@ -112,3 +112,61 @@ def test_cli_requires_output_for_file_exports(tmp_path: Path, export_format) -> 
 
     assert result == 2
     assert "requires --output" in stderr.getvalue()
+
+
+def _note_program() -> dict:
+    return {
+        "program": {
+            "id": "note-export",
+            "name": "Note Export",
+            "short_name": "NOTE",
+            "start_week": "2026-W01",
+        },
+        "weeks": [
+            {
+                "week": 1,
+                "workouts": [
+                    {
+                        "id": "w1",
+                        "day": 1,
+                        "name": "Intervals",
+                        "steps": [
+                            {"warmup": {"time": "5m"}},
+                            {
+                                "repeat": {
+                                    "count": 2,
+                                    "steps": [
+                                        {"run": {"time": "1m", "note": "1:00 5K Pace"}},
+                                        {"recovery": {"time": "1m", "note": "1:00 jog"}},
+                                    ],
+                                }
+                            },
+                            {"cooldown": {"time": "5m", "note": "Finish easy"}},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_markdown_renders_step_note_inline() -> None:
+    program = load_program_model(_note_program())
+
+    document = format_program_markdown(build_program_export(program, WeekSelection.all()))
+
+    assert "Run: 1 min — 1:00 5K Pace" in document
+    assert "Recovery: 1 min — 1:00 jog" in document
+    assert "Cooldown: 5 min — Finish easy" in document
+    assert "Note:" not in document
+
+
+def test_html_renders_step_note_inline() -> None:
+    program = load_program_model(_note_program())
+
+    document = format_program_html(build_program_export(program, WeekSelection.all()))
+
+    assert "Run: 1 min — 1:00 5K Pace" in document
+    assert "Recovery: 1 min — 1:00 jog" in document
+    assert "Cooldown: 5 min — Finish easy" in document
+    assert "Note:" not in document

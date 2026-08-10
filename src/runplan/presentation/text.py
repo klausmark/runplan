@@ -66,14 +66,19 @@ def format_pace(pace: tuple[float, float]) -> str:
 
 
 def format_model_step_value(step: Step) -> str:
-    """Format the end condition and optional pace of a typed step."""
+    """Format the end condition, optional pace, and optional note of a typed step."""
     assert step.end_kind is not None and step.end_value is not None
     value = (
         format_seconds_compact(step.end_value)
         if step.end_kind == "time"
         else format_distance_compact(step.end_value)
     )
-    return f"{value} @ {format_pace(step.pace)}" if step.pace else value
+    parts = [value]
+    if step.pace:
+        parts.append(f"@ {format_pace(step.pace)}")
+    if step.note:
+        parts.append(f"— {step.note}")
+    return " ".join(parts)
 
 
 def _format_note(note: str | None) -> str:
@@ -123,8 +128,6 @@ def format_model_steps(steps: tuple[Step, ...], indent: str = "  ") -> str:
             lines.append(format_model_steps(step.steps, indent + "  "))
         else:
             lines.append(f"{indent}{labels[step.action]}: {format_model_step_value(step)}")
-            if step.note:
-                lines.append(f"{indent}  Note: {step.note}")
     return "\n".join(lines)
 
 
@@ -239,9 +242,6 @@ def format_step_overview(steps: list[Any], indent: str = "    ") -> str:
         else:
             location = f"steps[{index}]"
             lines.append(f"{indent}{labels[action]}: {format_step_value(value, location)}")
-            note = step_note(value, location)
-            if note:
-                lines.append(f"{indent}  Note: {note}")
     return "\n".join(lines)
 
 

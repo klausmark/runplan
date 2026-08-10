@@ -141,6 +141,50 @@ def test_pdf_cli_requires_output_path(tmp_path: Path) -> None:
     assert "PDF export requires --output" in stderr.getvalue()
 
 
+def test_text_renderer_includes_step_note_inline() -> None:
+    raw = {
+        "program": {
+            "id": "note-export",
+            "name": "Note Export",
+            "short_name": "NOTE",
+            "start_week": "2026-W01",
+        },
+        "weeks": [
+            {
+                "week": 1,
+                "workouts": [
+                    {
+                        "id": "w1",
+                        "day": 1,
+                        "name": "Intervals",
+                        "steps": [
+                            {"warmup": {"time": "5m"}},
+                            {
+                                "repeat": {
+                                    "count": 2,
+                                    "steps": [
+                                        {"run": {"time": "1m", "note": "1:00 5K Pace"}},
+                                        {"recovery": {"time": "1m", "note": "1:00 jog"}},
+                                    ],
+                                }
+                            },
+                            {"cooldown": {"time": "5m", "note": "Finish easy"}},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    program = load_program_model(raw)
+
+    text = format_program_text(build_program_export(program, WeekSelection.all()))
+
+    assert "Run: 1 min — 1:00 5K Pace" in text
+    assert "Recovery: 1 min — 1:00 jog" in text
+    assert "Cooldown: 5 min — Finish easy" in text
+    assert "\nNote:" not in text
+
+
 def write_program(directory: Path) -> Path:
     source = directory / "plan.yaml"
     source.write_text(yaml.safe_dump(program_data()), encoding="utf-8")
