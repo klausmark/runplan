@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Any
 
 from reportlab.lib.units import mm
@@ -19,6 +20,10 @@ from .coaching_sections import coaching_lines
 from .pdf_brand import RunplanMark
 from .pdf_styles import PdfStyles
 from .pdf_theme import CARD, GREEN, LINE
+
+_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
+_ITALIC_PATTERN = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
+_LIST_INDENT = "    "
 
 
 def build_pdf_story(program: ProgramExport, width: float, styles: PdfStyles) -> list[Any]:
@@ -49,33 +54,90 @@ def _coaching_section(guide, width: float, styles: PdfStyles) -> list[Any]:
         if title == "__eyebrow__":
             continue
         flowables.append(Paragraph(html.escape(title), styles.week_number))
-        kind = _coaching_block_kind(title, content)
-        if kind == "table":
-            flowables.extend(_coaching_table(content, width, styles))
-        else:
-            for line in content:
-                flowables.append(Paragraph(html.escape(line) if line else "", styles.body))
+        flowables.extend(_coaching_blocks(content, width, styles))
         flowables.append(Spacer(1, 4 * mm))
     return flowables
 
 
-def _coaching_block_kind(title: str, content: list[str]) -> str:
-    if title == "Nike Run Club Pace Chart" and content and content[0].startswith("|"):
+def _coaching_blocks(content: list[str], width: float, styles: PdfStyles) -> list[Any]:
+    flowables: list[Any] = []
+    for kind, lines in _split_coaching_blocks(content):
+        if kind == "table":
+            flowables.extend(_coaching_table(lines, width, styles))
+        elif kind == "list":
+            flowables.extend(_coaching_list(lines, styles))
+        else:
+            flowables.extend(_coaching_prose(lines, styles))
+    return flowables
+
+
+def _split_coaching_blocks(content: list[str]) -> list[tuple[str, list[str]]]:
+    blocks: list[tuple[str, list[str]]] = []
+    current: list[str] = []
+    current_kind: str | None = None
+
+    def flush() -> None:
+        nonlocal current, current_kind
+        if current:
+            blocks.append((current_kind or "prose", current))
+            current = []
+            current_kind = None
+
+    for line in content:
+        if line == "":
+            flush()
+            continue
+        kind = _classify_line(line)
+        if kind != current_kind:
+            flush()
+            current_kind = kind
+        current.append(line)
+    flush()
+    return blocks
+
+
+def _classify_line(line: str) -> str:
+    if line.startswith("|"):
         return "table"
+    if line.lstrip().startswith("- "):
+        return "list"
     return "prose"
 
 
-def _coaching_table(content: list[str], width: float, styles: PdfStyles) -> list[Any]:
-    rows = [line for line in content if line.startswith("|")]
+def _coaching_prose(lines: list[str], styles: PdfStyles) -> list[Any]:
+    flowables: list[Any] = []
+    for line in lines:
+        if line == "":
+            flowables.append(Spacer(1, 1 * mm))
+            continue
+        flowables.append(Paragraph(_inline_markup(line), styles.body))
+    return flowables
+
+
+def _coaching_list(lines: list[str], styles: PdfStyles) -> list[Any]:
+    flowables: list[Any] = []
+    for line in lines:
+        if line.startswith("  - "):
+            prefix = _LIST_INDENT + _LIST_INDENT + "\u2022\u00a0"
+            item = line[4:]
+        else:
+            prefix = _LIST_INDENT + "\u2022\u00a0"
+            item = line[2:]
+        flowables.append(Paragraph(f"{prefix}{_inline_markup(item)}", styles.body))
+    return flowables
+
+
+def _coaching_table(lines: list[str], width: float, styles: PdfStyles) -> list[Any]:
+    rows = [line for line in lines if line.startswith("|")]
     if len(rows) < 3:
-        return []
+        return _coaching_prose(lines, styles)
     header = [cell.strip() for cell in rows[0].strip("|").split("|")]
     data: list[list[Any]] = [
-        [Paragraph(f"<b>{html.escape(cell)}</b>", styles.body) for cell in header]
+        [Paragraph(f"<b>{_inline_markup(cell)}</b>", styles.body) for cell in header]
     ]
     for row in rows[2:]:
         cells = [cell.strip() for cell in row.strip("|").split("|")]
-        data.append([Paragraph(html.escape(cell), styles.body) for cell in cells])
+        data.append([Paragraph(_inline_markup(cell), styles.body) for cell in cells])
     col_width = width / len(header)
     table = Table(data, colWidths=[col_width] * len(header), repeatRows=1)
     table.setStyle(
@@ -94,6 +156,21 @@ def _coaching_table(content: list[str], width: float, styles: PdfStyles) -> list
         )
     )
     return [table]
+
+
+def _inline_markup(text: str) -> str:
+    escaped = html.escape(text)
+    placeholders: list[str] = []
+
+    def stash(match: re.Match[str]) -> str:
+        placeholders.append(f"<b>{match.group(1)}</b>")
+        return f"\x00{len(placeholders) - 1}\x00"
+
+    escaped = _BOLD_PATTERN.sub(stash, escaped)
+    escaped = _ITALIC_PATTERN.sub(lambda m: f"<i>{m.group(1)}</i>", escaped)
+    for index, snippet in enumerate(placeholders):
+        escaped = escaped.replace(f"\x00{index}\x00", snippet)
+    return escaped
 
 
 def _stat(value: str, label: str, styles: PdfStyles) -> list[Paragraph]:

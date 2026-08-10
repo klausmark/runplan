@@ -179,3 +179,64 @@ class TestPdfExport:
             )
             assert warm_paper > len(pixels) // 2
             assert runplan_green > 100
+
+
+def _load_nike_export(slug: str):
+    import yaml
+
+    raw = yaml.safe_load(
+        (PROJECT_DIR / "src" / "runplan" / "templates" / "programs" / f"{slug}.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    program = load_program_model(raw)
+    return build_program_export(program, WeekSelection.all())
+
+
+def _pdf_text(path: Path) -> str:
+    return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+
+
+class TestPdfCoachingFormatting:
+    def test_pdf_coaching_renders_pace_chart_intro_and_examples(self, tmp_path: Path) -> None:
+        export = _load_nike_export("nike-5k")
+        output = tmp_path / "nike-5k.pdf"
+        export_pdf(export, output, force=False)
+
+        text = _pdf_text(output)
+
+        assert "Throughout the plan" in text
+        assert "Worked examples" in text
+        assert "If your last 5K was 27:00" in text
+
+    def test_pdf_coaching_renders_bold_in_glossary_terms(self, tmp_path: Path) -> None:
+        export = _load_nike_export("nike-5k")
+        output = tmp_path / "nike-5k.pdf"
+        export_pdf(export, output, force=False)
+
+        text = _pdf_text(output)
+
+        assert "Progression Run" in text
+        assert "Intervals" in text
+        assert "**Progression Run**" not in text
+        assert "**" not in text
+
+    def test_pdf_coaching_renders_bullets_with_bullet_character(self, tmp_path: Path) -> None:
+        export = _load_nike_export("nike-5k")
+        output = tmp_path / "nike-5k.pdf"
+        export_pdf(export, output, force=False)
+
+        text = _pdf_text(output)
+
+        assert "\u2022" in text
+
+    def test_pdf_coaching_renders_italic_in_pace_chart_examples(self, tmp_path: Path) -> None:
+        export = _load_nike_export("nike-5k")
+        output = tmp_path / "nike-5k.pdf"
+        export_pdf(export, output, force=False)
+
+        text = _pdf_text(output)
+
+        assert "If your last 5K was 27:00" in text
+        assert "Best Mile Pace: 8:00 minutes" in text
+        assert "*If your last 5K was 27:00*" not in text
