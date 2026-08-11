@@ -246,3 +246,39 @@ class TestSyncExecution(SyncTestBase):
         state = load_state("characterization-plan")["workouts"]
         assert "missed" == state["week-01/mixed"]["status"]
         assert "missed" == state["week-01/easy"]["status"]
+
+    def test_replaced_workout_cleanup_ignores_missing_garmin_objects(self) -> None:
+        old_record = {
+            "week": 1,
+            "workout_id": 42,
+            "schedule_id": 142,
+            "date": "2026-12-28",
+            "name": "Week 1 - Mixed",
+            "description": "Stale description",
+            "content_hash": "stale",
+            "status": "scheduled",
+        }
+        save_state(
+            "characterization-plan",
+            {
+                "program_id": "characterization-plan",
+                "workouts": {"week-01/mixed": old_record},
+            },
+        )
+        client = FakeGarmin(
+            workouts=[
+                {
+                    "workoutId": 42,
+                    "workoutName": "Week 1 - Mixed",
+                    "description": "Stale description",
+                    "workoutSegments": [],
+                    "estimatedDurationInSecs": 1,
+                }
+            ],
+            not_found_workout_ids={42},
+            not_found_schedule_ids={142},
+        )
+        selection = compiled_week(1)
+        synchronize_program_weeks(client, JsonStateRepository(), [selection])
+        assert ("delete", 42) in client.events
+        assert ("unschedule", 142) in client.events

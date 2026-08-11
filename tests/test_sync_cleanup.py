@@ -79,6 +79,43 @@ class TestSyncCleanup(SyncTestBase):
         assert "workout_id" not in state["week-08/past"]
         assert "workout_id" not in state["week-10/completed"]
 
+    def test_prune_ignores_missing_garmin_schedule_and_workout(self) -> None:
+        old = {
+            **self.old_record(),
+            "workout_id": 90,
+            "schedule_id": 190,
+            "date": "2026-11-01",
+            "name": "Future workout",
+            "status": "scheduled",
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-09/old": old}},
+        )
+        client = FakeGarmin(
+            workouts=[
+                {
+                    "workoutId": 90,
+                    "workoutName": "Future workout",
+                    "description": old["description"],
+                }
+            ],
+            not_found_workout_ids={90},
+            not_found_schedule_ids={190},
+        )
+        with redirect_stdout(StringIO()):
+            synchronize_program_weeks(
+                client,
+                JsonStateRepository(),
+                [compiled_week(1)],
+                prune=True,
+                today=date(2026, 10, 1),
+            )
+        assert ("delete", 90) in client.events
+        assert ("unschedule", 190) in client.events
+        state = load_state("characterization-plan")["workouts"]
+        assert "week-09/old" not in state
+
     def test_terminal_cleanup_removes_remote_objects_but_keeps_completed_result(self) -> None:
         record = {
             **self.old_record(),
@@ -354,3 +391,90 @@ class TestSyncCleanup(SyncTestBase):
         assert client.events.index(("unschedule", 199)) < client.events.index(("delete", 99))
         assert 77 in [item["workoutId"] for item in client.workouts]
         assert not state_path("characterization-plan").exists()
+
+    def test_delete_all_ignores_missing_garmin_schedule_and_workout(self) -> None:
+        old = self.old_record()
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-09/old": old}},
+        )
+        client = FakeGarmin(
+            workouts=[
+                {
+                    "workoutId": 99,
+                    "workoutName": "Old workout",
+                    "description": "Owned description",
+                }
+            ],
+            not_found_workout_ids={99},
+            not_found_schedule_ids={199},
+        )
+        program, compiled = compiled_week(1)
+        with redirect_stdout(StringIO()):
+            deleted = delete_all_managed(client, program, compiled)
+        assert 1 == deleted
+        assert ("unschedule", 199) in client.events
+        assert ("delete", 99) in client.events
+        assert not state_path("characterization-plan").exists()
+
+    def test_delete_all_ignores_missing_schedule_only(self) -> None:
+        old = self.old_record()
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-09/old": old}},
+        )
+        client = FakeGarmin(
+            workouts=[
+                {
+                    "workoutId": 99,
+                    "workoutName": "Old workout",
+                    "description": "Owned description",
+                }
+            ],
+            not_found_schedule_ids={199},
+        )
+        program, compiled = compiled_week(1)
+        with redirect_stdout(StringIO()):
+            deleted = delete_all_managed(client, program, compiled)
+        assert 1 == deleted
+        assert ("delete", 99) in client.events
+        assert not state_path("characterization-plan").exists()
+
+    def test_cleanup_terminal_workouts_ignores_missing_garmin_objects(self) -> None:
+        record = {
+            **self.old_record(),
+            "status": "completed",
+            "activity_id": 900,
+            "completed_at": "2026-11-01T18:30:00",
+            "actual_distance_meters": 7593.39,
+            "actual_duration_seconds": 2489.549,
+        }
+        save_state(
+            "characterization-plan",
+            {"program_id": "characterization-plan", "workouts": {"week-09/old": record}},
+        )
+        client = FakeGarmin(
+            workouts=[
+                {
+                    "workoutId": 99,
+                    "workoutName": "Old workout",
+                    "description": "Owned description",
+                }
+            ],
+            schedules=[
+                {
+                    "itemType": "workout",
+                    "workoutId": 99,
+                    "workoutScheduleId": 199,
+                    "date": "2026-11-01",
+                }
+            ],
+            not_found_workout_ids={99},
+            not_found_schedule_ids={199},
+        )
+        actions = cleanup_terminal_workouts(client, JsonStateRepository(), "characterization-plan")
+        assert ["unschedule", "delete"] == [action.kind for action in actions]
+        cleaned = load_state("characterization-plan")["workouts"]["week-09/old"]
+        assert "completed" == cleaned["status"]
+        assert "workout_id" not in cleaned
+        assert "schedule_id" not in cleaned

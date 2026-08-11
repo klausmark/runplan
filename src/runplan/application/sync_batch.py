@@ -11,7 +11,13 @@ from .ports import GarminClient, StateRepository
 from .reconciliation import reconcile_program, reconcile_selected_program
 from .results import SyncAction, SyncResult
 from .sync_cleanup import cleanup_terminal_workouts
-from .sync_support import SyncSelection, is_owned, is_prunable, validate_selections
+from .sync_support import (
+    SyncSelection,
+    ignore_garmin_not_found,
+    is_owned,
+    is_prunable,
+    validate_selections,
+)
 from .sync_week import synchronize_program_week
 
 logger = logging.getLogger("runplan.application.sync")
@@ -73,10 +79,14 @@ def _prune_unselected(
         name = record.get("name", key)
         schedule_id = record.get("schedule_id")
         if schedule_id:
-            client.unschedule_workout(schedule_id)
+            ignore_garmin_not_found("unschedule_workout", {"schedule_id": schedule_id})(
+                lambda sid=schedule_id: client.unschedule_workout(sid)
+            )
             result.add("unschedule", name, workout_id=workout_id, schedule_id=schedule_id)
         if workout_id and remote is not None:
-            client.delete_workout(workout_id)
+            ignore_garmin_not_found("delete_workout", {"workout_id": workout_id})(
+                lambda wid=workout_id: client.delete_workout(wid)
+            )
             result.add("delete", name, workout_id=workout_id)
         elif workout_id:
             logger.warning(

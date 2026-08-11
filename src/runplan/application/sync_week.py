@@ -13,6 +13,7 @@ from .sync_matching import resolve_workout
 from .sync_scheduling import ensure_schedule, remove_superseded_schedule
 from .sync_support import (
     TERMINAL_STATUSES,
+    ignore_garmin_not_found,
     is_prunable,
     workout_content_hash,
     workout_payload,
@@ -194,10 +195,14 @@ class WeekSynchronizer:
         schedule_id = record.get("schedule_id")
         name = record.get("name", key)
         if schedule_id:
-            self.client.unschedule_workout(schedule_id)
+            ignore_garmin_not_found("unschedule_workout", {"schedule_id": schedule_id})(
+                lambda sid=schedule_id: self.client.unschedule_workout(sid)
+            )
             self.result.add("unschedule", name, workout_id=workout_id, schedule_id=schedule_id)
         if workout_id and remote is not None:
-            self.client.delete_workout(workout_id)
+            ignore_garmin_not_found("delete_workout", {"workout_id": workout_id})(
+                lambda wid=workout_id: self.client.delete_workout(wid)
+            )
             self.result.add("delete", name, workout_id=workout_id)
         elif workout_id:
             logger.warning(

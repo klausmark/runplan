@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import copy
 
+from garminconnect.exceptions import GarminConnectConnectionError
+
 
 class FakeGarmin:
     def __init__(
-        self, workouts=None, schedules=None, fail_upload_number=None, activities=None
+        self,
+        workouts=None,
+        schedules=None,
+        fail_upload_number=None,
+        activities=None,
+        not_found_workout_ids=None,
+        not_found_schedule_ids=None,
     ) -> None:
         self.workouts = copy.deepcopy(workouts or [])
         self.schedules = copy.deepcopy(schedules or [])
@@ -15,6 +23,8 @@ class FakeGarmin:
         self.next_workout_id = 1000
         self.next_schedule_id = 2000
         self.activities = copy.deepcopy(activities or [])
+        self.not_found_workout_ids = set(not_found_workout_ids or ())
+        self.not_found_schedule_ids = set(not_found_schedule_ids or ())
 
     def get_workouts(self, start: int, limit: int) -> list[dict]:
         self.events.append(("get_workouts", start, limit))
@@ -89,6 +99,10 @@ class FakeGarmin:
 
     def unschedule_workout(self, schedule_id: int) -> None:
         self.events.append(("unschedule", schedule_id))
+        if schedule_id in self.not_found_schedule_ids:
+            raise GarminConnectConnectionError(
+                f"API Error 404 - No workout found for workout schedule = {schedule_id}"
+            )
         self.schedules = [
             item
             for item in self.schedules
@@ -97,4 +111,8 @@ class FakeGarmin:
 
     def delete_workout(self, workout_id: int) -> None:
         self.events.append(("delete", workout_id))
+        if workout_id in self.not_found_workout_ids:
+            raise GarminConnectConnectionError(
+                f"API Error 404 - No workout found for workout = {workout_id}"
+            )
         self.workouts = [item for item in self.workouts if item.get("workoutId") != workout_id]

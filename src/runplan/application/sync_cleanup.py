@@ -8,7 +8,13 @@ from typing import Any
 from ..integrations.garmin.client import get_all_workouts, scheduled_items_for_dates
 from .ports import GarminClient, StateRepository
 from .results import SyncAction
-from .sync_support import CLEANUP_STATUSES, TERMINAL_STATUSES, is_owned, schedule_for_record
+from .sync_support import (
+    CLEANUP_STATUSES,
+    TERMINAL_STATUSES,
+    ignore_garmin_not_found,
+    is_owned,
+    schedule_for_record,
+)
 
 logger = logging.getLogger("runplan.application.sync")
 
@@ -47,7 +53,9 @@ def _remove_terminal_record(
     occurrence = schedule_for_record(scheduled, record)
     schedule_id = occurrence.get("workoutScheduleId", occurrence.get("id")) if occurrence else None
     if schedule_id is not None:
-        client.unschedule_workout(schedule_id)
+        ignore_garmin_not_found("unschedule_workout", {"schedule_id": schedule_id})(
+            lambda sid=schedule_id: client.unschedule_workout(sid)
+        )
         actions.append(
             SyncAction(
                 "unschedule",
@@ -69,7 +77,9 @@ def _remove_terminal_record(
 
     remote = remote_by_id.get(workout_id)
     if workout_id is not None and remote is not None:
-        client.delete_workout(workout_id)
+        ignore_garmin_not_found("delete_workout", {"workout_id": workout_id})(
+            lambda wid=workout_id: client.delete_workout(wid)
+        )
         actions.append(SyncAction("delete", name, workout_id=workout_id))
     elif workout_id is not None:
         logger.warning(
@@ -174,10 +184,14 @@ def delete_managed_workouts(
         schedule_id = _find_schedule_id(scheduled, record, workout_id)
         name = record.get("name", key)
         if schedule_id:
-            client.unschedule_workout(schedule_id)
+            ignore_garmin_not_found("unschedule_workout", {"schedule_id": schedule_id})(
+                lambda sid=schedule_id: client.unschedule_workout(sid)
+            )
             actions.append(SyncAction("unschedule", name, workout_id, schedule_id=schedule_id))
         if workout_id and remote is not None:
-            client.delete_workout(workout_id)
+            ignore_garmin_not_found("delete_workout", {"workout_id": workout_id})(
+                lambda wid=workout_id: client.delete_workout(wid)
+            )
             actions.append(SyncAction("delete", name, workout_id))
         elif workout_id:
             logger.warning(

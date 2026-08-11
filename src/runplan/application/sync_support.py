@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+from collections.abc import Callable
 from datetime import date
 from typing import Any
+
+from garminconnect.exceptions import GarminConnectConnectionError
 
 type SyncSelection = tuple[dict[str, Any], list[tuple[dict[str, Any], Any]]]
 
@@ -17,6 +21,37 @@ CONTENT_FIELDS = (
 )
 TERMINAL_STATUSES = {"completed", "missed", "retired"}
 CLEANUP_STATUSES = {"completed", "missed"}
+_NOT_FOUND_MARKERS = ("404", "not found")
+
+logger = logging.getLogger("runplan.application.sync")
+
+
+def ignore_garmin_not_found(
+    operation: str, context: dict[str, Any]
+) -> Callable[[Callable[[], Any]], Any]:
+    """Run a destructive Garmin call; treat 'object missing' as success.
+
+    Garmin returns 404 when a workout or schedule was already removed by the
+    user, a previous partial sync, or the current transaction. Local state is
+    the source of truth for what should exist, so 'already gone' satisfies the
+    cleanup intent and must not abort the batch. Other failures still raise.
+    """
+
+    def _wrap(call: Callable[[], Any]) -> Any:
+        try:
+            return call()
+        except GarminConnectConnectionError as exc:
+            message = str(exc).lower()
+            if any(marker in message for marker in _NOT_FOUND_MARKERS):
+                logger.warning(
+                    "Garmin %s already gone during cleanup; treating as success %s",
+                    operation,
+                    context,
+                )
+                return None
+            raise
+
+    return _wrap
 
 
 def schedule_for_record(
