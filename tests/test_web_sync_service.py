@@ -46,6 +46,45 @@ class TestWebSyncService:
         assert 64 == len(preview["confirmationToken"])
         self.client_factory.assert_not_called()
 
+    def test_preview_default_limits_to_current_plus_next_week(self) -> None:
+        from datetime import timedelta
+
+        from tests.helpers import program_data
+
+        data = program_data()
+        data["weeks"].append(
+            {
+                "week": 3,
+                "focus": "Extra week",
+                "workouts": [
+                    {
+                        "id": "extra",
+                        "day": 1,
+                        "name": "Week 3 - Extra",
+                        "description": "Extra workout",
+                        "steps": [{"run": {"distance": "3km"}}],
+                    }
+                ],
+            }
+        )
+        self.path.write_text(
+            yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+        )
+
+        preview = self.service.preview("plan.yaml")
+
+        assert [1, 2] == preview["plan"]["weeks"]
+        third_week_start = date(2026, 12, 28) + timedelta(weeks=2)
+        third_week_end = third_week_start + timedelta(days=6)
+        action_dates = {
+            action["date"] for action in preview["plan"]["actions"] if action.get("date")
+        }
+        assert action_dates, "preview should include actions with dates"
+        assert not any(
+            third_week_start.isoformat() <= d <= third_week_end.isoformat() for d in action_dates
+        ), "no actions should target week 3"
+        self.client_factory.assert_not_called()
+
     def test_confirmed_sync_returns_structured_results(self) -> None:
         preview = self.service.preview("plan.yaml")
         result = SyncResult("characterization-plan", 1)
