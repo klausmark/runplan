@@ -81,7 +81,7 @@ class TestWebAsset:
         assert "state.user.activeProgram" in script
         assert "/active-program" in script
         assert 'request("/api/users")' in script
-        assert '$("#user-dialog").showModal()' in script
+        assert 'openModal($("#user-dialog"))' in script
         assert 'id="user-settings-dialog"' in html
         assert 'id="user-settings-five-k-best"' in html
         assert 'id="user-settings-pace-zone"' in html
@@ -163,7 +163,7 @@ class TestWebAsset:
         assert 'id="sync-preview-confirm"' in html
         assert 'id="sync-preview-cancel"' in html
         assert "renderSyncPreview" in script
-        assert "dialog.showModal()" in script
+        assert "openModal(dialog)" in script
         assert "dialog.close" in script
         assert "syncPreviewDialog" not in script
         assert 'button.textContent = "Checking…"' in script
@@ -447,3 +447,48 @@ class TestWebAsset:
         assert "innerHTML" not in block
         assert "createElement" in block
         assert "textContent" in block
+
+    def test_dialog_backdrop_click_closes_every_modal(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert "function openModal(" in script
+        assert "setupDialogChrome()" in script
+        assert 'querySelectorAll("dialog")' in script
+        click_block = script[
+            script.index('dialog.addEventListener("click"') : script.index(
+                "});", script.index('dialog.addEventListener("click"')
+            )
+        ]
+        assert "event.target !== dialog" in click_block
+        assert 'dialog.close("backdrop")' in click_block
+        cancel_block = script[
+            script.index('dialog.addEventListener("cancel"') : script.index(
+                "});", script.index('dialog.addEventListener("cancel"')
+            )
+        ]
+        assert 'dialog.id === "user-dialog"' in cancel_block
+        assert "!state.user" in cancel_block
+
+    def test_user_dialog_remains_mandatory_before_selection(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert 'addEventListener("cancel", (event) =>' not in script
+        block = script[
+            script.index('dialog.addEventListener("cancel"') : script.index(
+                "});", script.index('dialog.addEventListener("cancel"')
+            )
+        ]
+        assert "user-dialog" in block
+
+    def test_body_scroll_is_locked_while_a_dialog_is_open(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert "function lockBodyScroll(" in script
+        assert "function unlockBodyScroll(" in script
+        assert "openDialogCount" in script
+        assert 'document.body.classList.add("dialog-open")' in script
+        assert 'document.body.classList.remove("dialog-open")' in script
+        assert "body.dialog-open" in styles
+        assert "overflow: hidden" in styles.split("body.dialog-open", 1)[1].split("}", 1)[0]
+        sync_start = script.index("async function syncGarmin()")
+        sync_end = script.index("\nfunction ", sync_start + 1)
+        sync_block = script[sync_start:sync_end]
+        assert "openModal(dialog)" in sync_block

@@ -6,6 +6,40 @@ const TOUCH_CANCEL_DISTANCE = 10;
 const USER_STORAGE_KEY = "runplan-user";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 let studioInitialized = false;
+let openDialogCount = 0;
+
+function lockBodyScroll() {
+  openDialogCount += 1;
+  document.body.classList.add("dialog-open");
+}
+
+function unlockBodyScroll() {
+  if (openDialogCount <= 0) return;
+  openDialogCount -= 1;
+  if (openDialogCount === 0) document.body.classList.remove("dialog-open");
+}
+
+function setupDialogChrome() {
+  document.querySelectorAll("dialog").forEach((dialog) => {
+    dialog.addEventListener("close", () => unlockBodyScroll());
+    dialog.addEventListener("cancel", () => {
+      if (dialog.id === "user-dialog" && !state.user) return;
+      dialog.close("cancel");
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target !== dialog) return;
+      if (dialog.id === "user-dialog" && !state.user) return;
+      dialog.close("backdrop");
+    });
+  });
+}
+
+function openModal(dialog) {
+  if (!dialog.open) lockBodyScroll();
+  dialog.showModal();
+}
+
+setupDialogChrome();
 
 function storedValue(key) {
   try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -403,7 +437,7 @@ async function syncGarmin() {
   let result;
   try {
     result = await new Promise((resolve) => {
-      dialog.showModal();
+      openModal(dialog);
       dialog.addEventListener(
         "close",
         () => {
@@ -1118,7 +1152,7 @@ function openMove(week, workout) {
   }));
   $("#move-day").value = workout.day;
   updateMoveDayOptions(week);
-  $("#move-dialog").showModal();
+  openModal($("#move-dialog"));
 }
 
 function updateMoveDayOptions(weekNumber) {
@@ -1215,7 +1249,7 @@ function openWorkout(week, workout) {
     $("#activity-apply").disabled = true;
     loadActivityCandidates();
   }
-  $("#workout-dialog").showModal();
+  openModal($("#workout-dialog"));
 }
 
 function nextWorkoutId(week) {
@@ -1250,7 +1284,7 @@ function openAddWorkout(weekNumber, day) {
   $("#save-workout-button").textContent = "Validate & add";
   $("#save-workout-button").disabled = false;
   $("#workout-yaml").value = workoutTemplate(week, day);
-  $("#workout-dialog").showModal();
+  openModal($("#workout-dialog"));
 }
 
 async function saveEdit(payload) {
@@ -1367,7 +1401,7 @@ function showUserDialog(createUser = false) {
   $("#user-submit").textContent = createUser ? "Create user" : "Continue";
   $("#user-cancel").classList.toggle("hidden", !optional);
   $("#user-dialog").dataset.mode = createUser ? "create" : "select";
-  $("#user-dialog").showModal();
+  openModal($("#user-dialog"));
 }
 
 async function selectUser(userId, persist = true) {
@@ -1453,7 +1487,7 @@ document.querySelectorAll("[data-add-action]").forEach((button) => {
 function openAddProgramDialog(tab = "upload") {
   const dialog = $("#add-program-dialog");
   switchAddProgramTab(tab);
-  dialog.showModal();
+  openModal(dialog);
 }
 
 function switchAddProgramTab(tab) {
@@ -1499,15 +1533,12 @@ $("#user-form").addEventListener("submit", async (event) => {
     $("#user-dialog").close();
   } catch (error) { showError(error.message); }
 });
-$("#user-dialog").addEventListener("cancel", (event) => {
-  if (!state.user) event.preventDefault();
-});
 $("#settings-button").addEventListener("click", () => {
   $("#settings-name").value = state.program.program.name;
   $("#settings-short-name").value = state.program.program.short_name;
   $("#settings-description").value = state.program.program.description || "";
   $("#settings-start-week").value = state.program.program.start_week;
-  $("#settings-dialog").showModal();
+  openModal($("#settings-dialog"));
 });
 $("#user-settings-button").addEventListener("click", async () => {
   try {
@@ -1523,7 +1554,7 @@ $("#user-settings-button").addEventListener("click", async () => {
     $("#user-settings-password-help").textContent = settings.hasGarminPassword
       ? "A password is saved. Leave blank to keep it. Optional."
       : "Leave blank if you do not want to set up Garmin credentials right now. Optional.";
-    $("#user-settings-dialog").showModal();
+    openModal($("#user-settings-dialog"));
   } catch (error) { showError(error.message); }
 });
 $("#sync-button").addEventListener("click", syncGarmin);
@@ -1571,7 +1602,7 @@ $("#workout-dialog").addEventListener("close", () => { state.workout = null; });
 $("#delete-workout-button").addEventListener("click", () => {
   $("#delete-workout-title").textContent = `Delete ${state.workout.name}?`;
   $("#delete-workout-message").textContent = "This removes the workout from the plan. If it was synchronized, its Garmin schedule and workout will be removed during the next reviewed and confirmed sync.";
-  $("#delete-workout-dialog").showModal();
+  openModal($("#delete-workout-dialog"));
 });
 
 $("#delete-workout-form").addEventListener("submit", async (event) => {
@@ -1611,7 +1642,7 @@ $("#delete-program-button").addEventListener("click", () => {
   $("#delete-program-title").textContent = `Delete ${state.program.program.name}?`;
   $("#delete-program-message").textContent = "This permanently removes the YAML file, all local sync state, and any Garmin schedules and workouts that were created from this plan.";
   $("#settings-dialog").close();
-  $("#delete-program-dialog").showModal();
+  openModal($("#delete-program-dialog"));
 });
 
 $("#delete-program-form").addEventListener("submit", async (event) => {
