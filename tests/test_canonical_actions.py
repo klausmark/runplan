@@ -129,11 +129,30 @@ def test_warmup_and_cooldown_keep_default_garmin_descriptions() -> None:
     assert cooldown.description == "Cool down"
 
 
-def test_walk_and_rest_have_empty_default_garmin_description() -> None:
+@pytest.mark.parametrize(
+    ("action", "expected_description"),
+    [
+        ("warmup", "Warm up"),
+        ("run", "Run"),
+        ("walk", "Walk"),
+        ("recovery", "Recovery"),
+        ("rest", "Rest"),
+        ("cooldown", "Cool down"),
+    ],
+)
+def test_every_action_has_default_garmin_description(
+    action: str, expected_description: str
+) -> None:
+    step = compile_steps([{action: "1m"}])[0]
+
+    assert step.description == expected_description
+
+
+def test_walk_and_rest_have_default_garmin_description() -> None:
     walk, rest = compile_steps([{"walk": "1m"}, {"rest": "1m"}])
 
-    assert walk.description == ""
-    assert rest.description == ""
+    assert walk.description == "Walk"
+    assert rest.description == "Rest"
 
 
 def test_walk_and_rest_use_note_as_garmin_description() -> None:
@@ -168,6 +187,12 @@ def test_recovery_compiles_to_recovery_garmin_step_type_with_default_label() -> 
     assert recovery.stepType["stepTypeKey"] == "recovery"
     assert recovery.stepType["stepTypeId"] == 4
     assert recovery.description == "Recovery"
+
+
+def test_run_has_default_garmin_description() -> None:
+    run = compile_steps([{"run": {"distance": "10km"}}])[0]
+
+    assert run.description == "Run"
 
 
 def test_walk_and_rest_round_trip_inside_repeat_group() -> None:

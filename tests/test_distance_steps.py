@@ -118,7 +118,7 @@ def test_step_note_replaces_default_garmin_description() -> None:
 def test_step_note_absent_keeps_default_label() -> None:
     run, warmup = compile_steps([{"run": {"distance": "10km"}}, {"warmup": "5m"}])
 
-    assert run.description == "Very easy run"
+    assert run.description == "Run"
     assert warmup.description == "Warm up"
 
 

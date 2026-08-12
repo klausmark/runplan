@@ -344,8 +344,8 @@ bundled Nike Run Club templates use `pace_type` exclusively so every runner
 syncs personalised targets from the same plan file.
 
 A regular step may carry an optional watch-facing note that the runner sees
-instead of the default step label (`Very easy run`, `Warm up`, `Walk`, or
-`Cool down`):
+instead of the default step label (`Warm up`, `Run`, `Walk`, `Recovery`,
+`Rest`, or `Cool down`):
 
 ```yaml
 - run: {distance: 10km, note: "Stay relaxed, focus on breathing"}

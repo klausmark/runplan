@@ -112,13 +112,11 @@ def compile_steps(
         # Warmup and cooldown describe the phase of a workout, not whether the
         # athlete should walk or run.  Keep these watch-facing instructions
         # neutral; beginner plans can prescribe walking in the workout text.
-        # `walk` and `rest` have no default description: the watch shows the
-        # step's note when present, otherwise the description stays empty.
         "warmup": (create_warmup_step, "Warm up"),
-        "run": (create_interval_step, "Very easy run"),
-        "walk": (create_recovery_step, ""),
+        "run": (create_interval_step, "Run"),
+        "walk": (create_recovery_step, "Walk"),
         "recovery": (create_recovery_step, "Recovery"),
-        "rest": (create_rest_step, ""),
+        "rest": (create_rest_step, "Rest"),
         "cooldown": (create_cooldown_step, "Cool down"),
     }
     for order, item in enumerate(step_definitions, start=1):
