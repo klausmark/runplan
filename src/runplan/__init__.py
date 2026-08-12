@@ -2,6 +2,7 @@
 
 import logging
 
+from .application.coaching import recommend_workouts
 from .application.export import ProgramExport, build_program_export
 from .application.sync import delete_all_managed, reconcile_program, sync_program_week
 from .cli import run_sync
@@ -29,6 +30,16 @@ from .domain.recipes import (
     WorkoutRecipe,
     get_recipe,
     recipes_by_form,
+)
+from .domain.recommendations import (
+    KEY_WORKOUT_FORMS,
+    CoachingContext,
+    CompletedWorkout,
+    Readiness,
+    RecipeSuggestion,
+    RunnerPace,
+    WorkoutRecommendation,
+    WorkoutRequestKind,
 )
 from .domain.selectors import WeekSelection, WeekSelectionError
 from .domain.workout_form import (
@@ -92,15 +103,18 @@ logging.getLogger("runplan").addHandler(logging.NullHandler())
 
 __all__ = [
     "BRace",
+    "CoachingContext",
     "CoachingGuide",
     "CoachingSection",
     "CoachingTip",
+    "CompletedWorkout",
     "EASY_RUN",
     "FORM_BY_NAME",
     "GeneratorRequest",
     "GlossaryEntry",
     "GoalRace",
     "INTERVAL_WORKOUT",
+    "KEY_WORKOUT_FORMS",
     "LONG_RUN",
     "PaceChart",
     "PaceColumn",
@@ -111,8 +125,11 @@ __all__ = [
     "RECIPE_CATALOG",
     "RECOVERY_RUN",
     "RUN_WALK",
+    "Readiness",
     "RecipeInstantiationError",
     "RecipeParameters",
+    "RecipeSuggestion",
+    "RunnerPace",
     "Step",
     "TEMPLATE_CATALOG",
     "TEMPO_RUN",
@@ -127,7 +144,9 @@ __all__ = [
     "WorkoutDefinitionError",
     "WorkoutForm",
     "WorkoutFormName",
+    "WorkoutRecommendation",
     "WorkoutRecipe",
+    "WorkoutRequestKind",
     "WorkoutStatus",
     "WorkoutWithForm",
     "build_step",
@@ -162,6 +181,7 @@ __all__ = [
     "plan_to_yaml",
     "reconcile_program",
     "recipes_by_form",
+    "recommend_workouts",
     "run_sync",
     "save_state",
     "state_path",

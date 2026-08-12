@@ -32,6 +32,16 @@ from .recipes import (
     get_recipe,
     recipes_by_form,
 )
+from .recommendations import (
+    KEY_WORKOUT_FORMS,
+    CoachingContext,
+    CompletedWorkout,
+    Readiness,
+    RecipeSuggestion,
+    RunnerPace,
+    WorkoutRecommendation,
+    WorkoutRequestKind,
+)
 from .selectors import WeekSelection, WeekSelectionError
 from .workout_form import (
     EASY_RUN,
@@ -48,11 +58,14 @@ from .workout_form import (
 )
 
 __all__ = [
+    "CoachingContext",
+    "CompletedWorkout",
     "EASY_RUN",
     "FIVE_KM",
     "FORM_BY_NAME",
     "HALF_MARATHON_KM",
     "INTERVAL_WORKOUT",
+    "KEY_WORKOUT_FORMS",
     "KM_PER_MILE",
     "LONG_RUN",
     "MARATHON_KM",
@@ -64,8 +77,11 @@ __all__ = [
     "RECOVERY_RUN",
     "RIEGEL_EXPONENT",
     "RUN_WALK",
+    "Readiness",
     "RecipeInstantiationError",
     "RecipeParameters",
+    "RecipeSuggestion",
+    "RunnerPace",
     "Step",
     "TEMPO_OFFSET_SECONDS_PER_KM",
     "TEMPO_RUN",
@@ -79,7 +95,10 @@ __all__ = [
     "WorkoutDefinitionError",
     "WorkoutForm",
     "WorkoutFormName",
+    "WorkoutRecommendation",
     "WorkoutRecipe",
+    "WorkoutRequestKind",
+    "WorkoutStatus",
     "WorkoutWithForm",
     "five_k_pace_seconds",
     "format_pace_seconds",
