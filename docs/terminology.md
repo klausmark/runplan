@@ -19,6 +19,8 @@ maintained content.
 | Closing easy movement | cooldown |
 | A recursive group performed multiple times | repeat |
 | An easy aerobic workout | easy run |
+| Alternating running and planned walking intervals | run/walk |
+| An extra-easy recovery jog | recovery run |
 | A sustained controlled effort | tempo run |
 | Repeated faster work with recoveries | interval workout |
 | The longest aerobic workout of a week | long run |
