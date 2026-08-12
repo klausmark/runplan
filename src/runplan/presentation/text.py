@@ -118,7 +118,9 @@ def format_model_steps(steps: tuple[Step, ...], indent: str = "  ") -> str:
     labels = {
         "warmup": "Warmup",
         "run": "Run",
+        "walk": "Walk",
         "recovery": "Recovery",
+        "rest": "Rest",
         "cooldown": "Cooldown",
     }
     lines = []
@@ -134,7 +136,9 @@ def format_model_steps(steps: tuple[Step, ...], indent: str = "  ") -> str:
 STEP_LABELS: dict[str, str] = {
     "warmup": "Warmup",
     "run": "Run",
+    "walk": "Walk",
     "recovery": "Recovery",
+    "rest": "Rest",
     "cooldown": "Cooldown",
 }
 
@@ -180,7 +184,9 @@ def format_model_step_summary(steps: tuple[Step, ...]) -> str:
     labels = {
         "warmup": "Warmup",
         "run": "Run",
+        "walk": "Walk",
         "recovery": "Recovery",
+        "rest": "Rest",
         "cooldown": "Cooldown",
     }
     parts = []
@@ -212,7 +218,14 @@ def format_totals(steps: list[Any]) -> str:
 
 
 def step_summary(steps: list[Any]) -> str:
-    labels = {"warmup": "Warmup", "run": "Run", "walk": "Recovery", "cooldown": "Cooldown"}
+    labels = {
+        "warmup": "Warmup",
+        "run": "Run",
+        "walk": "Walk",
+        "recovery": "Recovery",
+        "rest": "Rest",
+        "cooldown": "Cooldown",
+    }
     parts = []
     for index, item in enumerate(steps, start=1):
         raw_action, value = next(iter(item.items()))
@@ -230,7 +243,14 @@ def step_summary(steps: list[Any]) -> str:
 
 
 def format_step_overview(steps: list[Any], indent: str = "    ") -> str:
-    labels = {"warmup": "Warmup", "run": "Run", "walk": "Recovery", "cooldown": "Cooldown"}
+    labels = {
+        "warmup": "Warmup",
+        "run": "Run",
+        "walk": "Walk",
+        "recovery": "Recovery",
+        "rest": "Rest",
+        "cooldown": "Cooldown",
+    }
     lines = []
     for index, item in enumerate(steps, start=1):
         raw_action, value = next(iter(item.items()))

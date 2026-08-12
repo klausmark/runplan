@@ -45,8 +45,9 @@ def estimate_steps(
         elif step.end_kind == "time":
             seconds = step.end_value or 0
             duration += seconds
-            # Recoveries represent pauses and do not contribute running distance.
-            if step.action != "recovery":
+            # `recovery` and `rest` are pauses or flexible active recovery; they do
+            # not contribute running distance when the end condition is time.
+            if step.action not in ("recovery", "rest"):
                 if step.pace:
                     pace = sum(step.pace) / len(step.pace)
                 else:

@@ -10,7 +10,9 @@ from .errors import WorkoutDefinitionError
 ACTION_NAMES = {
     "warmup": "warmup",
     "run": "run",
-    "recovery": "walk",
+    "walk": "walk",
+    "recovery": "recovery",
+    "rest": "rest",
     "cooldown": "cooldown",
     "repeat": "repeat",
 }
@@ -30,7 +32,7 @@ def normalize_action(raw_action: Any, location: str) -> str:
         raise WorkoutDefinitionError(f"{location}: the step name must be text")
     action = ACTION_NAMES.get(raw_action.strip().lower())
     if action is None:
-        valid = "warmup, run, recovery, repeat or cooldown"
+        valid = "warmup, run, walk, recovery, rest, cooldown or repeat"
         raise WorkoutDefinitionError(f"{location}: unknown step {raw_action!r}; use {valid}")
     return action
 

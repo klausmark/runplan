@@ -6,7 +6,9 @@ from collections.abc import Callable
 from typing import Any
 
 from garminconnect.workout import (
+    ExecutableStep,
     RunningWorkout,
+    StepType,
     WorkoutSegment,
     create_cooldown_step,
     create_interval_step,
@@ -32,6 +34,35 @@ PaceResolver = Callable[[str], tuple[float, float]]
 def add_description(step: Any, text: str) -> Any:
     """Return a Garmin step with its watch-facing description."""
     return step.model_copy(update={"description": text})
+
+
+def create_rest_step(
+    duration_seconds: float,
+    step_order: int,
+    target_type: dict[str, Any] | None = None,
+) -> ExecutableStep:
+    """Create a Garmin REST step using the library's typed step type."""
+    return ExecutableStep(
+        stepOrder=step_order,
+        stepType={
+            "stepTypeId": StepType.REST,
+            "stepTypeKey": "rest",
+            "displayOrder": StepType.REST,
+        },
+        endCondition={
+            "conditionTypeId": 2,
+            "conditionTypeKey": "time",
+            "displayOrder": 2,
+            "displayable": True,
+        },
+        endConditionValue=duration_seconds,
+        targetType=target_type
+        or {
+            "workoutTargetTypeId": 1,
+            "workoutTargetTypeKey": "no.target",
+            "displayOrder": 1,
+        },
+    )
 
 
 def set_step_end(step: Any, kind: str, value: float) -> Any:
@@ -81,9 +112,13 @@ def compile_steps(
         # Warmup and cooldown describe the phase of a workout, not whether the
         # athlete should walk or run.  Keep these watch-facing instructions
         # neutral; beginner plans can prescribe walking in the workout text.
+        # `walk` and `rest` have no default description: the watch shows the
+        # step's note when present, otherwise the description stays empty.
         "warmup": (create_warmup_step, "Warm up"),
         "run": (create_interval_step, "Very easy run"),
-        "walk": (create_recovery_step, "Walk"),
+        "walk": (create_recovery_step, ""),
+        "recovery": (create_recovery_step, "Recovery"),
+        "rest": (create_rest_step, ""),
         "cooldown": (create_cooldown_step, "Cool down"),
     }
     for order, item in enumerate(step_definitions, start=1):

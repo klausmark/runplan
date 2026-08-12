@@ -31,9 +31,8 @@ def _step_model(raw: Any, location: str) -> Step:
             steps=child_steps,
         )
     end_kind, end_value = parse_step_end(value, location)
-    public_action = "recovery" if action == "walk" else action
     return Step(
-        action=public_action,
+        action=action,
         end_kind=end_kind,
         end_value=end_value,
         pace=step_pace(value, location),

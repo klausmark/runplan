@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
 
-StepAction = Literal["warmup", "run", "recovery", "cooldown", "repeat"]
+StepAction = Literal["warmup", "run", "walk", "recovery", "rest", "cooldown", "repeat"]
 EndKind = Literal["time", "distance"]
 WorkoutStatus = Literal["planned", "scheduled", "completed", "missed", "retired"]
 
