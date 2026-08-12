@@ -1,7 +1,7 @@
 """Domain concepts and errors."""
 
 from .errors import WorkoutDefinitionError
-from .models import Program, Step, Week, Workout
+from .models import WORKOUT_SCHEDULE_SENTINEL, Program, Step, Week, Workout
 from .pace import (
     FIVE_KM,
     HALF_MARATHON_KM,
@@ -23,6 +23,14 @@ from .pace import (
     race_pace_seconds,
     round5,
     total_from_pace,
+)
+from .recipes import (
+    RECIPE_CATALOG,
+    RecipeInstantiationError,
+    RecipeParameters,
+    WorkoutRecipe,
+    get_recipe,
+    recipes_by_form,
 )
 from .selectors import WeekSelection, WeekSelectionError
 from .workout_form import (
@@ -51,15 +59,19 @@ __all__ = [
     "ONE_KM",
     "PACE_INTENSITIES",
     "Program",
+    "RECIPE_CATALOG",
     "RECOVERY_OFFSET_SECONDS_PER_KM",
     "RECOVERY_RUN",
     "RIEGEL_EXPONENT",
     "RUN_WALK",
+    "RecipeInstantiationError",
+    "RecipeParameters",
     "Step",
     "TEMPO_OFFSET_SECONDS_PER_KM",
     "TEMPO_RUN",
     "TEN_KM",
     "TRAINING_INTENSITY_OFFSETS",
+    "WORKOUT_SCHEDULE_SENTINEL",
     "Week",
     "WeekSelection",
     "WeekSelectionError",
@@ -67,15 +79,18 @@ __all__ = [
     "WorkoutDefinitionError",
     "WorkoutForm",
     "WorkoutFormName",
+    "WorkoutRecipe",
     "WorkoutWithForm",
     "five_k_pace_seconds",
     "format_pace_seconds",
+    "get_recipe",
     "infer_workout_form",
     "intensity_pace_seconds",
     "one_k_pace_to_five_k_seconds",
     "pace_zone",
     "parse_total_seconds",
     "race_pace_seconds",
+    "recipes_by_form",
     "round5",
     "total_from_pace",
 ]

@@ -11,6 +11,15 @@ StepAction = Literal["warmup", "run", "walk", "recovery", "rest", "cooldown", "r
 EndKind = Literal["time", "distance"]
 WorkoutStatus = Literal["planned", "scheduled", "completed", "missed", "retired"]
 
+WORKOUT_SCHEDULE_SENTINEL: date = date(1970, 1, 1)
+"""Marker schedule date used by recipe instantiations.
+
+Recipes are schedule-independent: they produce a :class:`Workout` with no
+program, week, day, or date. Step 6 (the ``instantiate_recipe`` use case)
+overwrites these placeholder fields when the workout is placed into a program.
+Test code that exercises a recipe should allow these defaults.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class Step:
@@ -46,12 +55,12 @@ class Step:
 
 @dataclass(frozen=True, slots=True)
 class Workout:
-    id: str
-    day: int
-    name: str
-    description: str | None
-    steps: tuple[Step, ...]
-    schedule_date: date
+    id: str = ""
+    day: int = 0
+    name: str = ""
+    description: str | None = None
+    steps: tuple[Step, ...] = ()
+    schedule_date: date = WORKOUT_SCHEDULE_SENTINEL
     status: WorkoutStatus = "planned"
     garmin_workout_id: int | None = None
     garmin_schedule_id: int | None = None
@@ -187,6 +196,7 @@ __all__ = [
     "Program",
     "StepAction",
     "Week",
+    "WORKOUT_SCHEDULE_SENTINEL",
     "Workout",
     "WorkoutStatus",
 ]

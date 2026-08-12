@@ -41,6 +41,17 @@ def _step_model(raw: Any, location: str) -> Step:
     )
 
 
+def build_step(raw: Any, location: str = "step") -> Step:
+    """Convert one raw step dictionary into a typed :class:`Step`.
+
+    This is the public entry point used by recipe instantiations to reuse the
+    existing validation pipeline. Recipes may also use the raw step builders
+    in :mod:`runplan.generation.workouts` and feed the result through this
+    helper so step validation is never duplicated.
+    """
+    return _step_model(raw, location)
+
+
 def _activity_id(tracking: dict[str, Any]) -> int | None:
     activities = tracking.get("activities")
     if isinstance(activities, list) and activities and isinstance(activities[0], dict):

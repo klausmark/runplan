@@ -7,6 +7,7 @@ from .application.sync import delete_all_managed, reconcile_program, sync_progra
 from .cli import run_sync
 from .domain.errors import WorkoutDefinitionError
 from .domain.models import (
+    WORKOUT_SCHEDULE_SENTINEL,
     CoachingGuide,
     CoachingSection,
     CoachingTip,
@@ -20,6 +21,14 @@ from .domain.models import (
     Week,
     Workout,
     WorkoutStatus,
+)
+from .domain.recipes import (
+    RECIPE_CATALOG,
+    RecipeInstantiationError,
+    RecipeParameters,
+    WorkoutRecipe,
+    get_recipe,
+    recipes_by_form,
 )
 from .domain.selectors import WeekSelection, WeekSelectionError
 from .domain.workout_form import (
@@ -60,6 +69,7 @@ from .parsing.yaml_loader import (
     load_program,
     load_program_model,
 )
+from .parsing.yaml_models import build_step
 from .presentation.text import (
     estimate_duration,
     estimate_totals,
@@ -98,14 +108,18 @@ __all__ = [
     "PaceType",
     "Program",
     "ProgramExport",
+    "RECIPE_CATALOG",
     "RECOVERY_RUN",
     "RUN_WALK",
+    "RecipeInstantiationError",
+    "RecipeParameters",
     "Step",
     "TEMPLATE_CATALOG",
     "TEMPO_RUN",
     "TemplateCopyError",
     "TemplateMetadata",
     "TrainingDays",
+    "WORKOUT_SCHEDULE_SENTINEL",
     "Week",
     "WeekSelection",
     "WeekSelectionError",
@@ -113,8 +127,10 @@ __all__ = [
     "WorkoutDefinitionError",
     "WorkoutForm",
     "WorkoutFormName",
+    "WorkoutRecipe",
     "WorkoutStatus",
     "WorkoutWithForm",
+    "build_step",
     "build_workout",
     "build_program_export",
     "compile_steps",
@@ -130,6 +146,7 @@ __all__ = [
     "format_program_html",
     "format_program_markdown",
     "format_totals",
+    "get_recipe",
     "get_template",
     "infer_workout_form",
     "list_templates",
@@ -144,6 +161,7 @@ __all__ = [
     "parse_step_end",
     "plan_to_yaml",
     "reconcile_program",
+    "recipes_by_form",
     "run_sync",
     "save_state",
     "state_path",
