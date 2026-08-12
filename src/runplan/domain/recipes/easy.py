@@ -198,12 +198,143 @@ def _warmup_run(params: WarmupRunParameters) -> tuple[Step, ...]:
     return _parse_steps(build_warmup_run(params.minutes))
 
 
+# ---------------------------------------------------------------------------
+# Run/walk bridge
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RunWalkBridgeParameters(RecipeParameters):
+    run_minutes: int = 4
+    walk_minutes: int = 1
+    cycles: int = 5
+
+    def __post_init__(self) -> None:
+        if self.run_minutes <= 0:
+            raise ValueError("run_minutes must be greater than 0")
+        if self.walk_minutes <= 0:
+            raise ValueError("walk_minutes must be greater than 0")
+        if self.cycles <= 0:
+            raise ValueError("cycles must be greater than 0")
+
+
+@recipe(
+    key="run_walk.bridge",
+    form=RUN_WALK,
+    label="Run/walk bridge",
+    description=(
+        "Longer run blocks with planned walking breaks. Bridges the gap "
+        "between short run/walk starts and continuous easy running, and "
+        "is a sustainable run/walk strategy in its own right."
+    ),
+    parameters_type=RunWalkBridgeParameters,
+)
+def _run_walk_bridge(params: RunWalkBridgeParameters) -> tuple[Step, ...]:
+    return _parse_steps(
+        [
+            {"warmup": "5m"},
+            {
+                "repeat": {
+                    "count": params.cycles,
+                    "steps": [
+                        {"run": {"time": f"{params.run_minutes}m"}},
+                        {"walk": {"time": f"{params.walk_minutes}m"}},
+                    ],
+                }
+            },
+            {"cooldown": "5m"},
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Run/walk pyramid
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RunWalkPyramidParameters(RecipeParameters):
+    peak_run_minutes: int = 4
+    walk_minutes: int = 1
+
+    def __post_init__(self) -> None:
+        if self.peak_run_minutes <= 0:
+            raise ValueError("peak_run_minutes must be greater than 0")
+        if self.walk_minutes <= 0:
+            raise ValueError("walk_minutes must be greater than 0")
+
+
+def _build_run_walk_pyramid(
+    *,
+    peak_run_minutes: int,
+    walk_minutes: int,
+) -> tuple[Step, ...]:
+    pyramid = list(range(1, peak_run_minutes + 1)) + list(range(peak_run_minutes - 1, 0, -1))
+    raw: list[dict] = [{"warmup": "5m"}]
+    for index, run_minutes in enumerate(pyramid):
+        raw.append({"run": {"time": f"{run_minutes}m"}})
+        if index < len(pyramid) - 1:
+            raw.append({"walk": {"time": f"{walk_minutes}m"}})
+    raw.append({"cooldown": "5m"})
+    return _parse_steps(raw)
+
+
+@recipe(
+    key="run_walk.pyramid",
+    form=RUN_WALK,
+    label="Run/walk pyramid",
+    description=(
+        "Run/walk intervals that climb to a peak then return, e.g. "
+        "1-2-3-4-3-2-1 minutes of running with short walks between. "
+        "Useful when monotony is the limiting factor."
+    ),
+    parameters_type=RunWalkPyramidParameters,
+)
+def _run_walk_pyramid(params: RunWalkPyramidParameters) -> tuple[Step, ...]:
+    return _build_run_walk_pyramid(
+        peak_run_minutes=params.peak_run_minutes,
+        walk_minutes=params.walk_minutes,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Recovery by distance
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryDistanceParameters(RecipeParameters):
+    target_km: float = 3.0
+
+    def __post_init__(self) -> None:
+        if self.target_km <= 0:
+            raise ValueError("target_km must be greater than 0")
+
+
+@recipe(
+    key="recovery.distance",
+    form=RECOVERY_RUN,
+    label="Recovery run by distance",
+    description=(
+        "One continuous, very easy run for a set distance. Useful when "
+        "you plan around a familiar short route rather than a fixed duration. "
+        "Treat the distance as a ceiling, not a debt."
+    ),
+    parameters_type=RecoveryDistanceParameters,
+)
+def _recovery_distance(params: RecoveryDistanceParameters) -> tuple[Step, ...]:
+    return _parse_steps([{"run": {"distance": f"{params.target_km:.1f}km"}}])
+
+
 EASY_RECIPES: tuple[WorkoutRecipe, ...] = (
     _easy_continuous,
     _easy_with_strides,
     _recovery_run,
     _run_walk_intervals,
     _warmup_run,
+    _run_walk_bridge,
+    _run_walk_pyramid,
+    _recovery_distance,
 )
 
 
@@ -211,7 +342,10 @@ __all__ = [
     "EASY_RECIPES",
     "EasyContinuousParameters",
     "EasyWithStridesParameters",
+    "RecoveryDistanceParameters",
     "RecoveryRunParameters",
+    "RunWalkBridgeParameters",
     "RunWalkIntervalsParameters",
+    "RunWalkPyramidParameters",
     "WarmupRunParameters",
 ]

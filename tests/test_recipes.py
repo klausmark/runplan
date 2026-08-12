@@ -31,8 +31,11 @@ from runplan.domain.recipes import (
     LongWithFinishParameters,
     LongWithHillSurgesParameters,
     LongWithKickoutsParameters,
+    RecoveryDistanceParameters,
     RecoveryRunParameters,
+    RunWalkBridgeParameters,
     RunWalkIntervalsParameters,
+    RunWalkPyramidParameters,
     Track1kParameters,
     Track400mParameters,
     WarmupRunParameters,
@@ -262,7 +265,10 @@ def test_recipe_form_is_declared_on_recipe() -> None:
         "easy.continuous": EASY_RUN,
         "easy.with_strides": EASY_RUN,
         "recovery.run": RECOVERY_RUN,
+        "recovery.distance": RECOVERY_RUN,
         "run_walk.intervals": RUN_WALK,
+        "run_walk.bridge": RUN_WALK,
+        "run_walk.pyramid": RUN_WALK,
         "easy.warmup_run": EASY_RUN,
         "long.steady": LONG_RUN,
         "long.with_finish": LONG_RUN,
@@ -331,6 +337,15 @@ def test_schedule_fields_visible_in_recipe_instantiation_summary() -> None:
         (lambda: RunWalkIntervalsParameters(run_minutes=0), "run_minutes must be greater than 0"),
         (lambda: RunWalkIntervalsParameters(walk_minutes=0), "walk_minutes must be greater than 0"),
         (lambda: RunWalkIntervalsParameters(cycles=0), "cycles must be greater than 0"),
+        (lambda: RunWalkBridgeParameters(run_minutes=0), "run_minutes must be greater than 0"),
+        (lambda: RunWalkBridgeParameters(walk_minutes=0), "walk_minutes must be greater than 0"),
+        (lambda: RunWalkBridgeParameters(cycles=0), "cycles must be greater than 0"),
+        (
+            lambda: RunWalkPyramidParameters(peak_run_minutes=0),
+            "peak_run_minutes must be greater than 0",
+        ),
+        (lambda: RunWalkPyramidParameters(walk_minutes=0), "walk_minutes must be greater than 0"),
+        (lambda: RecoveryDistanceParameters(target_km=0), "target_km must be greater than 0"),
         (lambda: LongSteadyParameters(target_km=0), "target_km must be greater than 0"),
         (lambda: LongWithFinishParameters(target_km=0), "target_km must be greater than 0"),
         (lambda: LongWithHillSurgesParameters(target_km=0), "target_km must be greater than 0"),
@@ -406,6 +421,64 @@ def test_run_walk_recipe_alternates_run_and_walk() -> None:
     repeat = pair.workout.steps[1]
     assert repeat.count == 4
     assert tuple(child.action for child in repeat.steps) == ("run", "walk")
+
+
+def test_run_walk_bridge_recipe_uses_long_blocks() -> None:
+    pair = get_recipe("run_walk.bridge").instantiate(
+        RunWalkBridgeParameters(run_minutes=4, walk_minutes=1, cycles=5)
+    )
+
+    actions = tuple(step.action for step in pair.workout.steps)
+    assert actions == ("warmup", "repeat", "cooldown")
+    repeat = pair.workout.steps[1]
+    assert repeat.count == 5
+    run_step, walk_step = repeat.steps
+    assert run_step.action == "run" and run_step.end_value == 4 * 60
+    assert walk_step.action == "walk" and walk_step.end_value == 60.0
+
+
+def test_run_walk_pyramid_recipe_uses_progressing_runs() -> None:
+    pair = get_recipe("run_walk.pyramid").instantiate(
+        RunWalkPyramidParameters(peak_run_minutes=4, walk_minutes=1)
+    )
+
+    actions = tuple(step.action for step in pair.workout.steps)
+    assert actions[0] == "warmup"
+    assert actions[-1] == "cooldown"
+
+    run_durations = [step.end_value for step in pair.workout.steps if step.action == "run"]
+    assert run_durations == [60.0, 120.0, 180.0, 240.0, 180.0, 120.0, 60.0]
+
+    walk_durations = [step.end_value for step in pair.workout.steps if step.action == "walk"]
+    assert walk_durations == [60.0] * 6
+
+
+def test_run_walk_pyramid_recipe_handles_peak_of_one() -> None:
+    pair = get_recipe("run_walk.pyramid").instantiate(
+        RunWalkPyramidParameters(peak_run_minutes=1, walk_minutes=1)
+    )
+
+    run_steps = [step for step in pair.workout.steps if step.action == "run"]
+    walk_steps = [step for step in pair.workout.steps if step.action == "walk"]
+    assert len(run_steps) == 1
+    assert walk_steps == []
+
+
+def test_recovery_distance_recipe_is_single_distance_step() -> None:
+    pair = get_recipe("recovery.distance").instantiate(RecoveryDistanceParameters(target_km=3.0))
+
+    assert len(pair.workout.steps) == 1
+    run = pair.workout.steps[0]
+    assert run.action == "run"
+    assert run.end_kind == "distance"
+    assert run.end_value == pytest.approx(3000.0)
+    assert run.pace is None
+
+
+def test_recovery_distance_recipe_scales_with_target_km() -> None:
+    pair = get_recipe("recovery.distance").instantiate(RecoveryDistanceParameters(target_km=4.5))
+
+    assert pair.workout.steps[0].end_value == pytest.approx(4500.0)
 
 
 def test_long_steady_recipe_carries_distance() -> None:
