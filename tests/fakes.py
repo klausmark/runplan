@@ -116,3 +116,22 @@ class FakeGarmin:
                 f"API Error 404 - No workout found for workout = {workout_id}"
             )
         self.workouts = [item for item in self.workouts if item.get("workoutId") != workout_id]
+
+
+class InMemoryProgramRepository:
+    """Minimal :class:`ProgramRepository` implementation for tests."""
+
+    def __init__(self, programs: dict[str, dict] | None = None) -> None:
+        self._programs: dict[str, dict] = {
+            key: copy.deepcopy(value) for key, value in (programs or {}).items()
+        }
+        self.saves: list[tuple[str, dict]] = []
+
+    def load(self, program_id: str) -> dict:
+        if program_id not in self._programs:
+            raise KeyError(f"unknown program_id {program_id!r}")
+        return copy.deepcopy(self._programs[program_id])
+
+    def save(self, program_id: str, raw: dict) -> None:
+        self._programs[program_id] = copy.deepcopy(raw)
+        self.saves.append((program_id, copy.deepcopy(raw)))

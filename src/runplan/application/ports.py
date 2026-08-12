@@ -40,4 +40,24 @@ class StateRepository(Protocol):
     def delete(self, program_id: str) -> None: ...
 
 
-__all__ = ["GarminClient", "StateRepository"]
+class ProgramRepository(Protocol):
+    """Persistence contract for program YAML documents.
+
+    Implementations read and write the raw YAML document so callers can
+    validate and edit it through the same pipeline used by the web layer.
+    The Step 6 ``instantiate_recipe`` use case consumes this port.
+    """
+
+    def load(self, program_id: str) -> dict[str, Any]:
+        """Return the raw YAML document for ``program_id``.
+
+        Raises ``KeyError`` when the document does not exist.
+        """
+        ...
+
+    def save(self, program_id: str, raw: dict[str, Any]) -> None:
+        """Persist the updated raw YAML document."""
+        ...
+
+
+__all__ = ["GarminClient", "ProgramRepository", "StateRepository"]
