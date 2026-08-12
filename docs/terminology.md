@@ -14,6 +14,8 @@ maintained content.
 | Minutes per kilometer | pace |
 | Opening preparation | warmup |
 | Easy movement between work intervals | recovery |
+| Planned walking as part of a workout | walk |
+| Pause where standing is acceptable | rest |
 | Closing easy movement | cooldown |
 | A recursive group performed multiple times | repeat |
 | An easy aerobic workout | easy run |
@@ -23,7 +25,20 @@ maintained content.
 | A version-neutral program that users copy with their own start week | template |
 | The Studio listing of bundled templates | template catalog |
 | The act of duplicating a template into a per-user program | copy template |
+| The coaching purpose of a workout, shown in the UI but not stored in program YAML | category |
+| A schedule-independent workout shape that instantiates into an explicit workout | recipe |
 
-Use “sync” for reconciliation with Garmin, “preview” for a read-only rendering,
-“export” for writing a presentation file, and “prune” only for explicitly
+Use "sync" for reconciliation with Garmin, "preview" for a read-only rendering,
+"export" for writing a presentation file, and "prune" only for explicitly
 removing managed workouts outside the selected set.
+
+Use `recovery` for flexible active recovery between work intervals. It is a
+coaching term and may carry a pace, a note, or no extra guidance. Use `walk`
+when planned walking is part of the workout and `rest` when standing is
+acceptable. The runner may combine `walk`, `run`, and `recovery` to express
+the same workout in different ways.
+
+Categories and recipes are authoring concepts. They are not fields in program
+YAML. Categories are shown to the runner as a label on workout cards and in
+export headings, but they live in local application state rather than inside
+the program file.

@@ -122,13 +122,37 @@ steps:
   - cooldown: 5m
 ```
 
+`walk` and `rest` follow the same end-condition rules as `run`:
+
+```yaml
+steps:
+  - warmup: 5m
+  - repeat:
+      count: 6
+      steps:
+        - run: 2m
+        - walk: 1m
+  - cooldown: 5m
+```
+
 Supported actions are:
 
 - `warmup`
 - `run`
+- `walk`
 - `recovery`
+- `rest`
 - `cooldown`
 - `repeat`
+
+Use `walk` when planned walking is part of the workout, such as a run/walk
+session, planned breaks on a long run, or a walking-only easy day. Use `rest`
+when a pause where standing is acceptable is intended, such as recovery
+between short fast intervals or after a hill sprint.
+
+Use `recovery` for flexible active recovery between work intervals. It may
+carry a pace, a note, or no extra guidance. When the exact movement matters,
+prefer `walk` for walking and `rest` for standing pauses.
 
 A repeat step has this structure:
 
@@ -141,7 +165,9 @@ A repeat step has this structure:
 ```
 
 `count` must be a positive integer, and `steps` must be a non-empty list.
-Avoid unnecessarily deep nesting.
+Avoid unnecessarily deep nesting. Repeat children may use any supported
+action, including `walk` and `rest`, so run/walk sessions can be expressed
+cleanly.
 
 ## Time-based steps
 
