@@ -321,6 +321,8 @@ body.authenticated #auth-view { display: none; }
 .recipe-dose { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .recipe-dose-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
 .recipe-dose-field input { font: inherit; }
+.recipe-dose-error { color: #b84d3e; font-size: 11px; font-weight: 400; min-height: 0; }
+.recipe-dose-error:empty { display: none; }
 .recipe-pace-range { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; grid-column: 1 / -1; }
 .recipe-dose-field:has(> .recipe-pace-range) { grid-column: 1 / -1; }
 .recipe-dose-field:has(> .recipe-pace-range) > .recipe-pace-range { grid-column: auto; }

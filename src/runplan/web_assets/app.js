@@ -1392,6 +1392,11 @@ function renderRecipeDoseForm(parameters, values) {
     caption.textContent = param.label;
     label.appendChild(caption);
     label.appendChild(_recipeInputFor(param, values));
+    const error = document.createElement("small");
+    error.className = "recipe-dose-error";
+    error.dataset.paceError = param.name;
+    error.setAttribute("role", "alert");
+    label.appendChild(error);
     form.appendChild(label);
   }
   form.oninput = () => scheduleRecipePreview();
@@ -1446,6 +1451,11 @@ function _recipeInputFor(param, values) {
   return input;
 }
 
+function setPaceRangeError(name, message) {
+  const error = $(`#recipe-dose-form [data-pace-error="${name}"]`);
+  if (error) error.textContent = message ?? "";
+}
+
 function readRecipeParameters(parameters) {
   const form = $("#recipe-dose-form");
   const values = {};
@@ -1453,7 +1463,19 @@ function readRecipeParameters(parameters) {
     if (param.type === "pace_range") {
       const parts = form.querySelectorAll(`[data-param-name="${param.name}"][data-param-type="pace_range"]`);
       const sides = Array.from(parts).map((node) => node.value.trim());
-      values[param.name] = sides.every((side) => side === "") ? null : sides;
+      if (sides.every((side) => side === "")) {
+        setPaceRangeError(param.name, null);
+        values[param.name] = null;
+      } else {
+        const normalized = sides.map(normalizePaceSide);
+        if (normalized.some((value) => value === null)) {
+          setPaceRangeError(param.name, "Use 4:30, 5, or 4:30-4:45 min/km");
+          values[param.name] = sides;
+        } else {
+          setPaceRangeError(param.name, null);
+          values[param.name] = normalized;
+        }
+      }
     } else if (param.type === "boolean") {
       const node = form.querySelector(`[data-param-name="${param.name}"][data-param-type="boolean"]`);
       values[param.name] = Boolean(node?.checked);
@@ -1468,9 +1490,22 @@ function readRecipeParameters(parameters) {
   return values;
 }
 
+function hasPaceError() {
+  const errors = document.querySelectorAll("#recipe-dose-form [data-pace-error]");
+  for (const node of errors) {
+    if (node.textContent && node.textContent.length > 0) return true;
+  }
+  return false;
+}
+
 let RECIPE_PREVIEW_TOKEN = 0;
 function scheduleRecipePreview() {
   if (!state.workout?.recipe) return;
+  if (hasPaceError()) {
+    $("#recipe-totals").textContent = "";
+    $("#save-workout-button").disabled = true;
+    return;
+  }
   const token = ++RECIPE_PREVIEW_TOKEN;
   setAppStatus("validation", "Updating preview…");
   const recipeState = state.workout.recipe;
@@ -1982,6 +2017,10 @@ $("#user-settings-form").addEventListener("submit", async (event) => {
 });
 $("#workout-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (state.workout.mode === "add" && hasPaceError()) {
+    showError("Fix the pace fields before saving.");
+    return;
+  }
   const change = state.workout.mode === "add"
     ? { add_workout: { week: state.workout.week, yaml: $("#workout-yaml").value } }
     : { workout: { week: state.workout.week, workout_id: state.workout.workoutId, yaml: $("#workout-yaml").value } };

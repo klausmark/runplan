@@ -272,6 +272,14 @@ class TestWebAsset:
             "inputs do not overflow the 'Build from a recipe' card"
         )
 
+    def test_recipe_dose_form_renders_an_error_element_per_field(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert "recipe-dose-error" in script
+        assert "dataset.paceError" in script
+        assert ".recipe-dose-error" in styles
+        assert ".recipe-dose-error:empty" in styles
+
     def test_add_workout_dialog_keeps_the_advanced_yaml_editor_as_escape_hatch(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

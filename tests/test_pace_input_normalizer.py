@@ -152,3 +152,14 @@ def test_javascript_normalizer_body_matches_python_mirror_rules() -> None:
     assert "[0-5]\\d" in side_body
     assert "min/km" in body
     assert "split" in body
+
+
+def test_recipe_pace_range_inputs_are_normalised_client_side() -> None:
+    script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+    assert "normalizePaceSide" in script
+    read_index = script.index("function readRecipeParameters(")
+    next_function = script.index("\nfunction ", read_index + 1)
+    read_body = script[read_index:next_function]
+    assert "normalizePaceSide" in read_body
+    assert "recipe-dose-error" in script
+    assert "hasPaceError" in script
