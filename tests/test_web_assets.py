@@ -188,8 +188,21 @@ class TestWebAsset:
         details_start = html.index('id="workout-yaml-details"')
         details_end = html.index("</details>", details_start)
         assert html.index('id="workout-activities"') < details_start
-        assert details_start < html.index('id="save-workout-button"') < details_end
+        assert 'id="save-workout-button"' not in html[details_start:details_end]
         assert '$("#workout-yaml-details").open = false;' in script
+
+    def test_save_button_lives_in_the_workout_dialog_footer(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        dialog_start = html.index('id="workout-dialog"')
+        dialog_end = html.index("</dialog>", dialog_start)
+        dialog = html[dialog_start:dialog_end]
+        footer_start = dialog.index("<footer>")
+        footer_end = dialog.index("</footer>", footer_start)
+        footer = dialog[footer_start:footer_end]
+        assert 'id="save-workout-button"' in footer
+        assert 'type="submit"' in footer
+        assert 'id="delete-workout-button"' in footer
+        assert 'class="button secondary close"' in footer
 
     def test_calendar_undo_and_explicit_operation_states_are_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
