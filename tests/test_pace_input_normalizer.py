@@ -173,3 +173,16 @@ def test_recipe_pace_range_inputs_drop_the_min_km_suffix_before_sending() -> Non
     next_function = script.index("\nfunction ", read_index + 1)
     read_body = script[read_index:next_function]
     assert "_stripPaceUnit" in read_body
+
+
+def test_recipe_yaml_keeps_min_km_suffix_for_pace() -> None:
+    script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+    append_index = script.index("function appendRecipeStepLines(")
+    next_function = script.index("\nfunction ", append_index + 1)
+    append_body = script[append_index:next_function]
+    pace_branch = append_body.split("pace_display", 1)[1]
+    assert ".replace(" not in pace_branch, (
+        "appendRecipeStepLines must keep the min/km suffix from pace_display "
+        "so the YAML matches the documented schema and parse_pace accepts it"
+    )
+    assert 'pace: "${step.pace_display}"' in append_body

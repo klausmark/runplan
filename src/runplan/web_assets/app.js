@@ -1605,7 +1605,7 @@ function appendRecipeStepLines(steps, lines, indent) {
     const parts = [];
     if (step.end_kind === "time") parts.push(`time: ${secondsToCompact(step.end_value)}`);
     else if (step.end_kind === "distance") parts.push(`distance: ${metersToCompact(step.end_value)}`);
-    if (step.pace_display) parts.push(`pace: "${step.pace_display.replace(" min/km", "")}"`);
+    if (step.pace_display) parts.push(`pace: "${step.pace_display}"`);
     if (step.note) parts.push(`note: ${JSON.stringify(step.note)}`);
     lines.push(`${pad}    ${parts.join(", ")}`);
     lines.push(`${pad}}`);
