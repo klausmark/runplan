@@ -1439,6 +1439,7 @@ function _recipeInputFor(param, values) {
       input.dataset.paramName = param.name;
       input.dataset.paramIndex = String(index);
       input.dataset.paramType = "pace_range";
+      input.addEventListener("blur", () => commitPaceSide(input));
       wrapper.appendChild(input);
     }
     return wrapper;
@@ -1451,9 +1452,49 @@ function _recipeInputFor(param, values) {
   return input;
 }
 
-function setPaceRangeError(name, message) {
-  const error = $(`#recipe-dose-form [data-pace-error="${name}"]`);
-  if (error) error.textContent = message ?? "";
+const PACE_ERROR_MESSAGE = "Enter a pace such as 5, 5.5, or 5:30.";
+
+function _paceErrorElement(name) {
+  return $(`#recipe-dose-form [data-pace-error="${name}"]`);
+}
+
+function commitPaceSide(input) {
+  const raw = input.value.trim();
+  const name = input.dataset.paramName;
+  const errorElement = _paceErrorElement(name);
+  if (raw === "") {
+    input.removeAttribute("aria-invalid");
+    if (errorElement) errorElement.textContent = "";
+    scheduleRecipePreview();
+    return;
+  }
+  const normalized = normalizePaceInput(raw);
+  if (normalized === null) {
+    input.setAttribute("aria-invalid", "true");
+    if (errorElement) errorElement.textContent = PACE_ERROR_MESSAGE;
+    scheduleRecipePreview();
+    return;
+  }
+  input.value = normalized;
+  input.removeAttribute("aria-invalid");
+  if (errorElement) errorElement.textContent = "";
+  scheduleRecipePreview();
+}
+
+function hasPaceError() {
+  const invalid = document.querySelectorAll(
+    "#recipe-dose-form [data-param-type=\"pace_range\"][aria-invalid=\"true\"]"
+  );
+  if (invalid.length > 0) return true;
+  const errors = document.querySelectorAll("#recipe-dose-form [data-pace-error]");
+  for (const node of errors) {
+    if (node.textContent && node.textContent.length > 0) return true;
+  }
+  return false;
+}
+
+function _stripPaceUnit(value) {
+  return value.replace(/\s*min\s*\/\s*km\s*$/i, "");
 }
 
 function readRecipeParameters(parameters) {
@@ -1462,20 +1503,8 @@ function readRecipeParameters(parameters) {
   for (const param of parameters) {
     if (param.type === "pace_range") {
       const parts = form.querySelectorAll(`[data-param-name="${param.name}"][data-param-type="pace_range"]`);
-      const sides = Array.from(parts).map((node) => node.value.trim());
-      if (sides.every((side) => side === "")) {
-        setPaceRangeError(param.name, null);
-        values[param.name] = null;
-      } else {
-        const normalized = sides.map(normalizePaceSide);
-        if (normalized.some((value) => value === null)) {
-          setPaceRangeError(param.name, "Use 4:30, 5, or 4:30-4:45 min/km");
-          values[param.name] = sides;
-        } else {
-          setPaceRangeError(param.name, null);
-          values[param.name] = normalized;
-        }
-      }
+      const sides = Array.from(parts).map((node) => _stripPaceUnit(node.value.trim()));
+      values[param.name] = sides.every((side) => side === "") ? null : sides;
     } else if (param.type === "boolean") {
       const node = form.querySelector(`[data-param-name="${param.name}"][data-param-type="boolean"]`);
       values[param.name] = Boolean(node?.checked);
@@ -1488,14 +1517,6 @@ function readRecipeParameters(parameters) {
     }
   }
   return values;
-}
-
-function hasPaceError() {
-  const errors = document.querySelectorAll("#recipe-dose-form [data-pace-error]");
-  for (const node of errors) {
-    if (node.textContent && node.textContent.length > 0) return true;
-  }
-  return false;
 }
 
 let RECIPE_PREVIEW_TOKEN = 0;

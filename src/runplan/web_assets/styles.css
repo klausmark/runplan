@@ -323,6 +323,10 @@ body.authenticated #auth-view { display: none; }
 .recipe-dose-field input { font: inherit; }
 .recipe-dose-error { color: #b84d3e; font-size: 11px; font-weight: 400; min-height: 0; }
 .recipe-dose-error:empty { display: none; }
+.recipe-pace-range input[aria-invalid="true"] {
+  border-color: #b84d3e;
+  box-shadow: 0 0 0 1px #b84d3e;
+}
 .recipe-pace-range { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; grid-column: 1 / -1; }
 .recipe-dose-field:has(> .recipe-pace-range) { grid-column: 1 / -1; }
 .recipe-dose-field:has(> .recipe-pace-range) > .recipe-pace-range { grid-column: auto; }

@@ -280,6 +280,14 @@ class TestWebAsset:
         assert ".recipe-dose-error" in styles
         assert ".recipe-dose-error:empty" in styles
 
+    def test_pace_range_inputs_show_invalid_aria_state_and_red_border(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert "aria-invalid" in script
+        assert 'recipe-pace-range input[aria-invalid="true"]' in styles
+        assert "#b84d3e" in styles
+        assert 'addEventListener("blur"' in script
+
     def test_add_workout_dialog_keeps_the_advanced_yaml_editor_as_escape_hatch(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")

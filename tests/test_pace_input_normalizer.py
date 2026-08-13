@@ -154,12 +154,22 @@ def test_javascript_normalizer_body_matches_python_mirror_rules() -> None:
     assert "split" in body
 
 
-def test_recipe_pace_range_inputs_are_normalised_client_side() -> None:
+def test_recipe_pace_range_inputs_normalise_on_blur() -> None:
     script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
-    assert "normalizePaceSide" in script
+    assert 'addEventListener("blur"' in script
+    assert "normalizePaceInput" in script
+    assert "aria-invalid" in script
+    assert "commitPaceSide" in script
+    assert "scheduleRecipePreview" in script
+    assert "hasPaceError" in script
+    assert "recipe-dose-error" in script
+
+
+def test_recipe_pace_range_inputs_drop_the_min_km_suffix_before_sending() -> None:
+    script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+    assert "_stripPaceUnit" in script
+    assert "min/km" in script
     read_index = script.index("function readRecipeParameters(")
     next_function = script.index("\nfunction ", read_index + 1)
     read_body = script[read_index:next_function]
-    assert "normalizePaceSide" in read_body
-    assert "recipe-dose-error" in script
-    assert "hasPaceError" in script
+    assert "_stripPaceUnit" in read_body
