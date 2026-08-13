@@ -321,7 +321,7 @@ body.authenticated #auth-view { display: none; }
 .recipe-dose { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .recipe-dose-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
 .recipe-dose-field input { font: inherit; }
-.recipe-pace-range { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.recipe-pace-range { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; grid-column: 1 / -1; }
 .recipe-pace-range input { font: inherit; }
 .recipe-totals { padding: 10px 12px; border-radius: 9px; background: var(--card); border: 1px solid var(--line); color: var(--green-dark); font-size: 13px; font-weight: 700; }
 .week-preview { display: grid; gap: 10px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; background: var(--card); }

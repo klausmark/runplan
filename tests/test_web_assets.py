@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock
@@ -239,6 +240,17 @@ class TestWebAsset:
         assert ".recipe-categories" in styles
         assert ".recipe-dose" in styles
         assert ".week-preview-day" in styles
+
+    def test_pace_range_wrapper_spans_the_full_dose_row(self) -> None:
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        match = re.search(r"\.recipe-pace-range\s*\{[^}]*\}", styles)
+        assert match is not None, ".recipe-pace-range rule must be present"
+        body = match.group(0)
+        assert "grid-column: 1 / -1" in body, (
+            "pace_range wrapper must span the full dose row so its two inputs "
+            "do not overflow the 'Build from a recipe' card"
+        )
+        assert "grid-template-columns: 1fr 1fr" in body
 
     def test_add_workout_dialog_keeps_the_advanced_yaml_editor_as_escape_hatch(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
