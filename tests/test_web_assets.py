@@ -189,7 +189,6 @@ class TestWebAsset:
         assert html.index('id="workout-activities"') < details_start
         assert details_start < html.index('id="save-workout-button"') < details_end
         assert '$("#workout-yaml-details").open = false;' in script
-        assert '$("#workout-yaml-details").open = true;' in script
 
     def test_calendar_undo_and_explicit_operation_states_are_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
@@ -217,6 +216,46 @@ class TestWebAsset:
         assert "id: ${nextWorkoutId(week)}" in script
         assert "add_workout: { week: state.workout.week" in script
         assert ".add-workout" in styles
+
+    def test_add_workout_dialog_uses_a_recipe_selector_with_a_week_preview(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'id="add-workout-builder"' in html
+        assert 'id="recipe-categories"' in html
+        assert 'id="recipe-detail"' in html
+        assert 'id="recipe-select"' in html
+        assert 'id="recipe-dose-form"' in html
+        assert 'id="recipe-totals"' in html
+        assert 'id="week-preview"' in html
+        assert 'id="week-preview-days"' in html
+        assert 'request("/api/recipes")' in script
+        assert "/api/recipes/preview" in script
+        assert "renderRecipeDetail" in script
+        assert "renderRecipeDoseForm" in script
+        assert "renderWeekPreview" in script
+        assert "scheduleRecipePreview" in script
+        assert "DEFAULT_RECIPE_FORM" in script
+        assert ".recipe-categories" in styles
+        assert ".recipe-dose" in styles
+        assert ".week-preview-day" in styles
+
+    def test_add_workout_dialog_keeps_the_advanced_yaml_editor_as_escape_hatch(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        assert 'id="workout-yaml-details"' in html
+        assert "Advanced: Edit workout YAML" in html
+        assert 'id="workout-yaml"' in html
+        assert "novalidate" in html
+        assert "function buildRecipeYaml(" in script
+        assert '$("#workout-yaml").value = state.workout.recipe.yaml' in script
+
+    def test_add_workout_save_branch_still_uses_the_existing_add_workout_payload(self) -> None:
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        submit_index = script.index('$("#workout-form").addEventListener("submit"')
+        submit_block = script[submit_index : script.index("\n", submit_index + 400)]
+        assert "add_workout: { week: state.workout.week" in submit_block
+        assert 'yaml: $("#workout-yaml").value' in submit_block
 
     def test_workout_deletion_uses_a_named_confirmation_dialog(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")

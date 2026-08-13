@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from .users import UserRegistry, WebError
 from .web_auth import WebAuthenticator
 from .web_auth_http import AuthResponse, WebAuthHttpAdapter
+from .web_recipes import list_recipes_response, preview_recipe_response
 from .web_templates import (
     copy_template_dict_response,
     copy_template_response,
@@ -103,6 +104,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/programs":
             self._upload_program(payload)
+            return
+        if path == "/api/recipes/preview":
+            self._json(HTTPStatus.OK, preview_recipe_response(payload))
             return
         template_parts = self._api_template_parts()
         if len(template_parts) == 2 and template_parts[1] == "copy":
@@ -204,6 +208,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/templates":
             self._json(HTTPStatus.OK, list_templates_response())
+            return
+        if parsed.path == "/api/recipes":
+            self._json(HTTPStatus.OK, list_recipes_response())
             return
         template_parts = self._api_template_parts()
         if len(template_parts) == 1:

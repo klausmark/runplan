@@ -307,3 +307,35 @@ body.authenticated #auth-view { display: none; }
 .sync-preview-details { margin-top: 8px; }
 .sync-preview-details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 .sync-preview-actions { margin: 8px 0 0; padding-left: 22px; max-height: 220px; overflow: auto; font-size: 14px; color: var(--muted); }
+
+.add-workout-builder { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.add-workout-builder h3 { margin: 0; font: 500 16px Georgia, serif; color: var(--ink); }
+.recipe-categories { display: flex; flex-wrap: wrap; gap: 6px; }
+.recipe-category { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.recipe-category:hover:not(:disabled), .recipe-category:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
+.recipe-category[data-active="true"] { background: var(--green); border-color: var(--green); color: var(--card); }
+.recipe-category:disabled { opacity: .5; cursor: not-allowed; }
+.recipe-detail { display: grid; gap: 10px; }
+.recipe-select-label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 700; }
+.recipe-description { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.recipe-dose { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.recipe-dose-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.recipe-dose-field input { font: inherit; }
+.recipe-pace-range { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.recipe-pace-range input { font: inherit; }
+.recipe-totals { padding: 10px 12px; border-radius: 9px; background: var(--card); border: 1px solid var(--line); color: var(--green-dark); font-size: 13px; font-weight: 700; }
+.week-preview { display: grid; gap: 10px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; background: var(--card); }
+.week-preview h4 { margin: 0; font: 500 14px Georgia, serif; color: var(--ink); }
+.week-preview-days { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.week-preview-day { display: grid; gap: 4px; padding: 8px; border-radius: 9px; background: var(--paper); }
+.week-preview-day-target { background: var(--day-start); border: 1px solid var(--green); }
+.week-preview-day-header { display: flex; justify-content: space-between; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.week-preview-card { display: grid; gap: 2px; padding: 6px 8px; border-radius: 7px; background: var(--card); border: 1px solid var(--line); font-size: 12px; }
+.week-preview-card-target { border-color: var(--green); border-left: 4px solid var(--green); color: var(--ink); }
+.week-preview-card-target span { color: var(--green-dark); font-weight: 700; font-size: 11px; }
+.week-preview-card-existing { color: var(--muted); }
+.week-preview-card-existing span { color: var(--muted); font-size: 11px; }
+.week-preview-card-empty { color: var(--muted); font-style: italic; }
+.week-preview-card-empty span { font-size: 11px; }
+[data-theme="dark"] .recipe-totals,
+[data-theme="dark"] .week-preview-card { background: var(--paper); }

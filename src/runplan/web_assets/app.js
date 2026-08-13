@@ -1271,20 +1271,412 @@ steps:
 `;
 }
 
-function openAddWorkout(weekNumber, day) {
+const RECIPE_CATALOG_CACHE = { promise: null, data: null };
+const DEFAULT_RECIPE_FORM = "long_run";
+const DEFAULT_RECIPE_KEY = "long.steady";
+
+function loadRecipeCatalog() {
+  if (RECIPE_CATALOG_CACHE.data) return Promise.resolve(RECIPE_CATALOG_CACHE.data);
+  if (!RECIPE_CATALOG_CACHE.promise) {
+    RECIPE_CATALOG_CACHE.promise = request("/api/recipes")
+      .then((data) => {
+        RECIPE_CATALOG_CACHE.data = data;
+        return data;
+      })
+      .catch((error) => {
+        RECIPE_CATALOG_CACHE.promise = null;
+        throw error;
+      });
+  }
+  return RECIPE_CATALOG_CACHE.promise;
+}
+
+function findRecipeInCatalog(catalog, key) {
+  for (const form of catalog.forms) {
+    for (const recipe of form.recipes) {
+      if (recipe.key === key) return { recipe, form };
+    }
+  }
+  return null;
+}
+
+function findRecipeByForm(catalog, formName) {
+  const form = catalog.forms.find((entry) => entry.name === formName);
+  if (!form || form.recipes.length === 0) return null;
+  return { recipe: form.recipes[0], form };
+}
+
+function renderRecipeCategories(catalog, activeForm) {
+  const nav = $("#recipe-categories");
+  clearChildren(nav);
+  for (const form of catalog.forms) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "recipe-category";
+    button.textContent = form.label;
+    button.dataset.form = form.name;
+    if (form.recipes.length === 0) button.disabled = true;
+    if (form.name === activeForm) button.dataset.active = "true";
+    button.addEventListener("click", () => {
+      if (state.workout?.recipe?.form === form.name) return;
+      const next = findRecipeByForm(catalog, form.name);
+      if (!next) return;
+      state.workout.recipe = {
+        form: form.name,
+        key: next.recipe.key,
+        parameters: parameterDefaults(next.recipe.parameters),
+      };
+      renderRecipeDetail();
+      scheduleRecipePreview();
+    });
+    nav.appendChild(button);
+  }
+}
+
+function parameterDefaults(parameters) {
+  const defaults = {};
+  for (const param of parameters) {
+    if (param.default !== null && param.default !== undefined) {
+      defaults[param.name] = param.default;
+    }
+  }
+  return defaults;
+}
+
+function renderRecipeDetail() {
+  const catalog = RECIPE_CATALOG_CACHE.data;
+  if (!catalog || !state.workout?.recipe) return;
+  const { key, form } = state.workout.recipe;
+  const found = findRecipeInCatalog(catalog, key) ?? findRecipeByForm(catalog, form);
+  if (!found) return;
+  state.workout.recipe.key = found.recipe.key;
+  state.workout.recipe.form = found.recipe.form.name;
+  if (!state.workout.recipe.parameters) {
+    state.workout.recipe.parameters = parameterDefaults(found.recipe.parameters);
+  }
+  const select = $("#recipe-select");
+  clearChildren(select);
+  const recipeForm = catalog.forms.find((entry) => entry.name === found.form.name);
+  for (const recipe of recipeForm.recipes) {
+    const option = document.createElement("option");
+    option.value = recipe.key;
+    option.textContent = recipe.label;
+    if (recipe.key === found.recipe.key) option.selected = true;
+    select.appendChild(option);
+  }
+  select.onchange = (event) => {
+    const newKey = event.target.value;
+    const match = findRecipeInCatalog(catalog, newKey);
+    if (!match) return;
+    state.workout.recipe = {
+      form: match.form.name,
+      key: match.recipe.key,
+      parameters: parameterDefaults(match.recipe.parameters),
+    };
+    renderRecipeDetail();
+    scheduleRecipePreview();
+  };
+  $("#recipe-description").textContent = found.recipe.description;
+  renderRecipeDoseForm(found.recipe.parameters, state.workout.recipe.parameters);
+  renderRecipeCategories(catalog, found.form.name);
+}
+
+function renderRecipeDoseForm(parameters, values) {
+  const form = $("#recipe-dose-form");
+  clearChildren(form);
+  for (const param of parameters) {
+    const label = document.createElement("label");
+    label.className = "recipe-dose-field";
+    const caption = document.createElement("span");
+    caption.className = "recipe-dose-label";
+    caption.textContent = param.label;
+    label.appendChild(caption);
+    label.appendChild(_recipeInputFor(param, values));
+    form.appendChild(label);
+  }
+  form.oninput = () => scheduleRecipePreview();
+  form.onchange = () => scheduleRecipePreview();
+}
+
+function _recipeInputFor(param, values) {
+  const current = values[param.name];
+  if (param.type === "integer" || param.type === "number") {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = param.type === "integer" ? "1" : "0.1";
+    input.min = param.type === "integer" ? "1" : "0";
+    input.value = current ?? param.default ?? "";
+    input.dataset.paramName = param.name;
+    input.dataset.paramType = param.type;
+    return input;
+  }
+  if (param.type === "boolean") {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = Boolean(current ?? param.default ?? false);
+    input.dataset.paramName = param.name;
+    input.dataset.paramType = "boolean";
+    return input;
+  }
+  if (param.type === "pace_range") {
+    const wrapper = document.createElement("div");
+    wrapper.className = "recipe-pace-range";
+    const stored = Array.isArray(current)
+      ? current
+      : Array.isArray(param.default)
+        ? param.default
+        : ["", ""];
+    for (let index = 0; index < 2; index += 1) {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = index === 0 ? "5:00" : "5:10";
+      input.value = stored[index] ?? "";
+      input.dataset.paramName = param.name;
+      input.dataset.paramIndex = String(index);
+      input.dataset.paramType = "pace_range";
+      wrapper.appendChild(input);
+    }
+    return wrapper;
+  }
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = current ?? param.default ?? "";
+  input.dataset.paramName = param.name;
+  input.dataset.paramType = "string";
+  return input;
+}
+
+function readRecipeParameters(parameters) {
+  const form = $("#recipe-dose-form");
+  const values = {};
+  for (const param of parameters) {
+    if (param.type === "pace_range") {
+      const parts = form.querySelectorAll(`[data-param-name="${param.name}"][data-param-type="pace_range"]`);
+      values[param.name] = Array.from(parts).map((node) => node.value);
+    } else if (param.type === "boolean") {
+      const node = form.querySelector(`[data-param-name="${param.name}"][data-param-type="boolean"]`);
+      values[param.name] = Boolean(node?.checked);
+    } else {
+      const node = form.querySelector(`[data-param-name="${param.name}"]`);
+      if (!node) continue;
+      if (param.type === "integer") values[param.name] = Number.parseInt(node.value, 10);
+      else if (param.type === "number") values[param.name] = Number.parseFloat(node.value);
+      else values[param.name] = node.value;
+    }
+  }
+  return values;
+}
+
+let RECIPE_PREVIEW_TOKEN = 0;
+function scheduleRecipePreview() {
+  if (!state.workout?.recipe) return;
+  const token = ++RECIPE_PREVIEW_TOKEN;
+  setAppStatus("validation", "Updating preview…");
+  const recipeState = state.workout.recipe;
+  const recipeKey = recipeState.key;
+  const recipeForm = recipeState.form;
+  const catalog = RECIPE_CATALOG_CACHE.data;
+  if (!catalog) return;
+  const found = findRecipeInCatalog(catalog, recipeKey);
+  if (!found) return;
+  const parameters = readRecipeParameters(found.recipe.parameters);
+  recipeState.parameters = parameters;
+  request("/api/recipes/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recipe_key: recipeKey, parameters }),
+  })
+    .then((preview) => {
+      if (token !== RECIPE_PREVIEW_TOKEN) return;
+      if (!state.workout || state.workout.mode !== "add") return;
+      applyRecipePreview(preview, recipeKey, recipeForm);
+    })
+    .catch(() => {
+      if (token !== RECIPE_PREVIEW_TOKEN) return;
+      $("#recipe-totals").textContent = "";
+    })
+    .finally(() => {
+      if (token === RECIPE_PREVIEW_TOKEN && state.program) {
+        setAppStatus("idle", state.program.program.name, `Starts ${state.program.program.start_week}`);
+      }
+    });
+}
+
+function applyRecipePreview(preview, recipeKey, formName) {
+  const totals = $("#recipe-totals");
+  const approxLabel = preview.distance_is_approximate || preview.duration_is_approximate ? " · approximate" : "";
+  totals.textContent = `Planned · ${distanceLabel(preview.estimated_distance_meters, preview.distance_is_approximate)} · ${durationLabel(preview.estimated_duration_seconds, preview.duration_is_approximate)}${approxLabel}`;
+  renderWeekPreview({ ...preview, recipe_key: recipeKey, form: formName });
+  renderRecipePreviewSteps(preview.steps);
+  state.workout.recipe.yaml = buildRecipeYaml(preview, state.workout.week, state.workout.day);
+  $("#workout-yaml").value = state.workout.recipe.yaml;
+  $("#save-workout-button").disabled = false;
+  updateWorkoutActions();
+}
+
+function renderRecipePreviewSteps(steps) {
+  const overview = $("#workout-overview");
+  const help = $("#workout-overview-help");
+  if (!Array.isArray(steps) || steps.length === 0) {
+    overview.classList.add("hidden");
+    return;
+  }
+  help.textContent = "Steps are generated by the recipe. The YAML editor below stays available for advanced edits.";
+  renderWorkoutSteps(steps);
+  overview.classList.remove("hidden");
+}
+
+function buildRecipeYaml(preview, weekNumber, day) {
+  const recipeId = `${preview.recipe_key.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${String(weekNumber).padStart(2, "0")}-d${day}`;
+  const stepLines = [];
+  appendRecipeStepLines(preview.steps, stepLines, 0);
+  const description = preview.description ? `description: ${JSON.stringify(preview.description)}\n` : "";
+  return `id: ${recipeId}\nday: ${day}\nname: ${JSON.stringify(preview.name)}\n${description}steps:\n${stepLines.join("\n")}\n`;
+}
+
+function appendRecipeStepLines(steps, lines, indent) {
+  const pad = "  ".repeat(indent + 1);
+  for (const step of steps) {
+    if (step.action === "repeat") {
+      lines.push(`${pad}- repeat:`);
+      lines.push(`${pad}    count: ${step.count}`);
+      lines.push(`${pad}    steps:`);
+      appendRecipeStepLines(step.steps, lines, indent + 2);
+      continue;
+    }
+    lines.push(`${pad}- ${step.action}: {`);
+    const parts = [];
+    if (step.end_kind === "time") parts.push(`time: ${secondsToCompact(step.end_value)}`);
+    else if (step.end_kind === "distance") parts.push(`distance: ${metersToCompact(step.end_value)}`);
+    if (step.pace_display) parts.push(`pace: "${step.pace_display.replace(" min/km", "")}"`);
+    if (step.note) parts.push(`note: ${JSON.stringify(step.note)}`);
+    lines.push(`${pad}    ${parts.join(", ")}`);
+    lines.push(`${pad}}`);
+  }
+}
+
+function secondsToCompact(seconds) {
+  const total = Math.max(1, Math.round(seconds || 0));
+  if (total % 60 === 0) return `${total / 60}m`;
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}m${secs}s`;
+}
+
+function metersToCompact(meters) {
+  const value = meters || 0;
+  if (value >= 1000 && value % 1000 === 0) return `${value / 1000}km`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}km`;
+  return `${Math.round(value)}m`;
+}
+
+function renderWeekPreview(preview) {
+  const list = $("#week-preview-days");
+  clearChildren(list);
+  const weekNumber = state.workout?.week;
+  const targetDay = state.workout?.day;
+  if (!weekNumber) return;
   const week = state.program.weeks.find((item) => item.week === weekNumber);
-  state.workout = { mode: "add", week: weekNumber };
+  if (!week) return;
+  const syntheticWorkout = {
+    id: "preview",
+    name: preview.name,
+    description: preview.description,
+    day: targetDay,
+    estimated_distance_meters: preview.estimated_distance_meters,
+    estimated_duration_seconds: preview.estimated_duration_seconds,
+    distance_is_approximate: preview.distance_is_approximate,
+    duration_is_approximate: preview.duration_is_approximate,
+    status: "planned",
+    can_move: true,
+    activity_link_source: null,
+    can_link_activity: false,
+    can_manage_activities: false,
+    activities: [],
+    actual_distance_meters: null,
+    actual_duration_seconds: null,
+    effective_distance_meters: preview.estimated_distance_meters,
+    effective_duration_seconds: preview.estimated_duration_seconds,
+    totals_are_actual: false,
+    steps: preview.steps,
+    yaml: "",
+  };
+  for (let day = 1; day <= 7; day += 1) {
+    const item = document.createElement("li");
+    item.className = "week-preview-day";
+    if (day === targetDay) item.classList.add("week-preview-day-target");
+    const header = document.createElement("div");
+    header.className = "week-preview-day-header";
+    const name = document.createElement("span");
+    name.textContent = WEEKDAYS[day - 1];
+    const date = document.createElement("span");
+    date.textContent = dateLabel(addDays(week.start_date, day - 1));
+    header.append(name, date);
+    item.appendChild(header);
+    const existing = week.workouts.find((workout) => workout.day === day);
+    const card = document.createElement("div");
+    card.className = "week-preview-card";
+    if (day === targetDay) {
+      card.classList.add("week-preview-card-target");
+      card.dataset.recipeForm = preview.form ?? "";
+      const title = document.createElement("strong");
+      title.textContent = preview.name;
+      const meta = document.createElement("span");
+      meta.textContent = `${preview.form_label ?? "Workout"} · ${distanceLabel(preview.estimated_distance_meters, preview.distance_is_approximate)} · ${durationLabel(preview.estimated_duration_seconds, preview.duration_is_approximate)}`;
+      card.append(title, meta);
+    } else if (existing) {
+      card.classList.add("week-preview-card-existing");
+      const title = document.createElement("strong");
+      title.textContent = existing.name.replace(/^Week \d+\s*-\s*/, "");
+      const meta = document.createElement("span");
+      meta.textContent = `${distanceLabel(existing.estimated_distance_meters, existing.distance_is_approximate)} · ${durationLabel(existing.estimated_duration_seconds, existing.duration_is_approximate)}`;
+      card.append(title, meta);
+    } else {
+      card.classList.add("week-preview-card-empty");
+      const empty = document.createElement("span");
+      empty.textContent = "No workout";
+      card.append(empty);
+    }
+    item.appendChild(card);
+    list.appendChild(item);
+  }
+  $("#week-preview-help").textContent = `New workout lands on ${WEEKDAYS[targetDay - 1]}. Existing days are unchanged.`;
+}
+
+async function openAddWorkout(weekNumber, day) {
+  const week = state.program.weeks.find((item) => item.week === weekNumber);
+  if (!week) return;
+  state.workout = {
+    mode: "add",
+    week: weekNumber,
+    day,
+    recipe: { form: DEFAULT_RECIPE_FORM, key: DEFAULT_RECIPE_KEY, parameters: {} },
+  };
   $("#workout-title").textContent = `Add workout · Week ${weekNumber}, ${WEEKDAYS[day - 1]}`;
-  $("#workout-editor-help").textContent = "Start with the valid template below. You may change every field, including the day, before validation.";
-  $("#workout-yaml-reference").classList.remove("hidden");
+  $("#workout-eyebrow").textContent = "Add workout";
+  $("#workout-editor-help").textContent = "Pick a recipe category, choose a recipe, and adjust the dose. The week preview and starter YAML update as you change the dose. The YAML editor below is always available for advanced edits.";
+  $("#workout-yaml-reference").classList.add("hidden");
   $("#delete-workout-button").classList.add("hidden");
   $("#workout-activities").classList.add("hidden");
   setWorkoutOverview(null);
-  $("#workout-yaml-details").open = true;
+  $("#workout-yaml-details").open = false;
+  $("#workout-yaml-summary").textContent = "Advanced: Edit workout YAML";
   $("#save-workout-button").textContent = "Validate & add";
-  $("#save-workout-button").disabled = false;
-  $("#workout-yaml").value = workoutTemplate(week, day);
+  $("#save-workout-button").disabled = true;
+  $("#add-workout-builder").classList.remove("hidden");
   openModal($("#workout-dialog"));
+  try {
+    const catalog = await loadRecipeCatalog();
+    if (!state.workout || state.workout.mode !== "add") return;
+    state.workout.recipe.form = DEFAULT_RECIPE_FORM;
+    state.workout.recipe.key = DEFAULT_RECIPE_KEY;
+    state.workout.recipe.parameters = {};
+    renderRecipeDetail();
+    scheduleRecipePreview();
+  } catch (error) {
+    $("#recipe-description").textContent = error.message;
+    $("#save-workout-button").disabled = true;
+  }
 }
 
 async function saveEdit(payload) {

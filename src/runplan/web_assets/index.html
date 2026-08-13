@@ -149,8 +149,8 @@
     </dialog>
 
     <dialog id="workout-dialog" class="workout-dialog">
-      <form id="workout-form">
-        <div class="dialog-heading"><div><p class="eyebrow">Advanced editor</p><h2 id="workout-title">Edit workout YAML</h2></div><button type="button" class="icon-button close">×</button></div>
+      <form id="workout-form" novalidate>
+        <div class="dialog-heading"><div><p class="eyebrow" id="workout-eyebrow">Advanced editor</p><h2 id="workout-title">Edit workout YAML</h2></div><button type="button" class="icon-button close">×</button></div>
         <p id="workout-editor-help" class="editor-help">The complete program is validated before saving.</p>
         <section id="workout-overview" class="workout-overview" aria-labelledby="workout-overview-title">
           <h3 id="workout-overview-title">Workout steps</h3>
@@ -162,8 +162,24 @@
           <div id="activity-list" class="activity-list" aria-live="polite"></div>
           <button id="activity-apply" type="button" class="button primary">Update activities</button>
         </section>
+        <section id="add-workout-builder" class="add-workout-builder hidden" aria-labelledby="add-workout-builder-title">
+          <h3 id="add-workout-builder-title">Build from a recipe</h3>
+          <p class="editor-help">Pick a category, choose a recipe, and adjust the dose. The week preview and starter YAML update as you change the dose. Advanced YAML editing stays available below.</p>
+          <nav id="recipe-categories" class="recipe-categories" aria-label="Recipe categories"></nav>
+          <div id="recipe-detail" class="recipe-detail">
+            <label class="recipe-select-label">Recipe<select id="recipe-select" required></select></label>
+            <p id="recipe-description" class="recipe-description"></p>
+            <div id="recipe-dose-form" class="recipe-dose"></div>
+            <div class="recipe-totals" id="recipe-totals" aria-live="polite"></div>
+          </div>
+          <section id="week-preview" class="week-preview" aria-labelledby="week-preview-title">
+            <h4 id="week-preview-title">Week preview</h4>
+            <p class="editor-help" id="week-preview-help"></p>
+            <ol id="week-preview-days" class="week-preview-days"></ol>
+          </section>
+        </section>
         <details id="workout-yaml-details" class="yaml-details">
-          <summary>Advanced: Edit workout YAML</summary>
+          <summary id="workout-yaml-summary">Advanced: Edit workout YAML</summary>
           <div class="yaml-details-content">
             <section id="workout-yaml-reference" class="yaml-reference hidden" aria-labelledby="workout-yaml-reference-title">
               <h3 id="workout-yaml-reference-title">Workout YAML syntax</h3>
