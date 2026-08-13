@@ -91,7 +91,8 @@ class WebActivityLinkService:
         workout = self._workout(program, week, workout_id)
         if not workout.get("can_manage_activities"):
             raise WebError(
-                HTTPStatus.CONFLICT, "Only missed or completed workouts can manage activities"
+                HTTPStatus.CONFLICT,
+                "Only scheduled, missed, or completed workouts can manage activities",
             )
         activities = self._activities(name, user.id, program, week, workout)
         return {"revision": program["revision"], "activities": activities}
@@ -135,7 +136,10 @@ class WebActivityLinkService:
                 }
             )
         apply_linked_activities(record, selected)
-        record["status"] = "completed" if selected else "missed"
+        if selected:
+            record["status"] = "completed"
+        elif record.get("status") != "scheduled":
+            record["status"] = "missed"
         if selected:
             record.pop("content_hash", None)
             record.pop("description", None)

@@ -179,9 +179,42 @@ def test_apply_rejects_stale_revision_invalid_ids_and_other_date(activity_servic
         )
 
 
-def test_scheduled_workout_cannot_manage_activities(activity_service) -> None:
+def test_scheduled_workout_can_manage_activities(activity_service) -> None:
     service, repository, _ = activity_service
     repository.load("characterization-plan")["workouts"]["week-01/mixed"]["status"] = "scheduled"
 
-    with pytest.raises(WebError, match="Only missed or completed"):
-        service.activity_links.candidates("plan.yaml", "1", "mixed", None)
+    result = service.activity_links.candidates("plan.yaml", "1", "mixed", None)
+
+    assert [item["id"] for item in result["activities"]] == [905, 900]
+
+
+def test_apply_links_scheduled_workout_as_completed(activity_service) -> None:
+    service, repository, _ = activity_service
+    repository.load("characterization-plan")["workouts"]["week-01/mixed"]["status"] = "scheduled"
+    revision = service.store.get("plan.yaml", repository=repository)["revision"]
+
+    service.activity_links.apply(
+        "plan.yaml",
+        "1",
+        "mixed",
+        {"revision": revision, "activityIds": [900]},
+    )
+
+    record = repository.load("characterization-plan")["workouts"]["week-01/mixed"]
+    assert record["status"] == "completed"
+    assert [item["activity_id"] for item in record["activities"]] == [900]
+    assert {item["link_source"] for item in record["activities"]} == {"manual"}
+
+
+def test_apply_with_no_selection_keeps_scheduled_status(activity_service) -> None:
+    service, repository, _ = activity_service
+    repository.load("characterization-plan")["workouts"]["week-01/mixed"]["status"] = "scheduled"
+    revision = service.store.get("plan.yaml", repository=repository)["revision"]
+
+    service.activity_links.apply(
+        "plan.yaml", "1", "mixed", {"revision": revision, "activityIds": []}
+    )
+
+    record = repository.load("characterization-plan")["workouts"]["week-01/mixed"]
+    assert record["status"] == "scheduled"
+    assert "activities" not in record

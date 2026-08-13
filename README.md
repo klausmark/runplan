@@ -427,16 +427,18 @@ it never deletes the recorded activity. The local Garmin workout and schedule
 IDs are then cleared while the activity ID and actual result remain. Run legacy file-based reconciliation
 without scheduling new workouts with:
 
-The web calendar can also link a `Missed` workout to one or more Garmin runs
-manually. Open **Edit** on a missed or completed workout to select unlinked runs
-from the workout's exact date, add more runs, or remove an activity associated
-automatically during sync. YAML changes and activity selections are saved with
-separate buttons so one kind of edit cannot silently overwrite the other.
-Runplan sums the selected activities' distance and duration and stores the
-earliest start as the completion time. These links exist only in Runplan: Garmin
-activities are never edited, and an activity already linked inside the active
-plan is not offered again. Workout deletion remains available in the same
-**Edit** dialog.
+The web calendar can also link a `Scheduled` or `Missed` workout to one or
+more Garmin runs manually. Open **Edit** on the workout to select unlinked
+runs from the workout's exact date, add more runs, or remove an activity
+associated automatically during sync. YAML changes and activity selections are
+saved with separate buttons so one kind of edit cannot silently overwrite the
+other. Selecting at least one activity marks the workout completed; opening
+the dialog for a scheduled workout without choosing an activity leaves it
+scheduled. Runplan sums the selected activities' distance and duration and
+stores the earliest start as the completion time. These links exist only in
+Runplan: Garmin activities are never edited, and an activity already linked
+inside the active plan is not offered again. Workout deletion remains
+available in the same **Edit** dialog.
 
 ```bash
 uv run runplan reconcile ~/.local/share/runplan/programs/morgan-example-5k.yaml
