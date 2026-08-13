@@ -347,6 +347,18 @@ def test_schedule_fields_visible_in_recipe_instantiation_summary() -> None:
         (lambda: RunWalkPyramidParameters(walk_minutes=0), "walk_minutes must be greater than 0"),
         (lambda: RecoveryDistanceParameters(target_km=0), "target_km must be greater than 0"),
         (lambda: LongSteadyParameters(target_km=0), "target_km must be greater than 0"),
+        (
+            lambda: LongSteadyParameters(target_km=10.0, pace=("", "")),
+            "pace must be a pair of non-empty",
+        ),
+        (
+            lambda: LongSteadyParameters(target_km=10.0, pace=("5:00", "")),
+            "pace must be a pair of non-empty",
+        ),
+        (
+            lambda: LongWithFinishParameters(target_km=10.0, pace=("", "")),
+            "pace must be a pair of non-empty",
+        ),
         (lambda: LongWithFinishParameters(target_km=0), "target_km must be greater than 0"),
         (lambda: LongWithHillSurgesParameters(target_km=0), "target_km must be greater than 0"),
         (lambda: LongWithHillSurgesParameters(surge_count=0), "surge_count must be greater than 0"),

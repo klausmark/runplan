@@ -1452,7 +1452,8 @@ function readRecipeParameters(parameters) {
   for (const param of parameters) {
     if (param.type === "pace_range") {
       const parts = form.querySelectorAll(`[data-param-name="${param.name}"][data-param-type="pace_range"]`);
-      values[param.name] = Array.from(parts).map((node) => node.value);
+      const sides = Array.from(parts).map((node) => node.value.trim());
+      values[param.name] = sides.every((side) => side === "") ? null : sides;
     } else if (param.type === "boolean") {
       const node = form.querySelector(`[data-param-name="${param.name}"][data-param-type="boolean"]`);
       values[param.name] = Boolean(node?.checked);

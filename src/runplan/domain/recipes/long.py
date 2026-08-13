@@ -39,8 +39,11 @@ class LongSteadyParameters(RecipeParameters):
     def __post_init__(self) -> None:
         if self.target_km <= 0:
             raise ValueError("target_km must be greater than 0")
-        if self.pace is not None and len(self.pace) != 2:
-            raise ValueError("pace must be a pair of min/km strings or None")
+        if self.pace is not None and (
+            len(self.pace) != 2
+            or not all(isinstance(side, str) and side.strip() for side in self.pace)
+        ):
+            raise ValueError("pace must be a pair of non-empty min/km strings or None")
 
 
 @recipe(
@@ -65,8 +68,11 @@ class LongWithFinishParameters(RecipeParameters):
     def __post_init__(self) -> None:
         if self.target_km <= 0:
             raise ValueError("target_km must be greater than 0")
-        if self.pace is not None and len(self.pace) != 2:
-            raise ValueError("pace must be a pair of min/km strings or None")
+        if self.pace is not None and (
+            len(self.pace) != 2
+            or not all(isinstance(side, str) and side.strip() for side in self.pace)
+        ):
+            raise ValueError("pace must be a pair of non-empty min/km strings or None")
 
 
 @recipe(

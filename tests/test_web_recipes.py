@@ -157,6 +157,38 @@ def test_preview_recipe_response_handles_pace_range_fields() -> None:
     assert paced_step["pace_display"] == "5:00-5:10 min/km"
 
 
+def test_preview_recipe_response_treats_blank_optional_pace_as_no_pace() -> None:
+    payload = preview_recipe_response(
+        {
+            "recipe_key": "long.steady",
+            "parameters": {"target_km": 10.0, "pace": ["", ""]},
+        }
+    )
+    assert payload["form"] == "long_run"
+    paced_step = next(step for step in payload["steps"] if step["action"] == "run")
+    assert paced_step["pace_display"] is None
+
+
+def test_preview_recipe_response_rejects_half_filled_pace_range(tmp_path: Path) -> None:
+    auth = fake_authenticator()
+    cookie = authorized_cookie(tmp_path, auth)
+    handler = request_recipes(
+        tmp_path,
+        "/api/recipes/preview",
+        body={
+            "recipe_key": "long.steady",
+            "parameters": {"target_km": 10.0, "pace": ["5:00", ""]},
+        },
+        method="POST",
+        authenticator=auth,
+        cookie=cookie,
+    )
+    handler.do_POST()
+    handler.send_response.assert_called_once_with(422)
+    payload = response_json(handler)
+    assert "both sides" in payload["error"]
+
+
 def test_preview_recipe_response_returns_422_on_invalid_parameters(tmp_path: Path) -> None:
     auth = fake_authenticator()
     cookie = authorized_cookie(tmp_path, auth)

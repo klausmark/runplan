@@ -136,6 +136,27 @@ def list_recipes_response() -> dict[str, Any]:
     }
 
 
+def _normalise_pace_range(value: Any) -> Any:
+    """Coerce a blank pace range to ``None`` and reject half-filled pairs.
+
+    A blank pair ``("", "")`` means the runner has no pace target, which is
+    valid for long runs. A half-filled pair is an actionable user error and
+    raises :class:`WebError` with a targeted message instead of letting it
+    leak into the workout YAML as ``"- min/km"``.
+    """
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return value
+    sides = [side.strip() if isinstance(side, str) else side for side in value]
+    if all(side == "" for side in sides):
+        return None
+    if any(side == "" for side in sides):
+        raise WebError(
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+            "pace range must have both sides or none; leave both blank for no pace target",
+        )
+    return tuple(sides)
+
+
 def _coerce_parameters(recipe: WorkoutRecipe, raw: dict[str, Any]) -> Any:
     """Turn a JSON dict into the typed parameter instance the recipe expects."""
     params_type = recipe.parameters_type
@@ -148,8 +169,8 @@ def _coerce_parameters(recipe: WorkoutRecipe, raw: dict[str, Any]) -> Any:
         annotation = _unwrap_optional(hints.get(name, field.type))
         if name in raw:
             value = raw[name]
-            if _is_pace_range(annotation) and value is not None:
-                kwargs[name] = tuple(value)
+            if _is_pace_range(annotation):
+                kwargs[name] = _normalise_pace_range(value)
             else:
                 kwargs[name] = value
             continue
