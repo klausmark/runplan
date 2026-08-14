@@ -291,9 +291,11 @@
           </section>
         </section>
         <section id="add-program-tab-rolling" class="add-program-tab hidden" role="tabpanel" data-tab="rolling">
-          <p class="editor-help">Runplan proposes the next weeks of your rolling plan based on the workouts already in your program — completed, missed, and planned. Accepting adds the proposed days to the same program file; re-calculate any time.</p>
+          <p class="editor-help">Create a rolling plan for your program. The recommender reads your completed, missed, and planned workouts and generates the next two weeks based on the inputs below.</p>
+          <section id="add-program-rolling-error" class="rolling-plan-error hidden" role="alert" aria-live="assertive"></section>
+          <section id="add-program-rolling-status" class="rolling-plan-status hidden" role="status" aria-live="polite"></section>
           <section class="rolling-plan-form" aria-labelledby="add-program-rolling-form-title">
-            <h3 id="add-program-rolling-form-title" class="visually-hidden">Proposal inputs</h3>
+            <h3 id="add-program-rolling-form-title" class="visually-hidden">Plan inputs</h3>
             <label class="rolling-plan-goal">Goal<select id="add-program-rolling-goal">
               <option value="maintain">Maintain</option>
               <option value="base">Base</option>
@@ -311,19 +313,12 @@
               <label><input type="checkbox" data-rolling-day="7"> Sun</label>
             </fieldset>
             <label class="rolling-plan-start">Start date<input id="add-program-rolling-start" type="date" required></label>
-            <label class="rolling-plan-horizon">Horizon (days)<input id="add-program-rolling-horizon" type="number" min="1" max="28" value="14" required inputmode="numeric"></label>
-            <div class="rolling-plan-actions">
-              <button type="button" id="add-program-rolling-recalculate" class="button secondary">Re-calculate</button>
-            </div>
           </section>
           <section id="add-program-rolling-preserve" class="rolling-plan-preserve">
-            <p><strong>Completed, missed, and already-planned workouts stay intact.</strong> Accepting adds the proposed days to your program without touching existing workouts or Garmin state.</p>
+            <p><strong>Completed, missed, and already-planned workouts stay intact.</strong> Creating the rolling plan appends the proposed days to your program without touching existing workouts or Garmin state.</p>
           </section>
-          <section id="add-program-rolling-status" class="rolling-plan-status hidden" role="status" aria-live="polite"></section>
-          <section id="add-program-rolling-error" class="rolling-plan-error hidden" role="alert"></section>
-          <section id="add-program-rolling-weeks" class="rolling-plan-weeks" aria-label="Proposed days"></section>
         </section>
-        <footer><button type="button" id="add-program-rolling-accept" class="button primary" disabled>Accept plan</button><button type="button" class="button secondary close">Close</button></footer>
+        <footer><button type="button" id="add-program-rolling-create" class="button primary">Create rolling plan</button><button type="button" class="button secondary close">Close</button></footer>
       </form>
     </dialog>
 

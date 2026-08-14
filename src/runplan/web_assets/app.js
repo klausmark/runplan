@@ -1,5 +1,9 @@
 const state = { users: [], user: null, program: null, pointerDrag: null, workout: null, move: null, undoMove: null };
 const $ = (selector) => document.querySelector(selector);
+function _bindClick(id, handler) {
+  const el = $(id);
+  if (el) el.addEventListener("click", handler);
+}
 const MOVE_THRESHOLD = 6;
 const TOUCH_LONG_PRESS_MS = 350;
 const TOUCH_CANCEL_DISTANCE = 10;
@@ -2193,23 +2197,26 @@ function switchAddProgramTab(tab) {
     section.classList.toggle("hidden", section.dataset.tab !== tab);
   }
   if (tab === "templates") loadTemplatesList();
-  if (tab === "rolling") initRollingPlanTab();
+  if (tab === "rolling") {
+    initRollingPlanTab();
+    const statusSection = $("#add-program-rolling-status");
+    statusSection.textContent = "Ready to create";
+    statusSection.classList.remove("hidden");
+  }
 }
 
 document.querySelectorAll('#add-program-dialog [role="tab"]').forEach((button) => {
   button.addEventListener("click", () => switchAddProgramTab(button.dataset.tab));
 });
 
-const ROLLING_PLAN_TOKEN = { value: 0 };
-const rollingPlanState = { horizon: null };
-
 function initRollingPlanTab() {
   if (!state.program || !state.user) return;
-  $("#add-program-rolling-error").classList.add("hidden");
-  $("#add-program-rolling-status").classList.add("hidden");
-  rollingPlanState.horizon = null;
-  $("#add-program-rolling-accept").disabled = true;
-  $("#add-program-rolling-recalculate").disabled = true;
+  const errorSection = $("#add-program-rolling-error");
+  const statusSection = $("#add-program-rolling-status");
+  errorSection.classList.add("hidden");
+  errorSection.textContent = "";
+  statusSection.classList.add("hidden");
+  statusSection.textContent = "";
   const lastWeek = state.program.weeks[state.program.weeks.length - 1];
   const startInput = $("#add-program-rolling-start");
   const lastMonday = lastWeek ? new Date(`${lastWeek.start_date}T00:00:00Z`) : null;
@@ -2220,8 +2227,6 @@ function initRollingPlanTab() {
   }
   const today = new Date().toISOString().slice(0, 10);
   startInput.min = today;
-  renderRollingPlanWeeks([], { loading: true });
-  scheduleRollingPlanRecalculate();
 }
 
 function _rollingPlanFormPayload() {
@@ -2230,194 +2235,63 @@ function _rollingPlanFormPayload() {
     .filter((node) => node.checked)
     .map((node) => Number(node.dataset.rollingDay));
   const start = $("#add-program-rolling-start").value;
-  const horizon = Number($("#add-program-rolling-horizon").value);
   return {
     userId: state.user.id,
     program_file: state.program.file,
     goal,
     training_days: days,
     start_date: start || undefined,
-    horizon_days: Number.isFinite(horizon) && horizon > 0 ? horizon : undefined,
   };
 }
 
-let rollingPlanTimer = null;
-function scheduleRollingPlanRecalculate() {
-  if (rollingPlanTimer) window.clearTimeout(rollingPlanTimer);
-  rollingPlanTimer = window.setTimeout(() => {
-    rollingPlanTimer = null;
-    requestRollingPlanPropose();
-  }, 250);
-}
-
-async function requestRollingPlanPropose() {
+async function createRollingPlan() {
   if (!state.program || !state.user) return;
-  const token = ++ROLLING_PLAN_TOKEN.value;
-  $("#add-program-rolling-recalculate").disabled = true;
-  $("#add-program-rolling-accept").disabled = true;
-  $("#add-program-rolling-error").classList.add("hidden");
-  $("#add-program-rolling-status").classList.add("hidden");
-  renderRollingPlanWeeks([], { loading: true });
+  const button = $("#add-program-rolling-create");
+  if (button.disabled) return;
+  const errorSection = $("#add-program-rolling-error");
+  const statusSection = $("#add-program-rolling-status");
+  button.classList.add("is-loading");
+  button.disabled = true;
+  errorSection.classList.add("hidden");
+  errorSection.textContent = "";
+  statusSection.textContent = "Creating rolling plan…";
+  statusSection.classList.remove("hidden");
+  setAppStatus("validation", "Creating rolling plan…");
   try {
-    const horizon = await request("/api/everyday/propose", {
+    const proposed = await request("/api/everyday/propose", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(_rollingPlanFormPayload()),
     });
-    if (token !== ROLLING_PLAN_TOKEN.value) return;
-    rollingPlanState.horizon = horizon;
-    renderRollingPlanWeeks(horizon.weeks || [], { loading: false });
-    const hasDays = (horizon.days || []).length > 0;
-    $("#add-program-rolling-accept").disabled = !hasDays;
-  } catch (error) {
-    if (token !== ROLLING_PLAN_TOKEN.value) return;
-    rollingPlanState.horizon = null;
-    renderRollingPlanWeeks([], { loading: false, error: error.message });
-  } finally {
-    $("#add-program-rolling-recalculate").disabled = false;
-  }
-}
-
-async function acceptRollingPlan() {
-  if (!rollingPlanState.horizon) return;
-  const acceptButton = $("#add-program-rolling-accept");
-  acceptButton.disabled = true;
-  setAppStatus("validation", "Saving rolling plan…");
-  try {
-    const payload = _rollingPlanFormPayload();
-    payload.horizon = rollingPlanState.horizon.horizon_payload;
-    await request("/api/everyday/accept", {
+    const dayCount = (proposed.days || []).length;
+    if (dayCount === 0) {
+      throw new Error(
+        "No training days generated — pick at least one training day or change the start date.",
+      );
+    }
+    const acceptPayload = { ..._rollingPlanFormPayload(), horizon: proposed.horizon_payload };
+    const accepted = await request("/api/everyday/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(acceptPayload),
     });
-    const days = (rollingPlanState.horizon.days || []).length;
-    rollingPlanState.horizon = null;
-    ROLLING_PLAN_TOKEN.value += 1;
+    const addedDays = (accepted.accepted?.days || []).length;
     $("#add-program-dialog").close();
     await loadProgram(state.program.file);
-    setAppStatus("saved", `Added ${days} day${days === 1 ? "" : "s"} to your rolling plan`);
+    setAppStatus("saved", `Added ${addedDays} day${addedDays === 1 ? "" : "s"} to your rolling plan`);
   } catch (error) {
-    showError(error.message);
+    console.error("createRollingPlan failed", error);
+    errorSection.textContent = error.message;
+    errorSection.classList.remove("hidden");
+    statusSection.classList.add("hidden");
     setAppStatus("failed", "Rolling plan failed");
-    acceptButton.disabled = false;
+  } finally {
+    button.classList.remove("is-loading");
+    button.disabled = false;
   }
 }
 
-function renderRollingPlanWeeks(weeks, { loading = false, error = null } = {}) {
-  const list = $("#add-program-rolling-weeks");
-  clearChildren(list);
-  const status = $("#add-program-rolling-status");
-  if (error) {
-    $("#add-program-rolling-error").textContent = error;
-    $("#add-program-rolling-error").classList.remove("hidden");
-    return;
-  }
-  $("#add-program-rolling-error").classList.add("hidden");
-  if (loading) {
-    status.textContent = "Calculating next weeks…";
-    status.classList.remove("hidden");
-    const empty = document.createElement("p");
-    empty.className = "rolling-plan-empty";
-    empty.textContent = "Preparing proposal…";
-    list.appendChild(empty);
-    return;
-  }
-  status.classList.add("hidden");
-  if (!weeks || weeks.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "rolling-plan-empty";
-    empty.textContent = "No training days scheduled in this horizon.";
-    list.appendChild(empty);
-    return;
-  }
-  for (const week of weeks) {
-    const section = document.createElement("section");
-    section.className = "rolling-plan-week";
-    const header = document.createElement("header");
-    header.className = "rolling-plan-week-header";
-    const title = document.createElement("h3");
-    title.textContent = week.label;
-    const summary = document.createElement("small");
-    const totalDays = week.days.length;
-    summary.textContent = `${totalDays} day${totalDays === 1 ? "" : "s"}`;
-    header.append(title, summary);
-    section.appendChild(header);
-    for (const day of week.days) {
-      section.appendChild(rollingPlanDayCard(day));
-    }
-    list.appendChild(section);
-  }
-}
-
-function rollingPlanDayCard(day) {
-  const card = document.createElement("article");
-  card.className = "rolling-plan-day";
-  const header = document.createElement("header");
-  header.className = "rolling-plan-day-header";
-  const weekday = document.createElement("span");
-  weekday.className = "rolling-plan-day-weekday";
-  weekday.textContent = WEEKDAYS[day.weekday - 1];
-  const date = document.createElement("span");
-  date.className = "rolling-plan-day-date";
-  date.textContent = day.date;
-  const form = document.createElement("span");
-  form.className = "rolling-plan-day-form";
-  form.textContent = day.form_label;
-  header.append(weekday, date, form);
-  const title = document.createElement("strong");
-  title.textContent = day.recipe_label;
-  const meta = document.createElement("span");
-  meta.className = "rolling-plan-day-meta";
-  if (day.estimate) {
-    const approx = day.estimate.distance_is_approximate || day.estimate.duration_is_approximate
-      ? " · approximate"
-      : "";
-    meta.textContent = `Planned · ${distanceLabel(day.estimate.estimated_distance_meters, day.estimate.distance_is_approximate)} · ${durationLabel(day.estimate.estimated_duration_seconds, day.estimate.duration_is_approximate)}${approx}`;
-  } else {
-    meta.textContent = `${day.recipe_key}`;
-  }
-  card.append(header, title, meta);
-  const reasoning = (day.reasoning || []).filter(Boolean);
-  if (reasoning.length > 0) {
-    const list = document.createElement("ul");
-    list.className = "rolling-plan-day-reasoning";
-    for (const text of reasoning) {
-      const li = document.createElement("li");
-      li.textContent = text;
-      list.appendChild(li);
-    }
-    card.appendChild(list);
-  }
-  const warnings = (day.warnings || []).filter(Boolean);
-  if (warnings.length > 0) {
-    const list = document.createElement("ul");
-    list.className = "rolling-plan-day-warnings";
-    for (const text of warnings) {
-      const li = document.createElement("li");
-      li.textContent = text;
-      list.appendChild(li);
-    }
-    card.appendChild(list);
-  }
-  return card;
-}
-
-$("#add-program-rolling-recalculate").addEventListener("click", () => requestRollingPlanPropose());
-$("#add-program-rolling-accept").addEventListener("click", () => acceptRollingPlan());
-$("#add-program-rolling-goal").addEventListener("change", () => scheduleRollingPlanRecalculate());
-$("#add-program-rolling-horizon").addEventListener("input", () => scheduleRollingPlanRecalculate());
-$("#add-program-rolling-start").addEventListener("change", () => scheduleRollingPlanRecalculate());
-document.querySelectorAll('[data-rolling-day]').forEach((node) =>
-  node.addEventListener("change", () => scheduleRollingPlanRecalculate())
-);
-$("#add-program-dialog").addEventListener("close", () => {
-  if (rollingPlanTimer) {
-    window.clearTimeout(rollingPlanTimer);
-    rollingPlanTimer = null;
-  }
-  ROLLING_PLAN_TOKEN.value += 1;
-});
+_bindClick("#add-program-rolling-create", () => createRollingPlan());
 $("#add-program-upload-button").addEventListener("click", () => $("#program-file-input").click());
 $("#user-select").addEventListener("change", (event) => {
   setMobileMenu(false, false);

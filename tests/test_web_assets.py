@@ -58,6 +58,22 @@ class TestWebAsset:
         handler.send_header.assert_any_call("Content-Type", "image/svg+xml; charset=utf-8")
         assert handler.wfile.getvalue().startswith(b"<svg")
 
+    def test_static_assets_set_cache_control_no_store(self, tmp_path: Path) -> None:
+        for path in ("/app.js", "/styles.css", "/favicon.svg"):
+            store = ProgramStore(tmp_path)
+            handler = object.__new__(make_handler(store, authenticator=fake_authenticator()))
+            handler.path = path
+            handler.client_address = ("127.0.0.1", 1234)
+            handler.headers = {}
+            handler.wfile = BytesIO()
+            handler.send_response = Mock()
+            handler.send_header = Mock()
+            handler.end_headers = Mock()
+
+            handler._get()
+
+            handler.send_header.assert_any_call("Cache-Control", "no-store")
+
     def test_theme_control_and_dark_palette_are_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
@@ -140,21 +156,70 @@ class TestWebAsset:
         assert 'id="add-program-dialog"' in html
         assert 'id="add-program-tab-rolling"' in html
         assert 'id="add-program-rolling-goal"' in html
-        assert 'id="add-program-rolling-horizon"' in html
         assert 'id="add-program-rolling-start"' in html
-        assert 'id="add-program-rolling-recalculate"' in html
-        assert 'id="add-program-rolling-accept"' in html
-        assert 'id="add-program-rolling-weeks"' in html
+        assert 'id="add-program-rolling-create"' in html
         assert 'data-rolling-day="1"' in html and 'data-rolling-day="7"' in html
+        assert 'id="add-program-rolling-horizon"' not in html
+        assert 'id="add-program-rolling-recalculate"' not in html
+        assert 'id="add-program-rolling-accept"' not in html
+        assert 'id="add-program-rolling-weeks"' not in html
         assert 'id="rolling-plan-dialog"' not in html
+        assert "Re-calculate" not in html
+        assert "Regenerate" not in html
         assert "function initRollingPlanTab(" in script
+        assert "function createRollingPlan(" in script
         assert 'request("/api/everyday/propose"' in script
         assert 'request("/api/everyday/accept"' in script
-        assert "function acceptRollingPlan(" in script
+        assert "function _setRollingPlanState(" not in script
+        assert "function acceptRollingPlan(" not in script
+        assert "function renderRollingPlanWeeks(" not in script
+        assert "function rollingPlanDayCard(" not in script
+        assert "scheduleRollingPlanRecalculate" not in script
+        assert "ROLLING_PLAN_TOKEN" not in script
         assert ".rolling-plan-form" in styles
-        assert ".rolling-plan-day" in styles
-        assert ".rolling-plan-week" in styles
+        assert ".rolling-plan-preserve" in styles
+        assert ".rolling-plan-error" in styles
+        assert ".rolling-plan-status" in styles
+        assert ".rolling-plan-day" not in styles
+        assert ".rolling-plan-week" not in styles
         assert ".rolling-plan-dialog" not in styles
+
+    def test_rolling_plan_creation_form_is_minimal(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        panel_start = html.index('id="add-program-tab-rolling"')
+        footer_start = html.index("<footer>", panel_start)
+        panel = html[panel_start:footer_start]
+        assert 'id="add-program-rolling-goal"' in panel
+        assert 'id="add-program-rolling-start"' in panel
+        assert 'data-rolling-day="1"' in panel and 'data-rolling-day="7"' in panel
+        assert 'id="add-program-rolling-horizon"' not in panel
+        assert 'id="add-program-rolling-recalculate"' not in panel
+        assert 'id="add-program-rolling-accept"' not in panel
+        footer = html[footer_start : html.index("</footer>", footer_start)]
+        assert ">Create rolling plan<" in footer
+        assert ">Accept plan<" not in footer
+        assert ">Regenerate<" not in footer
+        assert "No training days generated" in script
+        create_start = script.index("function createRollingPlan(")
+        # End of the function is the closing brace at column 1 (top-level function),
+        # reached by walking past nested braces.
+        depth = 0
+        end = create_start
+        for index in range(create_start, len(script)):
+            char = script[index]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    break
+        create_block = script[create_start:end]
+        assert 'request("/api/everyday/propose"' in create_block
+        assert 'request("/api/everyday/accept"' in create_block
+        assert "Added ${addedDays} day" in create_block
+        assert '"is-loading"' in create_block
 
     def test_coaching_guide_section_is_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
