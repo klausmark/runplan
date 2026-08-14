@@ -1,5 +1,14 @@
 """Runplan application use cases."""
 
+from .everyday import (
+    AcceptedDay,
+    AcceptedHorizon,
+    EverydayError,
+    accept_horizon,
+    horizon_from_payload,
+    horizon_to_payload,
+    propose_horizon,
+)
 from .ports import GarminClient, ProgramRepository, StateRepository
 from .recipes import (
     InstantiateRecipeError,
@@ -17,6 +26,9 @@ from .sync import (
 )
 
 __all__ = [
+    "AcceptedDay",
+    "AcceptedHorizon",
+    "EverydayError",
     "GarminClient",
     "InstantiateRecipeError",
     "InstantiateRecipeResult",
@@ -25,10 +37,14 @@ __all__ = [
     "SyncAction",
     "SyncPlan",
     "SyncResult",
+    "accept_horizon",
     "delete_all_managed",
     "delete_managed_workouts",
+    "horizon_from_payload",
+    "horizon_to_payload",
     "instantiate_recipe",
     "plan_program_weeks",
+    "propose_horizon",
     "sync_program_week",
     "synchronize_program_week",
     "synchronize_program_weeks",

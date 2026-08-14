@@ -42,6 +42,7 @@ def build_parser(program_directory: Path) -> argparse.ArgumentParser:
     _add_serve_command(commands, program_directory)
     _add_reconcile_command(commands)
     _add_generate_command(commands)
+    _add_everyday_command(commands)
     return parser
 
 
@@ -179,4 +180,68 @@ def _add_generate_command(commands: Any) -> None:
         "--output",
         type=Path,
         help="Output file (default: stdout)",
+    )
+
+
+def _add_everyday_command(commands: Any) -> None:
+    everyday = commands.add_parser(
+        "everyday",
+        help="Rolling everyday plan workflow",
+    )
+    sub = everyday.add_subparsers(dest="everyday_command", required=True)
+    propose = sub.add_parser("propose", help="Propose the next 14 days")
+    propose.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
+    propose.add_argument(
+        "--start",
+        help="ISO date for the horizon start (default: Monday after the last program week)",
+    )
+    propose.add_argument(
+        "--goal",
+        choices=("maintain", "base", "build", "peak"),
+        default="maintain",
+        help="Broad goal that tunes key-workout frequency",
+    )
+    propose.add_argument(
+        "--known-easy-pace",
+        help="5K best time, e.g. '30:00' (default: 30:00)",
+    )
+    propose.add_argument(
+        "--training-days",
+        help="Comma-separated weekdays (1-7) the runner CAN train on",
+    )
+    propose.add_argument(
+        "--long-run-day",
+        type=int,
+        help="Preferred long-run weekday (1-7)",
+    )
+    propose.add_argument(
+        "--current-weekly-km",
+        type=float,
+        default=0.0,
+        help="Soft weekly volume target in kilometres (default: 0, no target)",
+    )
+    propose.add_argument(
+        "--horizon-days",
+        type=int,
+        default=14,
+        help="Horizon length in days (default: 14)",
+    )
+    propose.add_argument(
+        "--format",
+        choices=("overview", "json"),
+        default="overview",
+        help="Output format (default: overview)",
+    )
+    propose.add_argument(
+        "--output",
+        type=Path,
+        help="Write the JSON proposal to this file (always written for json format)",
+    )
+    accept = sub.add_parser("accept", help="Write the most recent proposal into the program")
+    accept.add_argument("yaml_file", type=Path, help="Path to the program YAML file")
+    accept.add_argument(
+        "--proposal",
+        type=Path,
+        required=True,
+        help="Path to the JSON proposal file produced by `everyday propose --format json`",
     )

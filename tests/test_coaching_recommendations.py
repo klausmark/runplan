@@ -29,7 +29,7 @@ from runplan import (
     recipes_by_form,
     recommend_workouts,
 )
-from runplan.application.coaching.recommend import _classify_load
+from runplan.domain.load import classify_load
 from runplan.domain.recipes import (
     RecoveryRunParameters,
 )
@@ -428,7 +428,7 @@ def test_classify_load_low_at_exactly_80_percent_with_5km_margin() -> None:
     baseline = _baseline_only(_TARGET_DAY, km_per_week=25.0)
     low_recent = (_completed(_TARGET_DAY - timedelta(days=2), EASY_RUN, km=4.0, minutes=25),)
 
-    assert _classify_load(baseline + low_recent, _TARGET_DAY).value == "low"
+    assert classify_load(baseline + low_recent, _TARGET_DAY).value == "low"
 
 
 def test_classify_load_normal_at_81_percent_of_baseline() -> None:
@@ -439,7 +439,7 @@ def test_classify_load_normal_at_81_percent_of_baseline() -> None:
         _completed(_TARGET_DAY - timedelta(days=6), EASY_RUN, km=7.0, minutes=35),
     )
 
-    assert _classify_load(baseline + mild_recent, _TARGET_DAY).value == "normal"
+    assert classify_load(baseline + mild_recent, _TARGET_DAY).value == "normal"
 
 
 def test_classify_load_high_at_exactly_125_percent_with_5km_margin() -> None:
@@ -449,7 +449,7 @@ def test_classify_load_high_at_exactly_125_percent_with_5km_margin() -> None:
         _completed(_TARGET_DAY - timedelta(days=3), EASY_RUN, km=13.0, minutes=75),
     )
 
-    assert _classify_load(baseline + high_recent, _TARGET_DAY).value == "high"
+    assert classify_load(baseline + high_recent, _TARGET_DAY).value == "high"
 
 
 def test_classify_load_normal_at_124_percent_of_baseline() -> None:
@@ -459,13 +459,13 @@ def test_classify_load_normal_at_124_percent_of_baseline() -> None:
         _completed(_TARGET_DAY - timedelta(days=3), EASY_RUN, km=9.0, minutes=55),
     )
 
-    assert _classify_load(baseline + mild_recent, _TARGET_DAY).value == "normal"
+    assert classify_load(baseline + mild_recent, _TARGET_DAY).value == "normal"
 
 
 def test_classify_load_unknown_when_baseline_has_few_weeks() -> None:
     sparse = (_completed(_TARGET_DAY - timedelta(days=10), EASY_RUN, km=5, minutes=30),)
 
-    assert _classify_load(sparse, _TARGET_DAY).value == "unknown"
+    assert classify_load(sparse, _TARGET_DAY).value == "unknown"
 
 
 def test_classify_load_high_when_two_recent_key_workouts() -> None:
@@ -474,7 +474,7 @@ def test_classify_load_high_when_two_recent_key_workouts() -> None:
         _completed(_TARGET_DAY - timedelta(days=4), TEMPO_RUN, km=8, minutes=45),
     )
 
-    assert _classify_load(history, _TARGET_DAY).value == "high"
+    assert classify_load(history, _TARGET_DAY).value == "high"
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +511,7 @@ def test_eight_days_since_key_with_separator_passes_eligibility() -> None:
 def test_unknown_load_does_not_block_but_does_not_enable_key() -> None:
     sparse = (_completed(_TARGET_DAY - timedelta(days=10), EASY_RUN, km=5, minutes=30),)
 
-    assert _classify_load(sparse, _TARGET_DAY).value == "unknown"
+    assert classify_load(sparse, _TARGET_DAY).value == "unknown"
 
     result = recommend_workouts(
         CoachingContext(recent_completed_workouts=sparse),

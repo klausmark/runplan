@@ -44,3 +44,12 @@ Categories and recipes are authoring concepts. They are not fields in program
 YAML. Categories are shown to the runner as a label on workout cards and in
 export headings, but they live in local application state rather than inside
 the program file.
+
+The **rolling everyday plan** is an always-on mode that proposes the next 14
+days based on the runner's profile, a broad goal, completed workouts, and
+recent load. The proposal is previewable as one extra working week that can be
+accepted (written into the program YAML) or regenerated with different flags.
+The CLI exposes `everyday propose` and `everyday accept`; the Studio surfaces
+the same workflow in Step 11. Accepting the plan appends new workout blocks to
+the existing program rather than writing a separate file, so the runner's
+existing tracking and Garmin state remain intact.

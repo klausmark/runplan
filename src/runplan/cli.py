@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import re
 import sys
 from argparse import Namespace
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+from .application.everyday import EverydayError
 from .application.export import build_program_export
 from .application.ports import StateRepository
 from .application.preview import build_preview
@@ -182,6 +184,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_reconcile(arguments)
     if arguments.command == "generate":
         return run_generate(arguments)
+    if arguments.command == "everyday":
+        return run_everyday(arguments)
     return 2
 
 
@@ -395,12 +399,176 @@ def run_generate(arguments: Namespace) -> int:
     return 0
 
 
+def run_everyday(arguments: Namespace) -> int:
+    """Dispatch the ``everyday`` subcommand to ``propose`` or ``accept``."""
+    subcommand = getattr(arguments, "everyday_command", None)
+    if subcommand == "propose":
+        return run_everyday_propose(arguments)
+    if subcommand == "accept":
+        return run_everyday_accept(arguments)
+    print("Unsupported everyday subcommand. Use 'propose' or 'accept'.", file=sys.stderr)
+    return 2
+
+
+def _default_everyday_training_days() -> tuple[int, ...]:
+    return (1, 3, 5)
+
+
+def _parse_everyday_training_days(raw: str | None) -> tuple[int, ...]:
+    if not raw:
+        return _default_everyday_training_days()
+    cleaned = sorted({int(part.strip()) for part in raw.split(",") if part.strip()})
+    return tuple(cleaned)
+
+
+def _parse_five_k_seconds(raw: str | None) -> float:
+    if not raw:
+        return 30 * 60.0
+    text = raw.strip()
+    if not text:
+        return 30 * 60.0
+    if ":" not in text:
+        return float(text)
+    minutes, seconds = text.split(":")
+    return int(minutes) * 60 + int(seconds)
+
+
+def _resolve_horizon_start(yaml_file: Path, requested: str | None) -> date:
+    """Return the proposal's start date.
+
+    If ``requested`` is set, use it. Otherwise, read the program's last
+    week and return the Monday after it.
+    """
+    if requested:
+        return date.fromisoformat(requested)
+    from .parsing.yaml_loader import load_program_model, parse_iso_week
+
+    document = _yaml_doc(yaml_file)
+    model = load_program_model(document)
+    weeks = sorted(model.weeks, key=lambda week: week.number)
+    if not weeks:
+        raise ValueError("program has no weeks; cannot derive a horizon start")
+    last_week = weeks[-1]
+    _, start_date = parse_iso_week(model.start_week)
+    return start_date + timedelta(days=last_week.number * 7)
+
+
+def _yaml_doc(yaml_file: Path) -> dict[str, Any]:
+    """Read the raw YAML document for a program file."""
+    from ruamel.yaml import YAML
+
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    document = yaml.load(yaml_file.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise ValueError("program YAML must be an object")
+    return document
+
+
+def run_everyday_propose(arguments: Namespace) -> int:
+    """Propose the next 14 days of workouts for the runner's program."""
+    from .application.everyday import horizon_to_payload, propose_horizon
+    from .domain.everyday import EverydayProfile
+    from .presentation.everyday import format_everyday_horizon
+    from .state.yaml_program_repository import YamlProgramRepository
+
+    try:
+        profile = EverydayProfile(
+            five_k_seconds=_parse_five_k_seconds(getattr(arguments, "known_easy_pace", None)),
+            weekly_km_target=float(getattr(arguments, "current_weekly_km", 0.0) or 0.0),
+            training_days=_parse_everyday_training_days(getattr(arguments, "training_days", None)),
+            preferred_long_run_day=getattr(arguments, "long_run_day", None),
+        )
+        start_date = _resolve_horizon_start(arguments.yaml_file, getattr(arguments, "start", None))
+        horizon_days = int(getattr(arguments, "horizon_days", 14))
+        goal = getattr(arguments, "goal", "maintain")
+        repository = YamlProgramRepository(arguments.yaml_file)
+        horizon = propose_horizon(
+            program_id=_load_program_id(arguments.yaml_file),
+            profile=profile,
+            goal=goal,
+            start_date=start_date,
+            horizon_days=horizon_days,
+            repository=repository,
+        )
+    except (WorkoutDefinitionError, ValueError, EverydayError) as exc:
+        print(f"Everyday propose failed: {exc}", file=sys.stderr)
+        return 2
+    except FileNotFoundError as exc:
+        print(f"Everyday propose failed: {exc}", file=sys.stderr)
+        return 5
+
+    output_path = getattr(arguments, "output", None)
+    output_format = getattr(arguments, "format", "overview")
+    if output_format == "json" or output_path is not None:
+        json_path = output_path or Path(str(arguments.yaml_file) + ".proposal.json")
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(
+            json.dumps(horizon_to_payload(horizon), indent=2, sort_keys=False),
+            encoding="utf-8",
+        )
+        print(f"Proposal written to {json_path}", file=sys.stderr)
+    if output_format == "json":
+        return 0
+    print(format_everyday_horizon(horizon))
+    return 0
+
+
+def _load_program_id(yaml_file: Path) -> str:
+    """Return the ``program.id`` of the given YAML file."""
+    document = _yaml_doc(yaml_file)
+    program_block = document.get("program")
+    if not isinstance(program_block, dict):
+        raise ValueError("program YAML must contain a program block")
+    program_id = program_block.get("id")
+    if not isinstance(program_id, str):
+        raise ValueError("program.id must be a string")
+    return program_id
+
+
+def _load_horizon_from_proposal(proposal_path: Path):
+    """Read a JSON proposal and return the reconstructed :class:`EverydayHorizon`."""
+    from .application.everyday import horizon_from_payload
+
+    document = json.loads(proposal_path.read_text(encoding="utf-8"))
+    return horizon_from_payload(document)
+
+
+def run_everyday_accept(arguments: Namespace) -> int:
+    """Write a previously generated proposal into the program YAML."""
+    from .application.everyday import EverydayError, accept_horizon
+    from .state.yaml_program_repository import YamlProgramRepository
+
+    proposal_path = arguments.proposal
+    try:
+        horizon = _load_horizon_from_proposal(proposal_path)
+        repository = YamlProgramRepository(arguments.yaml_file)
+        result = accept_horizon(
+            horizon,
+            program_id=_load_program_id(arguments.yaml_file),
+            repository=repository,
+        )
+    except (WorkoutDefinitionError, ValueError, EverydayError) as exc:
+        print(f"Everyday accept failed: {exc}", file=sys.stderr)
+        return 2
+    except FileNotFoundError as exc:
+        print(f"Everyday accept failed: {exc}", file=sys.stderr)
+        return 5
+    print(f"Accepted {len(result.days)} days into {arguments.yaml_file}")
+    for day in result.days:
+        print(f"  {day.date} (week {day.week}, day {day.day}): {day.workout_id} ({day.recipe_key})")
+    return 0
+
+
 __all__ = [
     "build_parser",
     "add_week_selectors",
     "main",
     "parse_arguments",
     "prepare_sync_selections",
+    "run_everyday",
+    "run_everyday_accept",
+    "run_everyday_propose",
     "run_export",
     "run_generate",
     "run_hash_password",
