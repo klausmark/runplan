@@ -1,8 +1,10 @@
 """Placement of workouts within a week.
 
 The placement step merges the day assignment, the volume plan, and the
-variety pick into a concrete list of slots for one week. It also handles
-the dates where a B race or the goal race replaces the planned workout.
+recipe variety pick into a concrete list of slots for one week. Races
+and club sessions retain their raw builders because they are not recipe
+candidates; long, quality, and easy slots instantiate through the
+recipe catalogue.
 """
 
 from __future__ import annotations
@@ -11,17 +13,14 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from ..domain.models import Step
+from ..domain.recipes import RecipeParameters, WorkoutRecipe
+from ..parsing.yaml_models import build_step
 from .days import WeekAssignment
 from .inputs import BRace, ClubSession, GoalRace
 from .phase import Phase, PhaseKind
-from .workouts import (
-    build_long_steady,
-    build_race,
-    easy_builder,
-    easy_minutes_from_km,
-    long_run_builder,
-    quality_builder,
-)
+from .recipe_dose import easy_dose, long_run_dose, quality_dose
+from .workouts import build_long_steady, build_race
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,21 +31,49 @@ class Slot:
     workout_id: str
     name: str
     description: str | None
-    steps: tuple[dict, ...]
+    steps: tuple[Step, ...]
     long_run: bool = False
     quality: bool = False
     race: bool = False
+    recipe_key: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
             "id": self.workout_id,
             "day": self.day,
             "name": self.name,
-            "steps": list(self.steps),
+            "steps": [_step_to_dict(step) for step in self.steps],
         }
         if self.description:
             result["description"] = self.description
         return result
+
+
+def _step_to_dict(step: Step) -> dict[str, Any]:
+    """Render a :class:`Step` as a raw dict for snapshot comparisons."""
+    if step.action == "repeat":
+        return {
+            "repeat": {
+                "count": step.count,
+                "steps": [_step_to_dict(child) for child in step.steps],
+            }
+        }
+    payload: dict[str, Any] = {step.action: {}}
+    if step.end_kind == "time":
+        payload[step.action]["time"] = f"{int(step.end_value // 60)}m{int(step.end_value % 60)}s"
+    elif step.end_kind == "distance":
+        payload[step.action]["distance"] = f"{int(step.end_value)}m"
+    if step.pace:
+        fast, slow = step.pace
+        fast_min, fast_sec = divmod(int(fast), 60)
+        slow_min, slow_sec = divmod(int(slow), 60)
+        if fast == slow:
+            payload[step.action]["pace"] = f"{fast_min}:{fast_sec:02d} min/km"
+        else:
+            payload[step.action]["pace"] = (
+                f"{fast_min}:{fast_sec:02d}-{slow_min}:{slow_sec:02d} min/km"
+            )
+    return payload
 
 
 def _slot_id(week_number: int, day: int, role: str) -> str:
@@ -58,67 +85,110 @@ def _place_long_run(
     week_number: int,
     day: int,
     long_run_km: float,
-    style: str,
-    pace: list[str] | None,
+    recipe: WorkoutRecipe,
+    easy_pace_sec_per_km: list[Any] | None,
 ) -> Slot:
-    steps = long_run_builder(style, long_run_km, pace)
+    params = long_run_dose(
+        recipe,
+        target_km=long_run_km,
+        easy_pace_sec_per_km=tuple(easy_pace_sec_per_km or ())
+        if easy_pace_sec_per_km is not None
+        else None,
+    )
+    pair = recipe.instantiate(params)
     return Slot(
         day=day,
         workout_id=_slot_id(week_number, day, "long"),
-        name="Long run",
-        description=(
-            None if pace is None else f"Run {long_run_km:.1f} km at an easy, conversational pace."
-        ),
-        steps=tuple(steps),
+        name=pair.workout.name,
+        description=pair.workout.description,
+        steps=tuple(pair.workout.steps),
         long_run=True,
+        recipe_key=recipe.key,
     )
 
 
 def _place_quality(
     week_number: int,
     day: int,
-    style: str,
-    pace: list[str] | None,
-    phase: PhaseKind,
+    recipe: WorkoutRecipe,
+    easy_pace_sec_per_km: list[Any] | None,
+    phase: Phase,
 ) -> Slot:
-    name, steps = quality_builder(style, pace, week_number, phase)
+    recipe, params = _resolve_quality_recipe(
+        recipe,
+        week=week_number,
+        phase=phase.kind,
+        easy_pace_sec_per_km=easy_pace_sec_per_km,
+    )
+    pair = recipe.instantiate(params)
     return Slot(
         day=day,
         workout_id=_slot_id(week_number, day, "quality"),
-        name=name,
-        description=("Run the work intervals at a controlled effort and jog the recoveries."),
-        steps=tuple(steps),
+        name=pair.workout.name,
+        description=pair.workout.description,
+        steps=tuple(pair.workout.steps),
         quality=True,
+        recipe_key=recipe.key,
     )
+
+
+def _resolve_quality_recipe(
+    recipe: WorkoutRecipe,
+    *,
+    week: int,
+    phase: PhaseKind,
+    easy_pace_sec_per_km: list[Any] | None,
+) -> tuple[WorkoutRecipe, RecipeParameters]:
+    """Return the recipe plus parameters that match its declared form.
+
+    ``interval.track_1k`` collapses to a tempo recipe in the first few
+    weeks of the program. The dose calculator returns tempo parameters
+    in that case, so the helper swaps to the matching recipe instance
+    before instantiation.
+    """
+    from ..domain.recipes import get_recipe
+
+    params = quality_dose(
+        recipe,
+        week=week,
+        phase=phase,
+        easy_pace_sec_per_km=tuple(easy_pace_sec_per_km or ())
+        if easy_pace_sec_per_km is not None
+        else None,
+    )
+    if type(params).__name__ == recipe.parameters_type.__name__:
+        return recipe, params
+    swapped_key = _recipe_key_for_params(type(params).__name__)
+    return get_recipe(swapped_key), params
+
+
+def _recipe_key_for_params(parameters_type_name: str) -> str:
+    """Map recipe parameter type names back to their recipe keys."""
+    return {
+        "ContinuousTempoParameters": "tempo.continuous",
+        "CruiseIntervalsParameters": "tempo.cruise_intervals",
+        "Track400mParameters": "interval.track_400m",
+        "Track1kParameters": "interval.track_1k",
+        "HillRepeatsParameters": "interval.hill_repeats",
+        "FartlekParameters": "interval.fartlek",
+    }.get(parameters_type_name, "tempo.continuous")
 
 
 def _place_easy(
     week_number: int,
     day: int,
     target_km: float,
-    style: str,
+    recipe: WorkoutRecipe,
 ) -> Slot:
-    if target_km <= 1.5:
-        minutes = max(15, easy_minutes_from_km(target_km))
-        steps = [
-            {"warmup": "5m"},
-            {"run": {"time": f"{minutes}m"}},
-            {"cooldown": "5m"},
-        ]
-        return Slot(
-            day=day,
-            workout_id=_slot_id(week_number, day, "easy"),
-            name="Recovery run",
-            description="Run very easily and walk when the effort rises.",
-            steps=tuple(steps),
-        )
-    steps = easy_builder(style, target_km)
+    params = easy_dose(recipe, target_km=target_km)
+    pair = recipe.instantiate(params)
     return Slot(
         day=day,
         workout_id=_slot_id(week_number, day, "easy"),
-        name="Easy run",
-        description=("Run at an easy, conversational pace. Walk recoveries are fine."),
-        steps=tuple(steps),
+        name=pair.workout.name,
+        description=pair.workout.description,
+        steps=tuple(pair.workout.steps),
+        recipe_key=recipe.key,
     )
 
 
@@ -128,12 +198,14 @@ def _place_race(
     race_distance_km: float,
     race_kind: str,
 ) -> Slot:
+    raw = build_race(race_distance_km)
+    steps = tuple(build_step(item, f"steps[{index}]") for index, item in enumerate(raw, start=1))
     return Slot(
         day=day,
         workout_id=_slot_id(week_number, day, "race"),
         name="Goal 10K" if race_kind == "goal" else "Race",
         description=("Hold an even effort from start to finish. Walk breaks are allowed."),
-        steps=tuple(build_race(race_distance_km)),
+        steps=steps,
         race=True,
     )
 
@@ -144,21 +216,22 @@ def _slot_for_club(
     club: ClubSession,
 ) -> Slot:
     if club.distance_km is not None:
-        steps = build_long_steady(club.distance_km, None)
+        raw = build_long_steady(club.distance_km, None)
     else:
         minutes = int(club.duration_minutes or 30)
-        steps = [
+        raw = [
             {"warmup": "5m"},
             {"run": {"time": f"{minutes}m"}},
             {"cooldown": "5m"},
         ]
+    steps = tuple(build_step(item, f"steps[{index}]") for index, item in enumerate(raw, start=1))
     note = club.note or "Club session."
     return Slot(
         day=day,
         workout_id=_slot_id(week_number, day, "club"),
         name="Club session",
         description=note,
-        steps=tuple(steps),
+        steps=steps,
     )
 
 
@@ -168,15 +241,16 @@ def _place_b_race(
     race: BRace,
 ) -> Slot:
     if race.intensity in ("all-out", "controlled"):
-        steps = build_race(race.distance_km)
+        raw = build_race(race.distance_km)
     else:
-        steps = build_long_steady(race.distance_km, None)
+        raw = build_long_steady(race.distance_km, None)
+    steps = tuple(build_step(item, f"steps[{index}]") for index, item in enumerate(raw, start=1))
     return Slot(
         day=day,
         workout_id=_slot_id(week_number, day, "b-race"),
         name="B race",
         description=race.note or "Treat as a hard effort and recover afterwards.",
-        steps=tuple(steps),
+        steps=steps,
         race=True,
     )
 
@@ -187,11 +261,11 @@ def place_week(
     assignment: WeekAssignment,
     long_run_km: float,
     weekly_km: float,
-    long_run_style: str,
-    quality_style: str,
+    long_recipe: WorkoutRecipe,
+    quality_recipe: WorkoutRecipe,
+    easy_recipe: WorkoutRecipe,
     quality_per_week: int,
-    easy_style: str,
-    pace: list[str] | None,
+    easy_pace_sec_per_km: list[Any] | None,
     phase: Phase,
     club_sessions: tuple[ClubSession, ...],
     b_races: tuple[BRace, ...],
@@ -239,7 +313,13 @@ def place_week(
 
     if "long" not in consumed_kinds:
         slots.append(
-            _place_long_run(week_number, assignment.long_run_day, long_run_km, long_run_style, pace)
+            _place_long_run(
+                week_number,
+                assignment.long_run_day,
+                long_run_km,
+                long_recipe,
+                easy_pace_sec_per_km,
+            )
         )
         consumed_days.add(assignment.long_run_day)
 
@@ -253,9 +333,9 @@ def place_week(
                 _place_quality(
                     week_number,
                     assignment.quality_day,
-                    quality_style,
-                    pace,
-                    phase.kind,
+                    quality_recipe,
+                    easy_pace_sec_per_km,
+                    phase,
                 )
             )
             consumed_days.add(assignment.quality_day)
@@ -266,7 +346,7 @@ def place_week(
         if day in consumed_days:
             continue
         share = remaining_km / easy_count if easy_count else 0.0
-        slots.append(_place_easy(week_number, day, share, easy_style))
+        slots.append(_place_easy(week_number, day, share, easy_recipe))
         consumed_days.add(day)
         easy_count -= 1
 

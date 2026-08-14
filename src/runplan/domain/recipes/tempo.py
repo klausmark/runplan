@@ -19,20 +19,22 @@ def _parse_steps(raw: list[dict]) -> tuple[Step, ...]:
     return tuple(build_step(item, f"steps[{index}]") for index, item in enumerate(raw, start=1))
 
 
-def _format_pace(pace: tuple[str, str]) -> list[str]:
+def _format_pace(pace: tuple[str, str] | None) -> list[str] | None:
+    if pace is None:
+        return None
     return list(pace)
 
 
 @dataclass(frozen=True, slots=True)
 class ContinuousTempoParameters(RecipeParameters):
     minutes: int = 20
-    pace: tuple[str, str] = ("5:00", "5:00")
+    pace: tuple[str, str] | None = ("5:00", "5:00")
 
     def __post_init__(self) -> None:
         if self.minutes <= 0:
             raise ValueError("minutes must be greater than 0")
-        if len(self.pace) != 2:
-            raise ValueError("pace must be a pair of min/km strings")
+        if self.pace is not None and len(self.pace) != 2:
+            raise ValueError("pace must be a pair of min/km strings or None")
 
 
 @recipe(
@@ -53,15 +55,15 @@ def _continuous_tempo(params: ContinuousTempoParameters) -> tuple[Step, ...]:
 class CruiseIntervalsParameters(RecipeParameters):
     reps: int = 4
     rep_minutes: int = 5
-    pace: tuple[str, str] = ("5:00", "5:00")
+    pace: tuple[str, str] | None = ("5:00", "5:00")
 
     def __post_init__(self) -> None:
         if self.reps <= 0:
             raise ValueError("reps must be greater than 0")
         if self.rep_minutes <= 0:
             raise ValueError("rep_minutes must be greater than 0")
-        if len(self.pace) != 2:
-            raise ValueError("pace must be a pair of min/km strings")
+        if self.pace is not None and len(self.pace) != 2:
+            raise ValueError("pace must be a pair of min/km strings or None")
 
 
 @recipe(

@@ -69,6 +69,21 @@ def one_k_pace_to_five_k_seconds(one_k_pace_seconds_per_km: float) -> float:
     return one_k_pace_seconds_per_km * math.pow(FIVE_KM, RIEGEL_EXPONENT)
 
 
+def easy_pace_to_five_k_seconds(easy_pace_seconds_per_km: float) -> float:
+    """Predict the 5K race time implied by a known easy pace.
+
+    The easy running pace is assumed to be close to 10K race pace. The
+    10K time is the easy pace multiplied by ten kilometers; Riegel's
+    formula inverts that to the 5K time. The bridge lets the generator
+    reuse the central pace table (``intensity_pace_seconds``,
+    ``pace_zone``) when only an easy pace is available.
+    """
+    if easy_pace_seconds_per_km <= 0:
+        raise ValueError("easy_pace_seconds_per_km must be greater than 0")
+    ten_k_time = easy_pace_seconds_per_km * TEN_KM
+    return ten_k_time / math.pow(TEN_KM / FIVE_KM, RIEGEL_EXPONENT)
+
+
 def race_pace_seconds(five_k_seconds: float, distance_km: float) -> float:
     """Predict the average race pace for ``distance_km`` from a 5K time.
 
@@ -174,9 +189,11 @@ __all__ = [
     "TEMPO_OFFSET_SECONDS_PER_KM",
     "TEN_KM",
     "TRAINING_INTENSITY_OFFSETS",
+    "easy_pace_to_five_k_seconds",
     "five_k_pace_seconds",
     "format_pace_seconds",
     "intensity_pace_seconds",
+    "one_k_pace_to_five_k_seconds",
     "pace_zone",
     "parse_total_seconds",
     "race_pace_seconds",

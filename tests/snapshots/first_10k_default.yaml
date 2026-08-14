@@ -1,0 +1,625 @@
+program:
+  id: first-10k-2026-w32
+  name: First 10K - 2026-W32 (10K)
+  short_name: F10K
+  description: Deterministic first 10K program generated from a typed request. The
+    plan follows a soft pyramidal intensity distribution inspired by Knopp et al.
+    (2024) and uses a four-week microcycle with a forced recovery week. The final
+    week ends with a 10K test run.
+  start_week: 2026-W32
+weeks:
+- week: 1
+  focus: 'Foundation: easy volume and short intervals to build rhythm.'
+  workouts:
+  - id: week-01-easy-1
+    day: 1
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 34m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-01-easy-2
+    day: 2
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 69m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-01-long-7
+    day: 7
+    name: Steady long run
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 6km
+    - cooldown:
+        time: 10m
+    description: Continuous long run at a steady aerobic effort. Pair with an optional
+      effort-based pace range when known.
+- week: 2
+  focus: 'Foundation: easy volume and short intervals to build rhythm.'
+  workouts:
+  - id: week-02-easy-1
+    day: 1
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 36m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-02-easy-2
+    day: 2
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 73m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-02-long-7
+    day: 7
+    name: Long run with hill surges
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 6.5km
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m30s
+        - recovery:
+            time: 1m30s
+    - cooldown:
+        time: 10m
+    description: Easy long run with short hill surges inserted throughout. The count
+      scales with the target distance.
+- week: 3
+  focus: 'Foundation: easy volume and short intervals to build rhythm.'
+  workouts:
+  - id: week-03-easy-1
+    day: 1
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 38m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-03-easy-2
+    day: 2
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 76m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-03-long-7
+    day: 7
+    name: Long run with kickouts
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 7km
+    - repeat:
+        count: 3
+        steps:
+        - run:
+            time: 1m
+        - recovery:
+            time: 2m
+    - cooldown:
+        time: 10m
+    description: Easy long run with steady kickouts embedded to develop late-run strength
+      without breaking the aerobic intent.
+- week: 4
+  focus: 'Foundation: easy volume and short intervals to build rhythm.'
+  workouts:
+  - id: week-04-easy-1
+    day: 1
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 28m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-04-easy-2
+    day: 2
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 57m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-04-long-7
+    day: 7
+    name: Steady long run
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 6km
+    - cooldown:
+        time: 10m
+    description: Continuous long run at a steady aerobic effort. Pair with an optional
+      effort-based pace range when known.
+- week: 5
+  focus: 'Build: introduce quality work and grow the long run.'
+  workouts:
+  - id: week-05-long-1
+    day: 1
+    name: Long run with hill surges
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 6.8km
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m30s
+        - recovery:
+            time: 1m30s
+    - cooldown:
+        time: 10m
+    description: Easy long run with short hill surges inserted throughout. The count
+      scales with the target distance.
+  - id: week-05-easy-2
+    day: 2
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 30m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-05-easy-3
+    day: 3
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 61m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+- week: 6
+  focus: 'Build: introduce quality work and grow the long run.'
+  workouts:
+  - id: week-06-long-1
+    day: 1
+    name: Long run with kickouts
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 7.4km
+    - repeat:
+        count: 3
+        steps:
+        - run:
+            time: 1m
+        - recovery:
+            time: 2m
+    - cooldown:
+        time: 10m
+    description: Easy long run with steady kickouts embedded to develop late-run strength
+      without breaking the aerobic intent.
+  - id: week-06-easy-2
+    day: 2
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 33m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-06-easy-3
+    day: 3
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 66m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+- week: 7
+  focus: 'Build: introduce quality work and grow the long run.'
+  workouts:
+  - id: week-07-long-1
+    day: 1
+    name: Steady long run
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 8km
+    - cooldown:
+        time: 10m
+    description: Continuous long run at a steady aerobic effort. Pair with an optional
+      effort-based pace range when known.
+  - id: week-07-easy-2
+    day: 2
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 36m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-07-easy-3
+    day: 3
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 72m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+- week: 8
+  focus: 'Build: introduce quality work and grow the long run.'
+  workouts:
+  - id: week-08-long-1
+    day: 1
+    name: Long run with hill surges
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 6.2km
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m30s
+        - recovery:
+            time: 1m30s
+    - cooldown:
+        time: 10m
+    description: Easy long run with short hill surges inserted throughout. The count
+      scales with the target distance.
+  - id: week-08-easy-2
+    day: 2
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 28m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-08-easy-3
+    day: 3
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 56m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+- week: 9
+  focus: 'Peak: race-specific intensity and the longest run.'
+  workouts:
+  - id: week-09-easy-1
+    day: 1
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 31m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-09-long-2
+    day: 2
+    name: Long run with kickouts
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 6.8km
+    - repeat:
+        count: 3
+        steps:
+        - run:
+            time: 1m
+        - recovery:
+            time: 2m
+    - cooldown:
+        time: 10m
+    description: Easy long run with steady kickouts embedded to develop late-run strength
+      without breaking the aerobic intent.
+  - id: week-09-easy-3
+    day: 3
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 61m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+- week: 10
+  focus: 'Peak: race-specific intensity and the longest run.'
+  workouts:
+  - id: week-10-easy-1
+    day: 1
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 33m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-10-long-2
+    day: 2
+    name: Steady long run
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 7.4km
+    - cooldown:
+        time: 10m
+    description: Continuous long run at a steady aerobic effort. Pair with an optional
+      effort-based pace range when known.
+  - id: week-10-easy-3
+    day: 3
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 67m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+- week: 11
+  focus: 'Taper: reduce volume and keep one sharp session.'
+  workouts:
+  - id: week-11-easy-1
+    day: 1
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 20m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+  - id: week-11-long-2
+    day: 2
+    name: Long run with hill surges
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 4.4km
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m30s
+        - recovery:
+            time: 1m30s
+    - cooldown:
+        time: 10m
+    description: Easy long run with short hill surges inserted throughout. The count
+      scales with the target distance.
+  - id: week-11-easy-3
+    day: 3
+    name: Easy continuous run
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 39m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic effort for the prescribed time. Warm up and cool down
+      frame the main run.
+- week: 12
+  focus: 'Taper: reduce volume and keep one sharp session.'
+  workouts:
+  - id: week-12-easy-1
+    day: 1
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 20m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-12-long-2
+    day: 2
+    name: Long run with kickouts
+    steps:
+    - warmup:
+        time: 10m
+    - run:
+        distance: 4.4km
+    - repeat:
+        count: 3
+        steps:
+        - run:
+            time: 1m
+        - recovery:
+            time: 2m
+    - cooldown:
+        time: 10m
+    description: Easy long run with steady kickouts embedded to develop late-run strength
+      without breaking the aerobic intent.
+  - id: week-12-easy-3
+    day: 3
+    name: Easy run with strides
+    steps:
+    - warmup:
+        time: 5m
+    - run:
+        time: 39m
+    - repeat:
+        count: 4
+        steps:
+        - run:
+            time: 0m20s
+        - recovery:
+            time: 1m
+    - cooldown:
+        time: 5m
+    description: Steady aerobic run followed by four short strides to keep the neuromuscular
+      system sharp.
+  - id: week-12-race-7
+    day: 7
+    name: Race
+    steps:
+    - run:
+        distance: 10km
+    description: Hold an even effort from start to finish. Walk breaks are allowed.

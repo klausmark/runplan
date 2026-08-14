@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from ..domain.models import Program, Step, Week, Workout
+from ..domain.models import Program, Week, Workout
 from ..parsing.yaml_loader import parse_iso_week
 from .days import assign_program
 from .errors import GenerationError
@@ -23,9 +23,10 @@ from .placement import Slot, place_week
 from .progression import VolumePlan, build_volume_plan
 from .variety import (
     VarietyBoard,
-    pick_easy_kind,
-    pick_long_run_kind,
-    pick_quality_kind,
+    pick_easy_recipe,
+    pick_long_run_recipe,
+    pick_quality_recipe,
+    summary_stats,
 )
 
 
@@ -133,9 +134,9 @@ def compose_program(
         is_recovery = week_number in volume_plan.recovery_weeks
         is_taper = phase.kind is PhaseKind.TAPER
 
-        long_style, variety = pick_long_run_kind(variety, week_index)
-        quality_style, variety = pick_quality_kind(variety, week_index + 1)
-        easy_style, variety = pick_easy_kind(variety, week_index + 2)
+        long_recipe, variety = pick_long_run_recipe(variety, week_index)
+        quality_recipe, variety = pick_quality_recipe(variety, week_index + 1)
+        easy_recipe, variety = pick_easy_recipe(variety, week_index + 2)
 
         is_race_week = (
             request.goal_race.date is not None
@@ -148,11 +149,11 @@ def compose_program(
             assignment=assignment,
             long_run_km=volume_plan.long_run_km[week_index],
             weekly_km=volume_plan.weekly_km[week_index],
-            long_run_style=long_style,
-            quality_style=quality_style,
+            long_recipe=long_recipe,
+            quality_recipe=quality_recipe,
+            easy_recipe=easy_recipe,
             quality_per_week=request.quality_sessions_per_week,
-            easy_style=easy_style,
-            pace=pace,
+            easy_pace_sec_per_km=pace,
             phase=phase,
             club_sessions=request.club_sessions,
             b_races=b_races_in_window,
@@ -161,7 +162,7 @@ def compose_program(
             test_run_day=test_run_day if (is_final_week and not is_race_week) else None,
         )
 
-        workouts = tuple(_to_workout(slot, week_number) for slot in slots)
+        workouts = tuple(_to_workout(slot) for slot in slots)
         focus = _focus_text(phase.kind, is_recovery, is_race_week)
         weeks.append(Week(number=week_number, focus=focus, workouts=workouts))
         intensity_targets.append(target_for_phase(phase.kind, is_recovery or is_taper))
@@ -182,59 +183,26 @@ def compose_program(
         warnings=warnings,
         volume_plan=volume_plan,
         intensity_targets=tuple(intensity_targets),
-        variety_summary=variety.summary_for_result()
-        if hasattr(variety, "summary_for_result")
-        else _summary_stats(variety),
+        variety_summary=summary_stats(variety),
     )
 
 
-def _to_workout(slot: Slot, week_number: int) -> Workout:
+def _to_workout(slot: Slot) -> Workout:
     """Adapt a generated slot to the existing Runplan Workout model."""
-    steps = tuple(_to_step(step) for step in slot.steps)
     return Workout(
         id=slot.workout_id,
         day=slot.day,
         name=slot.name,
         description=slot.description,
-        steps=steps,
+        steps=tuple(slot.steps),
         schedule_date=date(1970, 1, 1),  # placeholder, replaced by parser
     )
 
 
-def _to_step(step: dict) -> Step:
-    """Convert a generated step dict to the domain Step dataclass."""
-    from ..parsing.yaml_loader import load_program_model
-
-    # Use the existing YAML loader to normalise a single-step program. This
-    # guarantees the generated steps round-trip through the same parser.
-    mini_program = {
-        "program": {"id": "tmp", "name": "tmp", "short_name": "TMP", "start_week": "2026-W01"},
-        "weeks": [
-            {
-                "week": 1,
-                "workouts": [
-                    {"id": "s1", "day": 1, "name": "s1", "steps": [step]},
-                ],
-            }
-        ],
-    }
-    model = load_program_model(mini_program)
-    return model.weeks[0].workouts[0].steps[0]
-
-
-def _format_pace(known_easy_pace_sec: tuple[int, int] | None) -> list[str] | None:
+def _format_pace(known_easy_pace_sec: tuple[int, int] | None) -> list[str | int] | None:
     if known_easy_pace_sec is None:
         return None
-    return [
-        f"{known_easy_pace_sec[0] // 60}:{known_easy_pace_sec[0] % 60:02d}",
-        f"{known_easy_pace_sec[1] // 60}:{known_easy_pace_sec[1] % 60:02d}",
-    ]
-
-
-def _summary_stats(board: VarietyBoard) -> dict[str, Any]:
-    from .variety import summary_stats as _summary
-
-    return _summary(board)
+    return list(known_easy_pace_sec)
 
 
 def _focus_text(phase: PhaseKind, recovery: bool, race_week: bool) -> str:

@@ -15,6 +15,7 @@ from runplan.domain import (
     RIEGEL_EXPONENT,
     TEMPO_OFFSET_SECONDS_PER_KM,
     TEN_KM,
+    easy_pace_to_five_k_seconds,
     five_k_pace_seconds,
     format_pace_seconds,
     intensity_pace_seconds,
@@ -158,3 +159,27 @@ def test_one_k_pace_to_five_k_seconds_rejects_non_positive_input() -> None:
         one_k_pace_to_five_k_seconds(0)
     with pytest.raises(ValueError):
         one_k_pace_to_five_k_seconds(-1)
+
+
+def test_easy_pace_to_five_k_seconds_inverts_riegel_for_10k_assumption() -> None:
+    # Easy pace ~ 10K race pace, so the implied 5K time should match the
+    # Riegel inversion: five_k_time = (easy_pace * 10) / (10/5)^RIEGEL_EXPONENT
+    easy_pace = 5 * 60 + 25  # 5:25 min/km
+    expected = easy_pace * TEN_KM / math.pow(TEN_KM / FIVE_KM, RIEGEL_EXPONENT)
+    assert easy_pace_to_five_k_seconds(easy_pace) == pytest.approx(expected)
+
+
+def test_easy_pace_to_five_k_seconds_routes_through_riegel() -> None:
+    # The resulting 5K time, fed back into race_pace_seconds for 10K, gives the
+    # original easy pace within the chart's 5s granularity.
+    easy_pace = 5 * 60 + 25
+    five_k = easy_pace_to_five_k_seconds(easy_pace)
+    ten_k_pace = race_pace_seconds(five_k, TEN_KM)
+    assert abs(ten_k_pace - easy_pace) <= 5
+
+
+def test_easy_pace_to_five_k_seconds_rejects_non_positive_input() -> None:
+    with pytest.raises(ValueError):
+        easy_pace_to_five_k_seconds(0)
+    with pytest.raises(ValueError):
+        easy_pace_to_five_k_seconds(-1)

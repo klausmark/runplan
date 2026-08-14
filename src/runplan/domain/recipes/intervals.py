@@ -25,20 +25,22 @@ def _parse_steps(raw: list[dict]) -> tuple[Step, ...]:
     return tuple(build_step(item, f"steps[{index}]") for index, item in enumerate(raw, start=1))
 
 
-def _format_pace(pace: tuple[str, str]) -> list[str]:
+def _format_pace(pace: tuple[str, str] | None) -> list[str] | None:
+    if pace is None:
+        return None
     return list(pace)
 
 
 @dataclass(frozen=True, slots=True)
 class Track400mParameters(RecipeParameters):
     reps: int = 6
-    pace: tuple[str, str] = ("4:30", "4:30")
+    pace: tuple[str, str] | None = ("4:30", "4:30")
 
     def __post_init__(self) -> None:
         if self.reps <= 0:
             raise ValueError("reps must be greater than 0")
-        if len(self.pace) != 2:
-            raise ValueError("pace must be a pair of min/km strings")
+        if self.pace is not None and len(self.pace) != 2:
+            raise ValueError("pace must be a pair of min/km strings or None")
 
 
 @recipe(
@@ -58,13 +60,13 @@ def _track_400m(params: Track400mParameters) -> tuple[Step, ...]:
 @dataclass(frozen=True, slots=True)
 class Track1kParameters(RecipeParameters):
     reps: int = 5
-    pace: tuple[str, str] = ("4:45", "4:45")
+    pace: tuple[str, str] | None = ("4:45", "4:45")
 
     def __post_init__(self) -> None:
         if self.reps <= 0:
             raise ValueError("reps must be greater than 0")
-        if len(self.pace) != 2:
-            raise ValueError("pace must be a pair of min/km strings")
+        if self.pace is not None and len(self.pace) != 2:
+            raise ValueError("pace must be a pair of min/km strings or None")
 
 
 @recipe(

@@ -267,3 +267,32 @@ def test_full_yaml_has_english_only_keys() -> None:
         re.MULTILINE,
     )
     assert danish_key.search(yaml) is None
+
+
+def test_default_request_snapshot_matches_known_yaml() -> None:
+    """Step 9 refactor keeps the generator's YAML output byte-stable.
+
+    The snapshot is regenerated from the recipe-aware generator; any
+    byte-level drift must be addressed in the same commit as the
+    refactor.
+    """
+    from pathlib import Path
+
+    result = compose_program(
+        GeneratorRequest(
+            start_week="2026-W32",
+            duration_weeks=12,
+            current_weekly_km=25,
+            current_longest_km=6,
+            training_days=TrainingDays(possible_days=(1, 2, 3, 4, 5, 6, 7), sessions_per_week=3),
+            quality_sessions_per_week=0,
+        ),
+        today=date(2026, 7, 1),
+    )
+    snapshot_path = Path(__file__).parent / "snapshots" / "first_10k_default.yaml"
+    yaml = plan_to_yaml(result)
+    assert snapshot_path.exists(), f"missing snapshot file at {snapshot_path}"
+    assert yaml == snapshot_path.read_text(encoding="utf-8"), (
+        "generator YAML drifted from the locked snapshot; review and "
+        "regenerate the snapshot file in the same commit if intentional"
+    )

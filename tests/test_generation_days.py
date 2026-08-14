@@ -13,8 +13,8 @@ from runplan.generation.days import (
 )
 from runplan.generation.variety import (
     VarietyBoard,
-    pick_long_run_kind,
-    pick_quality_kind,
+    pick_long_run_recipe,
+    pick_quality_recipe,
 )
 
 
@@ -59,8 +59,8 @@ def test_variety_avoids_repeating_consecutive_quality() -> None:
     board = VarietyBoard()
     kinds: list[str] = []
     for week in range(6):
-        kind, board = pick_quality_kind(board, week)
-        kinds.append(kind)
+        recipe, board = pick_quality_recipe(board, week)
+        kinds.append(recipe.key)
     for previous, current in zip(kinds, kinds[1:], strict=False):
         assert previous != current
 
@@ -69,8 +69,8 @@ def test_variety_avoids_repeating_consecutive_long_run() -> None:
     board = VarietyBoard()
     kinds: list[str] = []
     for week in range(6):
-        kind, board = pick_long_run_kind(board, week)
-        kinds.append(kind)
+        recipe, board = pick_long_run_recipe(board, week)
+        kinds.append(recipe.key)
     for previous, current in zip(kinds, kinds[1:], strict=False):
         assert previous != current
 
@@ -78,8 +78,8 @@ def test_variety_avoids_repeating_consecutive_long_run() -> None:
 def test_variety_summary_reflects_history() -> None:
     board = VarietyBoard()
     for week in range(6):
-        kind, board = pick_quality_kind(board, week)
-    history = board.quality_used
+        recipe, board = pick_quality_recipe(board, week)
+    history = board.quality_history
     assert len(history) == 6
     assert len(set(history)) >= 3
 
