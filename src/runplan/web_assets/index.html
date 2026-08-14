@@ -52,6 +52,7 @@
             <div id="add-program-menu" class="menu hidden" role="menu">
               <button type="button" data-add-action="upload" role="menuitem">Upload YAML file</button>
               <button type="button" data-add-action="templates" role="menuitem">Browse templates</button>
+              <button type="button" data-add-action="rolling" role="menuitem">Open rolling plan</button>
             </div>
           </div>
           <button id="sync-button" class="button primary">Sync Garmin</button>
@@ -266,6 +267,7 @@
         <nav class="tabs" aria-label="Add program tabs">
           <button type="button" class="tab" data-tab="upload" aria-selected="true" role="tab">Upload YAML</button>
           <button type="button" class="tab" data-tab="templates" aria-selected="false" role="tab">Templates</button>
+          <button type="button" class="tab" data-tab="rolling" aria-selected="false" role="tab">Rolling plan</button>
         </nav>
         <section id="add-program-tab-upload" class="add-program-tab" role="tabpanel" data-tab="upload">
           <p class="editor-help">Choose a valid Runplan YAML file. It will be validated, stored for the selected user, and set as the active program.</p>
@@ -288,7 +290,40 @@
             <footer class="dialog-footer inner"><button id="template-back-button" type="button" class="button secondary">Back</button><button id="template-use-button" class="button primary">Create program</button></footer>
           </section>
         </section>
-        <footer><button type="button" class="button secondary close">Close</button></footer>
+        <section id="add-program-tab-rolling" class="add-program-tab hidden" role="tabpanel" data-tab="rolling">
+          <p class="editor-help">Runplan proposes the next weeks of your rolling plan based on the workouts already in your program — completed, missed, and planned. Accepting adds the proposed days to the same program file; re-calculate any time.</p>
+          <section class="rolling-plan-form" aria-labelledby="add-program-rolling-form-title">
+            <h3 id="add-program-rolling-form-title" class="visually-hidden">Proposal inputs</h3>
+            <label class="rolling-plan-goal">Goal<select id="add-program-rolling-goal">
+              <option value="maintain">Maintain</option>
+              <option value="base">Base</option>
+              <option value="build">Build</option>
+              <option value="peak">Peak</option>
+            </select></label>
+            <fieldset class="rolling-plan-training-days">
+              <legend>Training days</legend>
+              <label><input type="checkbox" data-rolling-day="1" checked> Mon</label>
+              <label><input type="checkbox" data-rolling-day="2"> Tue</label>
+              <label><input type="checkbox" data-rolling-day="3" checked> Wed</label>
+              <label><input type="checkbox" data-rolling-day="4"> Thu</label>
+              <label><input type="checkbox" data-rolling-day="5" checked> Fri</label>
+              <label><input type="checkbox" data-rolling-day="6" checked> Sat</label>
+              <label><input type="checkbox" data-rolling-day="7"> Sun</label>
+            </fieldset>
+            <label class="rolling-plan-start">Start date<input id="add-program-rolling-start" type="date" required></label>
+            <label class="rolling-plan-horizon">Horizon (days)<input id="add-program-rolling-horizon" type="number" min="1" max="28" value="14" required inputmode="numeric"></label>
+            <div class="rolling-plan-actions">
+              <button type="button" id="add-program-rolling-recalculate" class="button secondary">Re-calculate</button>
+            </div>
+          </section>
+          <section id="add-program-rolling-preserve" class="rolling-plan-preserve">
+            <p><strong>Completed, missed, and already-planned workouts stay intact.</strong> Accepting adds the proposed days to your program without touching existing workouts or Garmin state.</p>
+          </section>
+          <section id="add-program-rolling-status" class="rolling-plan-status hidden" role="status" aria-live="polite"></section>
+          <section id="add-program-rolling-error" class="rolling-plan-error hidden" role="alert"></section>
+          <section id="add-program-rolling-weeks" class="rolling-plan-weeks" aria-label="Proposed days"></section>
+        </section>
+        <footer><button type="button" id="add-program-rolling-accept" class="button primary" disabled>Accept plan</button><button type="button" class="button secondary close">Close</button></footer>
       </form>
     </dialog>
 

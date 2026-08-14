@@ -125,6 +125,37 @@ class TestWebAsset:
         assert ".split-button" in styles
         assert ".add-program-dialog" in styles
 
+    def test_rolling_plan_tab_inside_add_program_dialog_is_packaged(self) -> None:
+        html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+        script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+        styles = (ASSET_DIR / "styles.css").read_text(encoding="utf-8")
+        assert 'data-add-action="rolling"' in html
+        assert "Open rolling plan" in html
+        tab_button_start = html.index('data-tab="rolling"')
+        panel_start = html.index('id="add-program-tab-rolling"')
+        dialog_start = html.index('id="add-program-dialog"')
+        dialog_end = html.index("</dialog>", dialog_start)
+        assert dialog_start < tab_button_start < dialog_end
+        assert dialog_start < panel_start < dialog_end
+        assert 'id="add-program-dialog"' in html
+        assert 'id="add-program-tab-rolling"' in html
+        assert 'id="add-program-rolling-goal"' in html
+        assert 'id="add-program-rolling-horizon"' in html
+        assert 'id="add-program-rolling-start"' in html
+        assert 'id="add-program-rolling-recalculate"' in html
+        assert 'id="add-program-rolling-accept"' in html
+        assert 'id="add-program-rolling-weeks"' in html
+        assert 'data-rolling-day="1"' in html and 'data-rolling-day="7"' in html
+        assert 'id="rolling-plan-dialog"' not in html
+        assert "function initRollingPlanTab(" in script
+        assert 'request("/api/everyday/propose"' in script
+        assert 'request("/api/everyday/accept"' in script
+        assert "function acceptRollingPlan(" in script
+        assert ".rolling-plan-form" in styles
+        assert ".rolling-plan-day" in styles
+        assert ".rolling-plan-week" in styles
+        assert ".rolling-plan-dialog" not in styles
+
     def test_coaching_guide_section_is_packaged(self) -> None:
         html = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
         script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
