@@ -165,6 +165,39 @@
         <section id="add-workout-builder" class="add-workout-builder hidden" aria-labelledby="add-workout-builder-title">
           <h3 id="add-workout-builder-title">Build from a recipe</h3>
           <p class="editor-help">Pick a category, choose a recipe, and adjust the dose. The week preview and starter YAML update as you change the dose. Advanced YAML editing stays available below.</p>
+          <section id="coaching-checkin" class="coaching-checkin" aria-labelledby="coaching-checkin-title">
+            <h4 id="coaching-checkin-title">Check in</h4>
+            <fieldset class="coaching-readiness">
+              <legend>How are you feeling today?</legend>
+              <label><input type="radio" name="readiness" value="low"> Tired</label>
+              <label><input type="radio" name="readiness" value="normal" checked> Normal</label>
+              <label><input type="radio" name="readiness" value="high"> Fresh</label>
+            </fieldset>
+            <div class="coaching-request-kind" role="group" aria-label="What do you want today?">
+              <button type="button" class="coaching-request-kind-button active" data-request-kind="default">Suggest</button>
+              <button type="button" class="coaching-request-kind-button" data-request-kind="easy">Easy</button>
+              <button type="button" class="coaching-request-kind-button" data-request-kind="recovery">Recovery</button>
+              <button type="button" class="coaching-request-kind-button" data-request-kind="key">Key workout</button>
+            </div>
+          </section>
+          <section id="coaching-recommendation" class="coaching-recommendation hidden" aria-labelledby="coaching-recommendation-title">
+            <p class="eyebrow">Coaching</p>
+            <h4 id="coaching-recommendation-title">Suggested workout</h4>
+            <p id="coaching-recommendation-form" class="coaching-recommendation-form"></p>
+            <p id="coaching-recommendation-reasoning"></p>
+            <ul id="coaching-recommendation-warnings" class="coaching-recommendation-warnings hidden"></ul>
+            <div class="coaching-controls">
+              <button type="button" id="coaching-easier" class="coaching-control">Make it easier</button>
+              <button type="button" id="coaching-harder" class="coaching-control">Make it harder</button>
+            </div>
+            <details id="coaching-alternatives">
+              <summary>Alternatives</summary>
+              <ol id="coaching-alternatives-list"></ol>
+            </details>
+          </section>
+          <section id="coaching-key-warning" class="coaching-warning hidden" role="alert">
+            <p>This week already has a key workout. Adding another key workout may break the key-workout rule.</p>
+          </section>
           <nav id="recipe-categories" class="recipe-categories" aria-label="Recipe categories"></nav>
           <div id="recipe-detail" class="recipe-detail">
             <label class="recipe-select-label">Recipe<select id="recipe-select" required></select></label>

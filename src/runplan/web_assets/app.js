@@ -1274,6 +1274,246 @@ steps:
 const RECIPE_CATALOG_CACHE = { promise: null, data: null };
 const DEFAULT_RECIPE_FORM = "long_run";
 const DEFAULT_RECIPE_KEY = "long.steady";
+const KEY_WORKOUT_FORMS_SET = new Set(["long_run", "tempo_run", "interval_workout"]);
+const REQUEST_KIND_VALUES = new Set(["default", "easy", "recovery", "key"]);
+
+function _addWorkoutIsoDate(weekStartDate, day) {
+  if (typeof weekStartDate !== "string" || !weekStartDate) return null;
+  const start = new Date(`${weekStartDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return null;
+  const offset = (day - 1) * 24 * 60 * 60 * 1000;
+  return new Date(start.getTime() + offset).toISOString().slice(0, 10);
+}
+
+function _coachingActiveForm(formName) {
+  if (!formName) return DEFAULT_RECIPE_FORM;
+  return formName;
+}
+
+function _coachingGetReadiness() {
+  const checked = document.querySelector('input[name="readiness"]:checked');
+  return checked ? checked.value : "normal";
+}
+
+function _coachingGetRequestKind() {
+  const active = document.querySelector(".coaching-request-kind-button.active");
+  return active ? active.dataset.requestKind : "default";
+}
+
+function _coachingSetRequestKind(value) {
+  for (const button of document.querySelectorAll(".coaching-request-kind-button")) {
+    button.classList.toggle("active", button.dataset.requestKind === value);
+  }
+}
+
+function _coachingEmpty() {
+  state.workout = state.workout || {};
+  state.workout.coaching = null;
+  const section = $("#coaching-recommendation");
+  section.classList.add("hidden");
+  $("#coaching-recommendation-title").textContent = "";
+  $("#coaching-recommendation-form").textContent = "";
+  $("#coaching-recommendation-reasoning").textContent = "";
+  const warnings = $("#coaching-recommendation-warnings");
+  warnings.replaceChildren();
+  warnings.classList.add("hidden");
+  const list = $("#coaching-alternatives-list");
+  list.replaceChildren();
+  $("#coaching-key-warning").classList.add("hidden");
+  $("#coaching-easier").disabled = true;
+  $("#coaching-harder").disabled = true;
+}
+
+function _coachingResetControls() {
+  _coachingSetRequestKind("default");
+  const normalRadio = document.querySelector('input[name="readiness"][value="normal"]');
+  if (normalRadio) normalRadio.checked = true;
+}
+
+function _coachingApplyPrimary() {
+  const recommendation = state.workout?.coaching;
+  if (!recommendation) return;
+  const primary = recommendation.primary;
+  state.workout.recipe = {
+    form: primary.form,
+    key: primary.recipe_key,
+    parameters: _coachingCopyParameters(primary.parameters),
+  };
+}
+
+function _coachingCopyParameters(parameters) {
+  if (!parameters) return {};
+  const copy = {};
+  for (const [key, value] of Object.entries(parameters)) {
+    if (Array.isArray(value)) copy[key] = value.slice();
+    else if (value && typeof value === "object") copy[key] = { ...value };
+    else copy[key] = value;
+  }
+  return copy;
+}
+
+function _coachingFindRecipeByKey(catalog, key) {
+  if (!catalog) return null;
+  for (const form of catalog.forms) {
+    for (const recipe of form.recipes) {
+      if (recipe.key === key) return { recipe, form };
+    }
+  }
+  return null;
+}
+
+function _coachingRenderRecommendations() {
+  const recommendation = state.workout?.coaching;
+  if (!recommendation) return;
+  const primary = recommendation.primary;
+  $("#coaching-recommendation").classList.remove("hidden");
+  $("#coaching-recommendation-title").textContent = primary.recipe_label;
+  $("#coaching-recommendation-form").textContent = primary.form_label;
+  $("#coaching-recommendation-reasoning").textContent = (recommendation.reasoning || []).join(" ");
+  const warnings = $("#coaching-recommendation-warnings");
+  warnings.replaceChildren();
+  const warningList = recommendation.warnings || [];
+  if (warningList.length > 0) {
+    for (const text of warningList) {
+      const li = document.createElement("li");
+      li.textContent = text;
+      warnings.appendChild(li);
+    }
+    warnings.classList.remove("hidden");
+  } else {
+    warnings.classList.add("hidden");
+  }
+  const list = $("#coaching-alternatives-list");
+  list.replaceChildren();
+  const alternatives = recommendation.alternatives || [];
+  for (const alternative of alternatives) {
+    const item = document.createElement("li");
+    item.className = "coaching-alternative";
+    const title = document.createElement("div");
+    title.className = "coaching-alternative-title";
+    title.textContent = alternative.recipe_label;
+    const meta = document.createElement("small");
+    meta.textContent = alternative.form_label;
+    meta.style.color = "var(--muted)";
+    title.appendChild(meta);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "coaching-alternative-button";
+    button.textContent = "Use";
+    button.addEventListener("click", () => _coachingChooseAlternative(alternative.recipe_key));
+    item.append(title, button);
+    list.appendChild(item);
+  }
+  const weekKeys = recommendation.week_key_forms || [];
+  const primaryIsKey = KEY_WORKOUT_FORMS_SET.has(primary.form);
+  const warningVisible = primaryIsKey && weekKeys.length > 0;
+  $("#coaching-key-warning").classList.toggle("hidden", !warningVisible);
+  const sameFormRecipes = _coachingSameFormRecipes(primary.form);
+  const recipesOfForm = sameFormRecipes.length;
+  const currentIndex = sameFormRecipes.indexOf(primary.recipe_key);
+  const easierDisabled = recipesOfForm < 2 || currentIndex <= 0;
+  const harderDisabled = recipesOfForm < 2 || currentIndex === -1 || currentIndex >= recipesOfForm - 1;
+  $("#coaching-easier").disabled = easierDisabled;
+  $("#coaching-harder").disabled = harderDisabled;
+  $("#coaching-easier").dataset.form = primary.form;
+  $("#coaching-harder").dataset.form = primary.form;
+}
+
+function _coachingSameFormRecipes(formName) {
+  const catalog = RECIPE_CATALOG_CACHE.data;
+  if (!catalog) return [];
+  const formEntry = catalog.forms.find((entry) => entry.name === formName);
+  if (!formEntry) return [];
+  return formEntry.recipes.map((recipe) => recipe.key);
+}
+
+function _coachingShiftRecipe(direction) {
+  const recommendation = state.workout?.coaching;
+  if (!recommendation) return;
+  const formName = recommendation.primary.form;
+  const recipes = _coachingSameFormRecipes(formName);
+  if (recipes.length < 2) return;
+  const currentIndex = recipes.indexOf(recommendation.primary.recipe_key);
+  if (currentIndex === -1) return;
+  const nextIndex = direction === "easier"
+    ? Math.max(0, currentIndex - 1)
+    : Math.min(recipes.length - 1, currentIndex + 1);
+  if (nextIndex === currentIndex) return;
+  _coachingChooseAlternative(recipes[nextIndex]);
+}
+
+function _coachingChooseAlternative(recipeKey) {
+  const recommendation = state.workout?.coaching;
+  if (!recommendation) return;
+  const all = [recommendation.primary, ...recommendation.alternatives];
+  const match = all.find((item) => item.recipe_key === recipeKey);
+  if (!match) return;
+  state.workout.recipe = {
+    form: match.form,
+    key: match.recipe_key,
+    parameters: _coachingCopyParameters(match.parameters),
+  };
+  renderRecipeDetail();
+  scheduleRecipePreview();
+  _coachingApplyPrimary();
+  _coachingRenderRecommendations();
+}
+
+async function _coachingLoadRecommendation() {
+  if (!state.workout || state.workout.mode !== "add" || !state.program) return;
+  const week = state.program.weeks.find((item) => item.week === state.workout.week);
+  if (!week) return;
+  const targetDate = _addWorkoutIsoDate(week.start_date, state.workout.day);
+  if (!targetDate) return;
+  const payload = {
+    userId: state.user.id,
+    program_file: state.program.file,
+    target_day: targetDate,
+    week: state.workout.week,
+    readiness: _coachingGetReadiness(),
+    request_kind: _coachingGetRequestKind(),
+  };
+  try {
+    const recommendation = await request("/api/coaching/recommendation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!state.workout || state.workout.mode !== "add") return;
+    state.workout.coaching = recommendation;
+    _coachingApplyPrimary();
+    _coachingRenderRecommendations();
+    renderRecipeDetail();
+    scheduleRecipePreview();
+  } catch (error) {
+    if (!state.workout || state.workout.mode !== "add") return;
+    _coachingEmpty();
+    $("#coaching-recommendation-reasoning").textContent = error.message || "Could not load coaching recommendation";
+    $("#coaching-recommendation").classList.remove("hidden");
+  }
+}
+
+let _coachingDebounceTimer = null;
+function _coachingDebouncedLoad() {
+  window.clearTimeout(_coachingDebounceTimer);
+  _coachingDebounceTimer = window.setTimeout(() => _coachingLoadRecommendation(), 200);
+}
+
+function setupCoachingControls() {
+  for (const radio of document.querySelectorAll('input[name="readiness"]')) {
+    radio.addEventListener("change", () => _coachingDebouncedLoad());
+  }
+  for (const button of document.querySelectorAll(".coaching-request-kind-button")) {
+    button.addEventListener("click", () => {
+      const kind = button.dataset.requestKind;
+      if (!REQUEST_KIND_VALUES.has(kind)) return;
+      _coachingSetRequestKind(kind);
+      _coachingLoadRecommendation();
+    });
+  }
+  $("#coaching-easier").addEventListener("click", () => _coachingShiftRecipe("easier"));
+  $("#coaching-harder").addEventListener("click", () => _coachingShiftRecipe("harder"));
+}
 
 function loadRecipeCatalog() {
   if (RECIPE_CATALOG_CACHE.data) return Promise.resolve(RECIPE_CATALOG_CACHE.data);
@@ -1708,6 +1948,7 @@ async function openAddWorkout(weekNumber, day) {
     week: weekNumber,
     day,
     recipe: { form: DEFAULT_RECIPE_FORM, key: DEFAULT_RECIPE_KEY, parameters: {} },
+    coaching: null,
   };
   $("#workout-title").textContent = `Add workout · Week ${weekNumber}, ${WEEKDAYS[day - 1]}`;
   $("#workout-eyebrow").textContent = "Add workout";
@@ -1721,6 +1962,8 @@ async function openAddWorkout(weekNumber, day) {
   $("#save-workout-button").textContent = "Validate & add";
   $("#save-workout-button").disabled = true;
   $("#add-workout-builder").classList.remove("hidden");
+  _coachingResetControls();
+  _coachingEmpty();
   openModal($("#workout-dialog"));
   try {
     const catalog = await loadRecipeCatalog();
@@ -1730,6 +1973,7 @@ async function openAddWorkout(weekNumber, day) {
     state.workout.recipe.parameters = {};
     renderRecipeDetail();
     scheduleRecipePreview();
+    _coachingLoadRecommendation();
   } catch (error) {
     $("#recipe-description").textContent = error.message;
     $("#save-workout-button").disabled = true;
@@ -2009,6 +2253,7 @@ $("#user-settings-button").addEventListener("click", async () => {
 $("#sync-button").addEventListener("click", syncGarmin);
 $("#undo-move").addEventListener("click", undoLastMove);
 document.querySelectorAll("dialog .close").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
+setupCoachingControls();
 $("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   try { await saveEdit({ program: { name: $("#settings-name").value, short_name: $("#settings-short-name").value, description: $("#settings-description").value || null, start_week: $("#settings-start-week").value } }); $("#settings-dialog").close(); }

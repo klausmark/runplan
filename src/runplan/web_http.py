@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from .users import UserRegistry, WebError
 from .web_auth import WebAuthenticator
 from .web_auth_http import AuthResponse, WebAuthHttpAdapter
+from .web_coaching import recommendation_response
 from .web_recipes import list_recipes_response, preview_recipe_response
 from .web_templates import (
     copy_template_dict_response,
@@ -108,6 +109,9 @@ class RunplanHandler(BaseHTTPRequestHandler):
         if path == "/api/recipes/preview":
             self._json(HTTPStatus.OK, preview_recipe_response(payload))
             return
+        if path == "/api/coaching/recommendation":
+            self._coaching_recommendation(payload)
+            return
         template_parts = self._api_template_parts()
         if len(template_parts) == 2 and template_parts[1] == "copy":
             self._copy_template(payload)
@@ -146,6 +150,28 @@ class RunplanHandler(BaseHTTPRequestHandler):
             pace_zone_seconds_per_km=user.pace_zone_seconds_per_km,
         )
         self._json(HTTPStatus.CREATED, uploaded)
+
+    def _coaching_recommendation(self, payload: dict[str, Any]) -> None:
+        user = self.registry.get(payload.get("userId"))
+        program_file = payload.get("program_file")
+        if not isinstance(program_file, str) or not program_file.strip():
+            raise WebError(HTTPStatus.BAD_REQUEST, "program_file is required")
+        store = self.sync.store_for(user.id)
+        path = store.path(program_file)
+        try:
+            program_text = path.read_text(encoding="utf-8")
+        except FileNotFoundError as exc:
+            raise WebError(HTTPStatus.NOT_FOUND, "Program not found") from exc
+        self._json(
+            HTTPStatus.OK,
+            recommendation_response(
+                payload,
+                user=user,
+                program_file=program_file,
+                program_text=program_text,
+                today=self.sync.today(),
+            ),
+        )
 
     def _copy_template(self, payload: dict[str, Any]) -> None:
         template_parts = self._api_template_parts()

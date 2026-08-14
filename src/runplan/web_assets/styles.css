@@ -347,3 +347,38 @@ body.authenticated #auth-view { display: none; }
 .week-preview-card-empty span { font-size: 11px; }
 [data-theme="dark"] .recipe-totals,
 [data-theme="dark"] .week-preview-card { background: var(--paper); }
+.coaching-checkin { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
+.coaching-checkin h4 { margin: 0; font: 500 14px Georgia, serif; color: var(--ink); }
+.coaching-readiness { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.coaching-readiness legend { padding: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.coaching-readiness label { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: 12px; font-weight: 700; cursor: pointer; }
+.coaching-readiness label:has(input:checked) { background: var(--green); border-color: var(--green); color: var(--card); }
+.coaching-request-kind { display: flex; flex-wrap: wrap; gap: 6px; }
+.coaching-request-kind-button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.coaching-request-kind-button:hover, .coaching-request-kind-button:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
+.coaching-request-kind-button.active { background: var(--green); border-color: var(--green); color: var(--card); }
+.coaching-recommendation { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--green); border-radius: 12px; background: var(--day-start); }
+.coaching-recommendation h4 { margin: 0; font: 500 18px Georgia, serif; color: var(--ink); }
+.coaching-recommendation-form { margin: 0; font-size: 12px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.coaching-recommendation-form:empty { display: none; }
+.coaching-recommendation p { margin: 0; line-height: 1.5; color: var(--ink); }
+.coaching-recommendation-warnings { margin: 0; padding-left: 18px; color: #b84d3e; font-size: 13px; }
+[data-theme="dark"] .coaching-recommendation-warnings { color: #efb5ab; }
+.coaching-recommendation-warnings li { line-height: 1.5; }
+.coaching-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.coaching-control { padding: 8px 14px; border: 1px solid var(--green); border-radius: 9px; background: var(--card); color: var(--green); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.coaching-control:hover, .coaching-control:focus-visible { background: var(--green); color: var(--card); outline: none; }
+.coaching-control:disabled { opacity: .5; cursor: not-allowed; }
+#coaching-alternatives { border-top: 1px solid var(--line); padding-top: 8px; }
+#coaching-alternatives summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 700; list-style: none; }
+#coaching-alternatives summary::-webkit-details-marker { display: none; }
+#coaching-alternatives summary::after { content: "▾"; margin-left: 6px; transition: transform 160ms ease; display: inline-block; }
+#coaching-alternatives[open] summary::after { transform: rotate(180deg); }
+.coaching-alternative { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); }
+.coaching-alternative + .coaching-alternative { margin-top: 6px; }
+.coaching-alternative-title { font-size: 13px; font-weight: 700; }
+.coaching-alternative-button { padding: 5px 10px; border: 1px solid var(--green); border-radius: 999px; background: transparent; color: var(--green); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+.coaching-alternative-button:hover, .coaching-alternative-button:focus-visible { background: var(--green); color: var(--card); outline: none; }
+.coaching-warning { padding: 10px 12px; border: 1px solid #c88a20; border-radius: 10px; background: #fff0c7; color: #725000; font-size: 13px; }
+[data-theme="dark"] .coaching-warning { background: #4a3c1f; border-color: #725000; color: #efd28a; }
+.coaching-warning p { margin: 0; line-height: 1.45; }
